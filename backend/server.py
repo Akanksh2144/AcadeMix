@@ -171,6 +171,7 @@ class MarkEntrySave(BaseModel):
     semester: int
     max_marks: float = 30
     entries: List[MarkEntryItem]
+    revision_reason: Optional[str] = None
 
 class MarkReview(BaseModel):
     action: str  # approve or reject
@@ -750,21 +751,56 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role(
         raise HTTPException(status_code=404, detail="Assignment not found or not yours")
     existing = await db.mark_entries.find_one({"assignment_id": req.assignment_id, "exam_type": req.exam_type, "teacher_id": user["id"]})
     entries_data = [e.dict() for e in req.entries]
+    
     if existing:
-        if existing.get("status") in ["submitted", "approved"]:
-            raise HTTPException(status_code=400, detail="Cannot edit submitted/approved marks")
+        current_status = existing.get("status")
+        
+        # Allow editing approved marks only with revision reason
+        if current_status == "approved":
+            if not req.revision_reason or not req.revision_reason.strip():
+                raise HTTPException(status_code=400, detail="Revision reason is required to edit approved marks")
+            
+            # Create revision history entry
+            revision_history = existing.get("revision_history", [])
+            revision_history.append({
+                "revised_at": datetime.now(timezone.utc),
+                "revised_by": user["id"],
+                "reviser_name": user["name"],
+                "reason": req.revision_reason,
+                "previous_status": "approved"
+            })
+            
+            # Update with new entries and change status back to draft
+            await db.mark_entries.update_one({"_id": existing["_id"]}, {"$set": {
+                "entries": entries_data, 
+                "max_marks": req.max_marks,
+                "status": "draft",
+                "revision_history": revision_history,
+                "updated_at": datetime.now(timezone.utc)
+            }})
+            updated = await db.mark_entries.find_one({"_id": existing["_id"]})
+            return serialize_doc(updated)
+        
+        # Prevent editing submitted marks (not approved)
+        if current_status == "submitted":
+            raise HTTPException(status_code=400, detail="Cannot edit submitted marks. Wait for approval or rejection.")
+        
+        # Normal draft/rejected edit
         await db.mark_entries.update_one({"_id": existing["_id"]}, {"$set": {
             "entries": entries_data, "max_marks": req.max_marks,
             "status": "draft", "updated_at": datetime.now(timezone.utc)
         }})
         updated = await db.mark_entries.find_one({"_id": existing["_id"]})
         return serialize_doc(updated)
+    
+    # Create new entry
     doc = {
         "assignment_id": req.assignment_id, "teacher_id": user["id"], "teacher_name": user["name"],
         "subject_code": assignment["subject_code"], "subject_name": assignment["subject_name"],
         "department": assignment["department"], "batch": assignment["batch"], "section": assignment["section"],
         "exam_type": req.exam_type, "semester": req.semester, "max_marks": req.max_marks,
         "entries": entries_data, "status": "draft",
+        "revision_history": [],
         "created_at": datetime.now(timezone.utc), "updated_at": datetime.now(timezone.utc)
     }
     result = await db.mark_entries.insert_one(doc)
