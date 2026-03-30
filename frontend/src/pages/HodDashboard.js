@@ -236,7 +236,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                       </div>
                       <div className="space-y-2 mt-4">
                         <button 
-                          onClick={() => navigate('marks-entry')}
+                          onClick={() => navigate('marks-entry', assignment)}
                           className="btn-primary w-full !py-2 text-sm"
                         >
                           Enter Marks (Mid-1 / Mid-2)

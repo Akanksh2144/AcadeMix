@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { ArrowLeft, PaperPlaneTilt, FloppyDisk, CheckCircle, Clock, Warning, Percent, ChartBar } from '@phosphor-icons/react';
 import { marksAPI } from '../services/api';
 
-const MarksEntry = ({ navigate, user }) => {
+const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [examType, setExamType] = useState('mid1');
@@ -19,11 +19,21 @@ const MarksEntry = ({ navigate, user }) => {
       try {
         const { data } = await marksAPI.myAssignments();
         setAssignments(data);
+        
+        // If preselected assignment is provided, auto-select it
+        if (preselectedAssignment) {
+          const matchingAssignment = data.find(a => a.id === preselectedAssignment.id);
+          if (matchingAssignment) {
+            setSelectedAssignment(matchingAssignment);
+            // Load students and marks for this assignment
+            loadStudentsAndMarks(matchingAssignment, 'mid1');
+          }
+        }
       } catch (err) { console.error(err); }
       setLoading(false);
     };
     fetchAssignments();
-  }, []);
+  }, [preselectedAssignment]);
 
   const loadStudentsAndMarks = async (assignment, exam) => {
     setLoading(true);

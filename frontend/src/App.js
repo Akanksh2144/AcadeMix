@@ -99,7 +99,7 @@ function App() {
       case 'live-monitor': return <LiveMonitor quiz={selectedData} navigate={navigate} user={user} />;
       case 'user-management': return <UserManagement navigate={navigate} user={user} />;
       case 'code-playground': return <CodePlayground navigate={navigate} user={user} />;
-      case 'marks-entry': return <MarksEntry navigate={navigate} user={user} />;
+      case 'marks-entry': return <MarksEntry navigate={navigate} user={user} preselectedAssignment={selectedData} />;
       case 'student-management': return <StudentManagement navigate={navigate} user={user} />;
       default: return <LoginPage onLogin={handleLogin} />;
     }
