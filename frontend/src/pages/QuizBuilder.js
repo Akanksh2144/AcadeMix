@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Plus, Trash, Copy, Eye } from '@phosphor-icons/react';
 
-const QuizBuilder = ({ navigate }) => {
+const QuizBuilder = ({ navigate, user }) => {
   const [quizTitle, setQuizTitle] = useState('New Quiz');
   const [questions, setQuestions] = useState([{ id: 1, type: 'mcq', text: '', options: ['', '', '', ''], correctAnswer: 0, marks: 2 }]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
