@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Trophy, ChartLine, Fire, BookOpen, Calendar, Target, SignOut } from '@phosphor-icons/react';
+import { Clock, Trophy, ChartLine, Fire, BookOpen, Calendar, Target, SignOut, Terminal } from '@phosphor-icons/react';
 import { analyticsAPI, quizzesAPI } from '../services/api';
 
 const StudentDashboard = ({ navigate, user, onLogout }) => {
@@ -73,7 +73,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
           })}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           <button data-testid="view-all-quizzes-button" onClick={() => navigate('quiz-results')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
             <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-100 transition-colors"><BookOpen size={24} weight="duotone" className="text-indigo-500" /></div>
             <div><p className="font-extrabold text-slate-900">My Quizzes</p><p className="text-sm font-medium text-slate-400">View all attempts</p></div>
@@ -85,6 +85,10 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
           <button data-testid="view-analytics-button" onClick={() => navigate('analytics')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
             <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center group-hover:bg-amber-100 transition-colors"><ChartLine size={24} weight="duotone" className="text-amber-500" /></div>
             <div><p className="font-extrabold text-slate-900">Analytics</p><p className="text-sm font-medium text-slate-400">Track performance</p></div>
+          </button>
+          <button data-testid="view-code-playground-button" onClick={() => navigate('code-playground')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
+            <div className="w-12 h-12 bg-purple-50 rounded-xl flex items-center justify-center group-hover:bg-purple-100 transition-colors"><Terminal size={24} weight="duotone" className="text-purple-500" /></div>
+            <div><p className="font-extrabold text-slate-900">Code Playground</p><p className="text-sm font-medium text-slate-400">Practice coding</p></div>
           </button>
         </div>
 

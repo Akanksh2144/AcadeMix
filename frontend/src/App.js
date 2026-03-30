@@ -13,6 +13,7 @@ import Leaderboard from './pages/Leaderboard';
 import QuizBuilder from './pages/QuizBuilder';
 import LiveMonitor from './pages/LiveMonitor';
 import UserManagement from './pages/UserManagement';
+import CodePlayground from './pages/CodePlayground';
 
 function App() {
   const [currentPage, setCurrentPage] = useState('login');
@@ -87,6 +88,7 @@ function App() {
       case 'quiz-builder': return <QuizBuilder navigate={navigate} user={user} editQuiz={selectedData} />;
       case 'live-monitor': return <LiveMonitor quiz={selectedData} navigate={navigate} />;
       case 'user-management': return <UserManagement navigate={navigate} user={user} />;
+      case 'code-playground': return <CodePlayground navigate={navigate} user={user} />;
       default: return <LoginPage onLogin={handleLogin} />;
     }
   };
