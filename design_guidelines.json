@@ -1,84 +1,109 @@
 {
-  "theme": "light",
-  "archetype": "3 (Pastel & Soft) with Neo-Brutalist twist",
-  "domain": "College Quiz Platform & Results Portal",
-  "typography": {
-    "heading_font": "Cabinet Grotesk",
-    "body_font": "DM Sans",
-    "fallback_heading_font": "Outfit",
-    "fallback_body_font": "Inter",
-    "rules": {
-      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-black",
-      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-extrabold",
-      "h3": "text-xl sm:text-2xl font-bold",
-      "body": "text-base leading-relaxed font-medium",
-      "labels": "text-xs tracking-[0.2em] uppercase font-bold"
-    }
-  },
+  "theme": "Light",
+  "archetype": "3 (Pastel & Soft)",
+  "emotional_tone": "Calm, focused, encouraging, modern, approachable. No boxy design, purely smooth and rounded.",
   "colors": {
-    "background": "#FDFCF8",
-    "foreground": "#0A0A0A",
-    "primary": "#FF9EC6",
-    "secondary": "#A1E3D8",
-    "accent": "#B4D8E7",
-    "warning": "#FDF5A9",
-    "muted": "#F0EFEB",
-    "border": "#0A0A0A",
-    "success": "#A1E3D8",
-    "danger": "#FF6B6B"
+    "background": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "primary": "#6366F1",
+    "primary_hover": "#4F46E5",
+    "primary_light": "#E0E7FF",
+    "secondary": "#14B8A6",
+    "accent_warning": "#F59E0B",
+    "accent_error": "#EF4444",
+    "accent_success": "#10B981",
+    "text_primary": "#0F172A",
+    "text_secondary": "#64748B",
+    "border_subtle": "#F1F5F9"
   },
-  "surfaces": {
-    "card": "bg-white border-2 border-[#0A0A0A] shadow-[4px_4px_0px_0px_#0A0A0A] transition-all hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0px_0px_#0A0A0A]",
-    "card_static": "bg-white border-2 border-[#0A0A0A] shadow-[4px_4px_0px_0px_#0A0A0A]",
-    "button_primary": "bg-[#FF9EC6] text-[#0A0A0A] font-bold border-2 border-[#0A0A0A] shadow-[4px_4px_0px_0px_#0A0A0A] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0px_0px_#0A0A0A] active:translate-y-0 active:translate-x-0 active:shadow-[0px_0px_0px_0px_#0A0A0A] transition-all",
-    "button_secondary": "bg-white text-[#0A0A0A] font-bold border-2 border-[#0A0A0A] shadow-[4px_4px_0px_0px_#0A0A0A] hover:-translate-y-1 hover:-translate-x-1 hover:shadow-[6px_6px_0px_0px_#0A0A0A] active:translate-y-0 active:translate-x-0 active:shadow-[0px_0px_0px_0px_#0A0A0A] transition-all",
-    "input": "bg-white border-2 border-[#0A0A0A] rounded-none focus:ring-0 focus:outline-none focus:shadow-[4px_4px_0px_0px_#B4D8E7] transition-all",
-    "header": "bg-[#FDFCF8] border-b-2 border-[#0A0A0A]"
-  },
-  "layout_and_spacing": {
-    "spacing_scale": "p-6 or p-8 inside cards, gap-6 or gap-8 in grids",
-    "dashboard_grid": "grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
-    "border_radius": "rounded-none or slightly rounded (rounded-md) but with hard borders"
-  },
-  "components_strategy": {
-    "shadcn": "Strip 'Vercel-look'. Replace soft shadows and subtle borders with 2px solid black borders and neo-brutalist hard shadows.",
-    "tables": "Use Shadcn Table. Apply border-b-2 border-black to header. Use pastel background for header row.",
-    "charts": "Recharts. Use sharp lines. Chart colors: #FF9EC6, #A1E3D8, #B4D8E7, #FDF5A9. Tooltip must be a neo-brutalist card.",
-    "badges": "bg-[var] border-2 border-[#0A0A0A] font-bold uppercase tracking-widest text-xs px-2 py-1 shadow-[2px_2px_0px_0px_#0A0A0A]"
-  },
-  "icons_and_assets": {
-    "library": "@phosphor-icons/react",
-    "weight": "bold or duotone",
-    "images": {
-      "hero_pattern": {
-        "url": "https://images.pexels.com/photos/7307396/pexels-photo-7307396.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "Abstract minimalist composition of geometric shapes. Use subtly in hero section backgrounds."
-      },
-      "student_laptop": {
-        "url": "https://images.unsplash.com/photo-1523240795612-9a054b0db644?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA4Mzl8MHwxfHNlYXJjaHwxfHxjb2xsZWdlJTIwc3R1ZGVudHMlMjBzdHVkeWluZ3xlbnwwfHx8fDE3NzQ4NjYwNTR8MA&ixlib=rb-4.1.0&q=85",
-        "description": "Students looking at laptop. Ideal for student dashboard welcome card."
-      },
-      "study_group": {
-        "url": "https://images.pexels.com/photos/6684506/pexels-photo-6684506.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
-        "description": "Group of students studying. Use for landing page or about section."
-      }
+  "typography": {
+    "fonts": {
+      "headings": "Nunito",
+      "body": "DM Sans",
+      "monospace": "JetBrains Mono"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900",
+      "h2": "text-2xl sm:text-3xl font-bold tracking-tight text-slate-800",
+      "h3": "text-xl sm:text-2xl font-bold text-slate-800",
+      "h4": "text-lg font-semibold text-slate-700",
+      "body": "text-base font-medium text-slate-600 leading-relaxed",
+      "label": "text-xs font-bold uppercase tracking-widest text-slate-500"
     }
   },
-  "animations": {
-    "hover": "Kinetic, bouncy. Transform translate and shadow offset adjustments. No soft fading.",
-    "marquee": "Use react-fast-marquee with bold black text or pastel text on black background for dynamic announcements."
+  "spacing_and_layout": {
+    "philosophy": "Generous spacing. Allow the rounded components to breathe.",
+    "dashboard_grid": "grid grid-cols-1 md:grid-cols-12 gap-6 or gap-8",
+    "card_padding": "p-6 sm:p-8",
+    "section_spacing": "py-12 md:py-20"
   },
-  "accessibility_and_testing": {
-    "contrast": "Ensure black text is used over pastel backgrounds for APCA/WCAG compliance.",
-    "data_testid": "MANDATORY on all interactive components."
+  "surface_strategies": {
+    "dashboard_card": {
+      "background": "bg-white",
+      "border_radius": "rounded-3xl",
+      "shadow": "shadow-[0_8px_30px_rgb(0,0,0,0.04)]",
+      "border": "border border-slate-100/50",
+      "hover_state": "hover:shadow-[0_20px_40px_rgb(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300"
+    },
+    "header_nav": {
+      "background": "bg-white/70 backdrop-blur-xl",
+      "border": "border-b border-slate-100/50",
+      "shadow": "shadow-sm",
+      "behavior": "sticky top-0 z-50"
+    },
+    "buttons": {
+      "primary": "bg-indigo-500 text-white rounded-2xl px-6 py-3 font-bold hover:bg-indigo-600 shadow-sm transition-colors",
+      "secondary": "bg-indigo-50 text-indigo-600 rounded-2xl px-6 py-3 font-bold hover:bg-indigo-100 transition-colors",
+      "icon_button": "p-3 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-600 transition-colors"
+    },
+    "inputs": {
+      "base": "bg-slate-50 border-none rounded-2xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all shadow-inner"
+    }
   },
-  "instructions_to_main_agent": [
-    "You are building a College Quiz Platform & Results Portal.",
-    "Adopt a Neo-Brutalist Pastel aesthetic. This blends approachability for students with the structural clarity needed for dashboards.",
-    "Ensure you add tailwind classes for the hard shadows (e.g., shadow-[4px_4px_0px_0px_rgba(10,10,10,1)]) and thick borders (border-2 border-[#0A0A0A]).",
-    "Install and use @phosphor-icons/react.",
-    "Use Cabinet Grotesk (or Outfit) for headings, DM Sans for body.",
-    "Include a 'data-testid' attribute on every button, input, and interactive element.",
-    "Do NOT use Space Grotesk. Do NOT use soft drop-shadows. Do NOT use generic gradients."
+  "animation": {
+    "page_transition": "animate-in fade-in slide-in-from-bottom-4 duration-500",
+    "hover_lift": "transition-transform hover:-translate-y-1 duration-300 ease-out",
+    "micro_interaction": "active:scale-95 transition-transform"
+  },
+  "icons": {
+    "library": "@phosphor-icons/react",
+    "weight": "duotone",
+    "installation": "yarn add @phosphor-icons/react"
+  },
+  "components": {
+    "charts": "recharts or shadcn charts with customized soft colors, removing standard grid lines to keep it minimal.",
+    "progress_bars": "h-3 rounded-full bg-slate-100 with a rounded-full indicator in primary or success color.",
+    "tables": "border-none, separate border spacing. Rows should have rounded-2xl on hover with bg-slate-50. No vertical borders.",
+    "tabs": "bg-slate-100 rounded-full p-1. Active tab is bg-white rounded-full shadow-sm."
+  },
+  "image_urls": {
+    "login_background": {
+      "url": "https://images.unsplash.com/photo-1767473907132-9e52351d023a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwzfHxhYnN0cmFjdCUyMHNvZnQlMjAzZCUyMHNoYXBlcyUyMHBhc3RlbHxlbnwwfHx8fDE3NzQ4Njc1NDd8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Abstract soft 3d shapes pastel for the login/auth split screen background"
+    },
+    "student_group": {
+      "url": "https://images.pexels.com/photos/6684506/pexels-photo-6684506.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Multiracial group of college students studying together for landing page or dashboard welcome section"
+    },
+    "laptop_student": {
+      "url": "https://images.unsplash.com/photo-1637589308599-3478cc55510d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1MDV8MHwxfHNlYXJjaHwxfHxzdHVkZW50JTIwdXNpbmclMjBsYXB0b3B8ZW58MHx8fHwxNzc0ODY3NTQ4fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Student studying on laptop for quiz-taking promotional section or loading screens"
+    },
+    "campus_building": {
+      "url": "https://images.pexels.com/photos/32907649/pexels-photo-32907649.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "University campus building to be used in context-heavy sections like department management"
+    },
+    "university_seal": {
+      "url": "https://images.unsplash.com/photo-1738464024478-2a60ac914513?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxOTF8MHwxfHNlYXJjaHwxfHx1bml2ZXJzaXR5JTIwbG9nb3xlbnwwfHx8fDE3NzQ4Njc1NDh8MA&ixlib=rb-4.1.0&q=85",
+      "description": "University seal/logo placeholder for the app's brand identity or admin dashboard"
+    }
+  },
+  "critical_rules": [
+    "NO hard borders. Everything must be smooth and rounded (rounded-2xl, rounded-3xl).",
+    "NO Neo-Brutalist elements. Avoid 1px solid black borders entirely.",
+    "Apply 'data-testid' to all interactive and key informational elements.",
+    "Do not use generic Inter font for headings. Use Nunito for headings to maintain the soft UI feel.",
+    "All cards must have soft ambient shadows (shadow-[0_8px_30px_rgb(0,0,0,0.04)]).",
+    "Use Phosphor icons in duotone for an elegant, approachable aesthetic."
   ]
 }
