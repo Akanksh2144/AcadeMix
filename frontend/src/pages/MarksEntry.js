@@ -163,16 +163,45 @@ const MarksEntry = ({ navigate, user }) => {
           </div>
         ) : (
           <div data-testid="marks-entry-form">
-            {/* Row 1: Mid-1/Mid-2 tabs + Avg Stats + Status */}
+            {/* Row 1: Mid-1/Mid-2 tabs + Status */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5" data-testid="exam-type-tabs">
-                  <button data-testid="tab-mid1" onClick={() => handleExamTypeChange('mid1')}
-                    className={`pill-tab ${examType === 'mid1' ? 'pill-tab-active' : 'pill-tab-inactive'}`}>Mid-term 1</button>
-                  <button data-testid="tab-mid2" onClick={() => handleExamTypeChange('mid2')}
-                    className={`pill-tab ${examType === 'mid2' ? 'pill-tab-active' : 'pill-tab-inactive'}`}>Mid-term 2</button>
+              <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5" data-testid="exam-type-tabs">
+                <button data-testid="tab-mid1" onClick={() => handleExamTypeChange('mid1')}
+                  className={`pill-tab ${examType === 'mid1' ? 'pill-tab-active' : 'pill-tab-inactive'}`}>Mid-term 1</button>
+                <button data-testid="tab-mid2" onClick={() => handleExamTypeChange('mid2')}
+                  className={`pill-tab ${examType === 'mid2' ? 'pill-tab-active' : 'pill-tab-inactive'}`}>Mid-term 2</button>
+              </div>
+              <span className={`soft-badge ${
+                status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
+                status === 'submitted' ? 'bg-amber-50 text-amber-600' :
+                status === 'rejected' ? 'bg-red-50 text-red-600' :
+                'bg-slate-100 text-slate-500'
+              }`}>
+                {status === 'new' ? 'Not Started' : status.charAt(0).toUpperCase() + status.slice(1)}
+              </span>
+            </div>
+
+            {/* Row 2: Class Buttons (left) + Max / Avg / % (right) */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+              <div className="flex flex-wrap items-center gap-2" data-testid="class-buttons">
+                {assignments.map(a => {
+                  const isActive = selectedAssignment?.id === a.id;
+                  return (
+                    <button key={a.id} data-testid={`class-btn-${a.id}`} onClick={() => handleClassSelect(a)}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
+                        isActive ? 'bg-indigo-500 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'
+                      }`}>
+                      {a.subject_code} &bull; {a.batch}-{a.section}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-slate-400">Max:</label>
+                  <input data-testid="max-marks-input" type="number" value={maxMarks} onChange={(e) => setMaxMarks(parseFloat(e.target.value) || 30)}
+                    className="soft-input !py-1.5 !px-3 w-20 text-sm" disabled={!isEditable} />
                 </div>
-                {/* Avg Stats */}
                 {stats.gradedCount > 0 && (
                   <div className="flex items-center gap-3" data-testid="avg-stats">
                     <div className="flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-xl">
@@ -186,36 +215,6 @@ const MarksEntry = ({ navigate, user }) => {
                   </div>
                 )}
               </div>
-              <div className="flex items-center gap-3">
-                <span className={`soft-badge ${
-                  status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
-                  status === 'submitted' ? 'bg-amber-50 text-amber-600' :
-                  status === 'rejected' ? 'bg-red-50 text-red-600' :
-                  'bg-slate-100 text-slate-500'
-                }`}>
-                  {status === 'new' ? 'Not Started' : status.charAt(0).toUpperCase() + status.slice(1)}
-                </span>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-bold text-slate-400">Max:</label>
-                  <input data-testid="max-marks-input" type="number" value={maxMarks} onChange={(e) => setMaxMarks(parseFloat(e.target.value) || 30)}
-                    className="soft-input !py-1.5 !px-3 w-20 text-sm" disabled={!isEditable} />
-                </div>
-              </div>
-            </div>
-
-            {/* Row 2: Class Buttons */}
-            <div className="flex flex-wrap items-center gap-2 mb-6" data-testid="class-buttons">
-              {assignments.map(a => {
-                const isActive = selectedAssignment?.id === a.id;
-                return (
-                  <button key={a.id} data-testid={`class-btn-${a.id}`} onClick={() => handleClassSelect(a)}
-                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${
-                      isActive ? 'bg-indigo-500 text-white shadow-md' : 'bg-white text-slate-600 border border-slate-200 hover:border-indigo-300 hover:bg-indigo-50'
-                    }`}>
-                    {a.subject_code} &bull; {a.batch}-{a.section}
-                  </button>
-                );
-              })}
             </div>
 
             {status === 'rejected' && (
