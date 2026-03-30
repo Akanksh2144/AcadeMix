@@ -4,7 +4,7 @@ import { marksAPI } from '../services/api';
 
 const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
   const [assignments, setAssignments] = useState([]);
-  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [selectedAssignment, setSelectedAssignment] = useState(preselectedAssignment || null);
   const [examType, setExamType] = useState('mid1');
   const [students, setStudents] = useState([]);
   const [marks, setMarks] = useState({});
@@ -13,6 +13,7 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
   const [status, setStatus] = useState('new');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isDirectNavigation, setIsDirectNavigation] = useState(!!preselectedAssignment);
 
   useEffect(() => {
     const fetchAssignments = async () => {
@@ -20,13 +21,13 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
         const { data } = await marksAPI.myAssignments();
         setAssignments(data);
         
-        // If preselected assignment is provided, auto-select it
+        // If preselected assignment is provided, load students and marks
         if (preselectedAssignment) {
           const matchingAssignment = data.find(a => a.id === preselectedAssignment.id);
           if (matchingAssignment) {
             setSelectedAssignment(matchingAssignment);
             // Load students and marks for this assignment
-            loadStudentsAndMarks(matchingAssignment, 'mid1');
+            await loadStudentsAndMarks(matchingAssignment, 'mid1');
           }
         }
       } catch (err) { console.error(err); }
@@ -61,6 +62,7 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
 
   const handleClassSelect = (a) => {
     setSelectedAssignment(a);
+    setIsDirectNavigation(false); // Mark as manual selection
     loadStudentsAndMarks(a, examType);
   };
 
@@ -132,9 +134,11 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
           <button data-testid="back-button" onClick={() => {
-            if (selectedAssignment) {
+            if (selectedAssignment && !isDirectNavigation) {
+              // Only go to assignment list if user manually selected from list
               setSelectedAssignment(null);
             } else {
+              // Go back to dashboard (for direct navigation or from assignment list)
               const dashboardRoute = user?.role === 'hod' ? 'hod-dashboard' : 'teacher-dashboard';
               navigate(dashboardRoute);
             }
