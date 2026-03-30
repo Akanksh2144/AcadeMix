@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowLeft, Trophy, Fire, Target, Medal } from '@phosphor-icons/react';
 
-const Leaderboard = ({ navigate, userRole }) => {
+const Leaderboard = ({ navigate, user, userRole }) => {
   const leaderboardData = [
     { rank: 1, name: 'Priya Sharma', rollNo: 'S2024101', avgScore: 94.5, quizzesTaken: 28, cgpa: 9.2, badge: 'gold' },
     { rank: 2, name: 'Amit Patel', rollNo: 'S2024045', avgScore: 92.8, quizzesTaken: 27, cgpa: 9.0, badge: 'gold' },
@@ -29,7 +29,7 @@ const Leaderboard = ({ navigate, userRole }) => {
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center gap-4">
-            <button data-testid="back-button" onClick={() => navigate(userRole === 'student' ? 'student-dashboard' : 'teacher-dashboard')}
+            <button data-testid="back-button" onClick={() => navigate((userRole || user?.role) === 'student' ? 'student-dashboard' : (userRole || user?.role) === 'hod' ? 'hod-dashboard' : (userRole || user?.role) === 'exam_cell' ? 'examcell-dashboard' : (userRole || user?.role) === 'admin' ? 'admin-dashboard' : 'teacher-dashboard')}
               className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
               <ArrowLeft size={22} weight="duotone" />
             </button>
