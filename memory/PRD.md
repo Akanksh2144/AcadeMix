@@ -62,6 +62,7 @@ Build a full-stack cross-platform College Quiz Platform & Results Portal with th
 - [x] **Analytics Tab Split**: Quiz Analytics and Semester Analytics separated into tabs
 - [x] **Python Coding Challenge quiz**: 3 coding questions seeded (factorial, palindrome, fibonacci)
 - [x] Code execution endpoint with 10s timeout, 10KB code limit
+- [x] **Code Playground**: Standalone practice page with Monaco editor, language switching (Python/JS/Java), stdin input, output display, run history, 6 built-in challenges (Two Sum, Reverse String, FizzBuzz, Palindrome, Fibonacci, Binary Search), accessible from Student Dashboard
 
 ---
 
@@ -73,7 +74,6 @@ Build a full-stack cross-platform College Quiz Platform & Results Portal with th
 ### P1 - Medium Priority
 - [ ] Results Portal enhancements (PDF marksheet upload & parsing for teachers)
 - [ ] Teacher Dashboard flows (Quiz Builder to backend, Live Monitor websockets)
-- [ ] Practice mode for coding (standalone code playground)
 
 ### P2 - Lower Priority
 - [ ] Notification System (FCM Push, SendGrid Email, In-app Socket.io)
