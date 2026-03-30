@@ -5,6 +5,7 @@ import { StudentResultsSearch } from '../components/StudentResultsSearch';
 
 const HodDashboard = ({ navigate, user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('overview');
+  const [analyticsTab, setAnalyticsTab] = useState('quiz');
   const [dashboard, setDashboard] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -150,8 +151,10 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">Welcome, {user?.name?.split(' ').pop()}!</h2>
-        <p className="text-base font-medium text-slate-500 mb-8">Department: {user?.department || 'DS'}</p>
+        <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">Welcome, {user?.name}!</h2>
+        <p className="text-base font-medium text-slate-500 mb-8">
+          {user?.designation || 'Head of Department'} - {user?.department || 'ET'} Department
+        </p>
 
         {/* Tabs */}
         <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit mb-8" data-testid="hod-tabs">
@@ -175,8 +178,144 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                 </div>
               ))}
             </div>
+
+            {/* Analytics Tabs */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit">
+                <button 
+                  onClick={() => setAnalyticsTab('quiz')} 
+                  className={`pill-tab ${analyticsTab === 'quiz' ? 'pill-tab-active' : 'pill-tab-inactive'}`}
+                >
+                  Quiz Analytics
+                </button>
+                <button 
+                  onClick={() => setAnalyticsTab('semester')} 
+                  className={`pill-tab ${analyticsTab === 'semester' ? 'pill-tab-active' : 'pill-tab-inactive'}`}
+                >
+                  Semester Analytics
+                </button>
+              </div>
+            </div>
+
+            {/* Quiz Analytics */}
+            {analyticsTab === 'quiz' && (
+              <div className="space-y-6">
+                <div className="soft-card p-6">
+                  <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <ChartLine size={24} weight="duotone" className="text-indigo-500" />
+                    Department Quiz Performance
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div className="bg-indigo-50 rounded-2xl p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-indigo-600 mb-1">Avg Score</p>
+                      <p className="text-3xl font-extrabold text-indigo-700">78.5%</p>
+                    </div>
+                    <div className="bg-teal-50 rounded-2xl p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-teal-600 mb-1">Total Attempts</p>
+                      <p className="text-3xl font-extrabold text-teal-700">1,248</p>
+                    </div>
+                    <div className="bg-amber-50 rounded-2xl p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-amber-600 mb-1">Completion Rate</p>
+                      <p className="text-3xl font-extrabold text-amber-700">94%</p>
+                    </div>
+                  </div>
+                  
+                  <h4 className="text-lg font-bold text-slate-700 mb-3">Section-wise Performance</h4>
+                  <div className="space-y-3">
+                    {['DS-1', 'DS-2', 'CS', 'AIML-1', 'AIML-2', 'AIML-3', 'IT-1', 'IT-2'].map(section => (
+                      <div key={section} className="flex items-center gap-4">
+                        <span className="soft-badge bg-indigo-50 text-indigo-600 !w-24">{section}</span>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-sm font-medium text-slate-600">Avg Score</span>
+                            <span className="text-sm font-bold text-slate-800">{75 + Math.floor(Math.random() * 15)}%</span>
+                          </div>
+                          <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-indigo-500 to-teal-400 rounded-full"
+                              style={{ width: `${75 + Math.floor(Math.random() * 15)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Semester Analytics */}
+            {analyticsTab === 'semester' && (
+              <div className="space-y-6">
+                <div className="soft-card p-6">
+                  <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <GraduationCap size={24} weight="duotone" className="text-indigo-500" />
+                    Department Semester Performance
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                    <div className="bg-purple-50 rounded-2xl p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-purple-600 mb-1">Avg SGPA</p>
+                      <p className="text-3xl font-extrabold text-purple-700">8.2</p>
+                    </div>
+                    <div className="bg-emerald-50 rounded-2xl p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-emerald-600 mb-1">Pass Rate</p>
+                      <p className="text-3xl font-extrabold text-emerald-700">96%</p>
+                    </div>
+                    <div className="bg-blue-50 rounded-2xl p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-blue-600 mb-1">First Class</p>
+                      <p className="text-3xl font-extrabold text-blue-700">78%</p>
+                    </div>
+                    <div className="bg-rose-50 rounded-2xl p-4">
+                      <p className="text-xs font-bold uppercase tracking-widest text-rose-600 mb-1">Distinction</p>
+                      <p className="text-3xl font-extrabold text-rose-700">45%</p>
+                    </div>
+                  </div>
+
+                  <h4 className="text-lg font-bold text-slate-700 mb-3">Section-wise Semester Results</h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                          <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Section</th>
+                          <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Students</th>
+                          <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Avg SGPA</th>
+                          <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Pass %</th>
+                          <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">First Class %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {['DS-1', 'DS-2', 'CS', 'AIML-1', 'AIML-2', 'AIML-3', 'IT-1', 'IT-2'].map(section => {
+                          const avgSgpa = (7.5 + Math.random() * 1.5).toFixed(2);
+                          const passRate = 92 + Math.floor(Math.random() * 8);
+                          const firstClass = 70 + Math.floor(Math.random() * 20);
+                          return (
+                            <tr key={section} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                              <td className="py-3 px-4">
+                                <span className="soft-badge bg-indigo-50 text-indigo-600">{section}</span>
+                              </td>
+                              <td className="text-center py-3 px-4 font-medium text-slate-700">{section === 'DS-1' ? 10 : 8}</td>
+                              <td className="text-center py-3 px-4 font-bold text-slate-800">{avgSgpa}</td>
+                              <td className="text-center py-3 px-4">
+                                <span className={`soft-badge ${passRate >= 95 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                  {passRate}%
+                                </span>
+                              </td>
+                              <td className="text-center py-3 px-4">
+                                <span className="soft-badge bg-blue-50 text-blue-600">{firstClass}%</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Pending Reviews */}
             {dashboard?.recent_submissions?.length > 0 && (
-              <div className="soft-card p-6">
+              <div className="soft-card p-6 mt-6">
                 <h3 className="text-xl font-bold text-slate-800 mb-4">Pending Mark Submissions</h3>
                 <div className="space-y-3">
                   {dashboard.recent_submissions.map((s, i) => (
