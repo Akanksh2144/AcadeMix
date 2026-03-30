@@ -1,6 +1,134 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, MagnifyingGlass, GraduationCap, Trophy, BookOpen, ChartLine, Target } from '@phosphor-icons/react';
+import { ArrowLeft, MagnifyingGlass, GraduationCap, Trophy, BookOpen, ChartLine, Target, TrendUp, TrendDown } from '@phosphor-icons/react';
 import { studentsAPI } from '../services/api';
+
+const getGradeColor = (grade) => {
+  if (!grade) return 'bg-slate-100 text-slate-600';
+  if (grade === 'O' || grade.startsWith('A')) return 'bg-emerald-50 text-emerald-600';
+  if (grade.startsWith('B')) return 'bg-amber-50 text-amber-600';
+  return 'bg-rose-50 text-rose-600';
+};
+
+const SemesterTabView = ({ semesters }) => {
+  const [selectedSem, setSelectedSem] = useState(semesters.length > 0 ? semesters[semesters.length - 1].semester : null);
+  const currentSem = semesters.find(s => s.semester === selectedSem);
+  const allSemNumbers = semesters.map(s => s.semester);
+
+  return (
+    <div className="mb-6" data-testid="semester-tab-view">
+      <h4 className="text-xl font-bold text-slate-800 mb-4">Semester Results</h4>
+
+      {/* Semester pill tabs */}
+      <div className="mb-6">
+        <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Select Semester</label>
+        <div className="bg-slate-100 rounded-full p-1 inline-flex gap-1 flex-wrap">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
+            <button
+              key={sem}
+              data-testid={`profile-semester-${sem}-tab`}
+              onClick={() => allSemNumbers.includes(sem) && setSelectedSem(sem)}
+              disabled={!allSemNumbers.includes(sem)}
+              className={`pill-tab ${selectedSem === sem ? 'pill-tab-active' : allSemNumbers.includes(sem) ? 'pill-tab-inactive' : 'text-slate-300 cursor-not-allowed'}`}
+            >
+              Sem {sem}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {currentSem && (
+        <>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="soft-card p-5" data-testid="profile-sgpa-card">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">SGPA</span>
+              <p className="text-3xl font-extrabold text-slate-900">{currentSem.sgpa?.toFixed(2) ?? '-'}</p>
+            </div>
+            <div className="soft-card p-5" data-testid="profile-cgpa-card">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">CGPA</span>
+              <p className="text-3xl font-extrabold text-slate-900">{currentSem.cgpa?.toFixed(2) ?? '-'}</p>
+            </div>
+            <div className="soft-card p-5" data-testid="profile-subjects-count">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">Subjects</span>
+              <p className="text-3xl font-extrabold text-slate-900">{currentSem.subjects?.length || 0}</p>
+            </div>
+            <div className="soft-card p-5" data-testid="profile-status-card">
+              <span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">Status</span>
+              <span className={`soft-badge text-base mt-1 ${currentSem.subjects?.every(s => s.status === 'PASS') ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                {currentSem.subjects?.every(s => s.status === 'PASS') ? 'All Pass' : 'Has Arrears'}
+              </span>
+            </div>
+          </div>
+
+          {/* Subject table + CGPA progression sidebar */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 soft-card p-6">
+              <h5 className="text-lg font-bold text-slate-800 mb-4">Subject-wise Results</h5>
+              {currentSem.subjects && currentSem.subjects.length > 0 ? (
+                <table className="w-full text-sm" data-testid="profile-subjects-table">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left p-3 text-xs font-bold uppercase tracking-widest text-slate-400">Subject</th>
+                      <th className="text-center p-3 text-xs font-bold uppercase tracking-widest text-slate-400">Credits</th>
+                      <th className="text-center p-3 text-xs font-bold uppercase tracking-widest text-slate-400">Grade</th>
+                      <th className="text-center p-3 text-xs font-bold uppercase tracking-widest text-slate-400">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentSem.subjects.map((sub, j) => (
+                      <tr key={j} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors" data-testid={`profile-subject-row-${j}`}>
+                        <td className="p-3">
+                          <p className="font-bold text-slate-800">{sub.name}</p>
+                          <p className="text-xs font-medium text-slate-400">{sub.code}</p>
+                        </td>
+                        <td className="text-center p-3 font-bold text-slate-700">{sub.credits}</td>
+                        <td className="text-center p-3"><span className={`soft-badge ${getGradeColor(sub.grade)}`}>{sub.grade}</span></td>
+                        <td className="text-center p-3">
+                          <span className={`soft-badge ${sub.status === 'PASS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>{sub.status}</span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-slate-400 font-medium">No subject details available.</p>
+              )}
+            </div>
+
+            <div className="space-y-6">
+              {/* CGPA Progression */}
+              <div className="soft-card p-6">
+                <h5 className="text-lg font-bold text-slate-800 mb-4">CGPA Progression</h5>
+                <div className="space-y-3">
+                  {semesters.map((s, i) => (
+                    <div key={s.semester} className={`flex items-center justify-between py-1 ${s.semester === selectedSem ? 'bg-indigo-50/60 -mx-2 px-2 rounded-lg' : ''}`} data-testid={`profile-cgpa-sem-${s.semester}`}>
+                      <span className={`font-bold text-sm ${s.semester === selectedSem ? 'text-indigo-600' : 'text-slate-700'}`}>Sem {s.semester}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-extrabold text-slate-900">{s.cgpa?.toFixed(2)}</span>
+                        {i > 0 && s.cgpa > semesters[i - 1].cgpa && <TrendUp size={14} weight="duotone" className="text-emerald-500" />}
+                        {i > 0 && s.cgpa < semesters[i - 1].cgpa && <TrendDown size={14} weight="duotone" className="text-red-500" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Performance Summary */}
+              <div className="soft-card p-6 bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                <h5 className="text-lg font-bold mb-3">Performance Summary</h5>
+                <div className="space-y-2 text-sm font-medium text-white/90">
+                  <p>Total credits: {currentSem.subjects?.reduce((s, sub) => s + (sub.credits || 0), 0) || 0}</p>
+                  <p>Grade O count: {currentSem.subjects?.filter(s => s.grade === 'O').length || 0}</p>
+                  <p>All subjects: {currentSem.subjects?.every(s => s.status === 'PASS') ? 'Passed' : 'Has arrears'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
 
 const StudentProfileView = ({ studentId, onBack }) => {
   const [profile, setProfile] = useState(null);
@@ -83,56 +211,9 @@ const StudentProfileView = ({ studentId, onBack }) => {
         </div>
       </div>
 
-      {/* Semester Results */}
+      {/* Semester Results — Tab-based */}
       {semesters.length > 0 && (
-        <div className="mb-6">
-          <h4 className="text-xl font-bold text-slate-800 mb-4">Semester Results</h4>
-          <div className="space-y-4">
-            {semesters.map((sem, i) => (
-              <div key={i} className="soft-card p-5" data-testid={`semester-result-${sem.semester}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <h5 className="text-lg font-bold text-slate-800">Semester {sem.semester}</h5>
-                  <div className="flex gap-3">
-                    <span className="soft-badge bg-indigo-50 text-indigo-600">SGPA: {sem.sgpa?.toFixed(2)}</span>
-                    <span className="soft-badge bg-emerald-50 text-emerald-600">CGPA: {sem.cgpa?.toFixed(2)}</span>
-                  </div>
-                </div>
-                {sem.subjects && sem.subjects.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-slate-100">
-                          <th className="text-left py-2 px-3 font-bold text-slate-500 text-xs uppercase tracking-widest">Code</th>
-                          <th className="text-left py-2 px-3 font-bold text-slate-500 text-xs uppercase tracking-widest">Subject</th>
-                          <th className="text-center py-2 px-3 font-bold text-slate-500 text-xs uppercase tracking-widest">Credits</th>
-                          <th className="text-center py-2 px-3 font-bold text-slate-500 text-xs uppercase tracking-widest">Grade</th>
-                          <th className="text-center py-2 px-3 font-bold text-slate-500 text-xs uppercase tracking-widest">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {sem.subjects.map((sub, j) => (
-                          <tr key={j} className="border-b border-slate-50 hover:bg-slate-50 transition-colors">
-                            <td className="py-2 px-3 font-medium text-slate-600">{sub.code}</td>
-                            <td className="py-2 px-3 font-medium text-slate-800">{sub.name}</td>
-                            <td className="py-2 px-3 text-center font-medium text-slate-600">{sub.credits}</td>
-                            <td className="py-2 px-3 text-center">
-                              <span className={`soft-badge ${sub.grade === 'O' ? 'bg-emerald-50 text-emerald-600' : sub.grade === 'A+' ? 'bg-indigo-50 text-indigo-600' : sub.grade === 'A' ? 'bg-sky-50 text-sky-600' : 'bg-amber-50 text-amber-600'}`}>
-                                {sub.grade}
-                              </span>
-                            </td>
-                            <td className="py-2 px-3 text-center">
-                              <span className={`text-xs font-bold ${sub.status === 'PASS' ? 'text-emerald-500' : 'text-red-500'}`}>{sub.status}</span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
+        <SemesterTabView semesters={semesters} />
       )}
 
       {/* Mid-term Marks */}
