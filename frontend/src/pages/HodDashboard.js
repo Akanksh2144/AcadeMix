@@ -14,6 +14,13 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAssignment, setNewAssignment] = useState({ teacher_id: '', subject_code: '', subject_name: '', department: user?.department || 'ET', batch: '2024', section: 'DS-1', semester: 3 });
   
+  // Marks entry state
+  const [showMarksEntry, setShowMarksEntry] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [examType, setExamType] = useState('');
+  const [marksEntries, setMarksEntries] = useState([]);
+  const [savingMarks, setSavingMarks] = useState(false);
+  
   // Mock subjects data (prepopulated)
   const mockSubjects = [
     { code: '22ET201', name: 'Data Structures and Algorithms', department: 'ET', semester: 2 },
@@ -120,6 +127,67 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
       fetchData();
     } catch (err) { alert(err.response?.data?.detail || 'Review failed'); }
   };
+
+  const openMarksEntry = async (assignment, type) => {
+    setSelectedAssignment(assignment);
+    setExamType(type);
+    setShowMarksEntry(true);
+    
+    // Fetch students for this assignment
+    try {
+      const { data } = await studentsAPI.search('', assignment.department);
+      const filteredStudents = data.filter(s => 
+        s.batch === assignment.batch && 
+        s.section === assignment.section
+      );
+      
+      // Initialize marks entries
+      const entries = filteredStudents.map(student => ({
+        student_id: student.id,
+        student_name: student.name,
+        college_id: student.college_id,
+        marks: '',
+        remarks: ''
+      }));
+      setMarksEntries(entries);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+  
+  const handleMarksChange = (studentId, value) => {
+    setMarksEntries(prev => prev.map(entry => 
+      entry.student_id === studentId 
+        ? { ...entry, marks: value }
+        : entry
+    ));
+  };
+  
+  const handleSaveMarks = async (isDraft) => {
+    setSavingMarks(true);
+    try {
+      const payload = {
+        assignment_id: selectedAssignment.id,
+        exam_type: examType,
+        entries: marksEntries.filter(e => e.marks !== '').map(e => ({
+          student_id: e.student_id,
+          marks: parseFloat(e.marks),
+          remarks: e.remarks
+        })),
+        status: isDraft ? 'draft' : 'submitted'
+      };
+      
+      await marksAPI.saveEntry(payload);
+      setShowMarksEntry(false);
+      setMarksEntries([]);
+      alert(isDraft ? 'Marks saved as draft!' : 'Marks submitted for approval!');
+    } catch (err) {
+      console.error(err);
+      alert('Error saving marks');
+    }
+    setSavingMarks(false);
+  };
+
 
   const stats = dashboard ? [
     { label: 'Teachers', value: dashboard.total_teachers, icon: Users, color: 'bg-indigo-50 text-indigo-500', onClick: () => setActiveTab('teachers') },
@@ -235,18 +303,13 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                       </div>
                       <div className="space-y-2 mt-4">
                         <button 
-                          onClick={() => {
-                            // Navigate to marks entry form
-                            alert('Marks entry form will open for ' + assignment.subject_name);
-                          }}
+                          onClick={() => openMarksEntry(assignment, 'mid1')}
                           className="btn-primary w-full !py-2 text-sm"
                         >
                           Enter Mid-1 Marks
                         </button>
                         <button 
-                          onClick={() => {
-                            alert('Marks entry form will open for ' + assignment.subject_name);
-                          }}
+                          onClick={() => openMarksEntry(assignment, 'mid2')}
                           className="btn-secondary w-full !py-2 text-sm"
                         >
                           Enter Mid-2 Marks
@@ -725,6 +788,91 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           </div>
         )}
       </div>
+      
+      {/* Marks Entry Modal */}
+      {showMarksEntry && selectedAssignment && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6" onClick={() => setShowMarksEntry(false)}>
+          <div className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white border-b border-slate-100 p-6 flex items-center justify-between rounded-t-3xl">
+              <div>
+                <h2 className="text-2xl font-extrabold text-slate-900">
+                  {examType === 'mid1' ? 'Mid-Term 1' : 'Mid-Term 2'} Marks Entry
+                </h2>
+                <p className="text-sm text-slate-500 mt-1">
+                  {selectedAssignment.subject_code} - {selectedAssignment.subject_name} | {selectedAssignment.section} | Batch {selectedAssignment.batch}
+                </p>
+              </div>
+              <button onClick={() => setShowMarksEntry(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                <X size={24} weight="bold" className="text-slate-400" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              <div className="soft-card overflow-hidden mb-6">
+                <table className="w-full">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest w-32">College ID</th>
+                      <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Student Name</th>
+                      <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest w-40">Marks (out of 30)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {marksEntries.map(entry => (
+                      <tr key={entry.student_id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3 px-4 font-bold text-indigo-600">{entry.college_id}</td>
+                        <td className="py-3 px-4 font-medium text-slate-800">{entry.student_name}</td>
+                        <td className="py-3 px-4">
+                          <input
+                            type="number"
+                            min="0"
+                            max="30"
+                            step="0.5"
+                            value={entry.marks}
+                            onChange={(e) => handleMarksChange(entry.student_id, e.target.value)}
+                            className="soft-input w-full text-center"
+                            placeholder="0"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                
+                {marksEntries.length === 0 && (
+                  <div className="p-12 text-center">
+                    <p className="text-slate-400 font-medium">No students found for this section</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex items-center justify-end gap-3">
+                <button 
+                  onClick={() => setShowMarksEntry(false)} 
+                  className="btn-ghost !px-6 !py-2.5"
+                  disabled={savingMarks}
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => handleSaveMarks(true)} 
+                  className="btn-secondary !px-6 !py-2.5"
+                  disabled={savingMarks || marksEntries.filter(e => e.marks !== '').length === 0}
+                >
+                  {savingMarks ? 'Saving...' : 'Save as Draft'}
+                </button>
+                <button 
+                  onClick={() => handleSaveMarks(false)} 
+                  className="btn-primary !px-6 !py-2.5"
+                  disabled={savingMarks || marksEntries.filter(e => e.marks !== '').length === 0}
+                >
+                  {savingMarks ? 'Submitting...' : 'Submit for Approval'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
