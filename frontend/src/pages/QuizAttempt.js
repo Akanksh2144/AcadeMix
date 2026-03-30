@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Clock, Warning, Camera, CheckCircle, XCircle, Play, Code } from '@phosphor-icons/react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Clock, Warning, Camera, CheckCircle, XCircle, Play, Code, ArrowsOut, CameraSlash } from '@phosphor-icons/react';
 import { attemptsAPI, quizzesAPI } from '../services/api';
 import Editor from '@monaco-editor/react';
 import api from '../services/api';
@@ -69,6 +69,82 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
   const [submitting, setSubmitting] = useState(false);
   const [codeOutputs, setCodeOutputs] = useState({});
   const [runningCode, setRunningCode] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [webcamActive, setWebcamActive] = useState(false);
+  const [webcamError, setWebcamError] = useState(false);
+  const webcamRef = useRef(null);
+  const videoRef = useRef(null);
+  const violationRef = useRef(0);
+
+  // Anti-cheat: Tab switch detection
+  useEffect(() => {
+    if (!attempt) return;
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        violationRef.current += 1;
+        setViolations(violationRef.current);
+        setShowWarning(true);
+        setTimeout(() => setShowWarning(false), 4000);
+        // Report to backend
+        if (attempt?.id) {
+          attemptsAPI.answer(attempt.id, { question_index: -1, answer: null, violation: true }).catch(() => {});
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [attempt]);
+
+  // Anti-cheat: Fullscreen enforcement
+  const enterFullscreen = useCallback(() => {
+    const el = document.documentElement;
+    try {
+      if (el.requestFullscreen) el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+      else if (el.msRequestFullscreen) el.msRequestFullscreen();
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (!attempt) return;
+    const handleFullscreenChange = () => {
+      const isFull = !!document.fullscreenElement;
+      setIsFullscreen(isFull);
+      if (!isFull && attempt) {
+        violationRef.current += 1;
+        setViolations(violationRef.current);
+        setShowWarning(true);
+        setTimeout(() => setShowWarning(false), 4000);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    // Try to enter fullscreen on start
+    enterFullscreen();
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [attempt, enterFullscreen]);
+
+  // Anti-cheat: Webcam monitoring
+  useEffect(() => {
+    if (!attempt) return;
+    let stream = null;
+    const startWebcam = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240 }, audio: false });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+        setWebcamActive(true);
+      } catch (err) {
+        console.warn('Webcam access denied:', err);
+        setWebcamError(true);
+      }
+    };
+    startWebcam();
+    return () => {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+    };
+  }, [attempt]);
 
   useEffect(() => {
     const init = async () => {
@@ -186,8 +262,14 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
             </div>
             <div className="bg-emerald-50 px-4 py-2 rounded-2xl flex items-center gap-2" data-testid="proctoring-status">
               <Camera size={22} weight="duotone" className="text-emerald-500" />
-              <span className="text-sm font-bold text-emerald-600">Active</span>
+              <span className="text-sm font-bold text-emerald-600">{webcamActive ? 'Cam On' : webcamError ? 'No Cam' : '...'}</span>
             </div>
+            {!isFullscreen && attempt && (
+              <button data-testid="enter-fullscreen-button" onClick={enterFullscreen} className="bg-indigo-50 px-4 py-2 rounded-2xl flex items-center gap-2 hover:bg-indigo-100 transition-colors">
+                <ArrowsOut size={20} weight="duotone" className="text-indigo-500" />
+                <span className="text-sm font-bold text-indigo-600">Fullscreen</span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -212,6 +294,21 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
                 <div className="flex items-center gap-2.5"><div className="w-4 h-4 bg-slate-100 rounded-md"></div><span className="font-medium text-slate-500">Not Answered</span></div>
               </div>
               <p className="text-sm font-medium text-slate-400 mt-4 text-center">{Object.keys(answers).length}/{questions.length} answered</p>
+              {/* Webcam feed */}
+              <div className="mt-4 rounded-2xl overflow-hidden bg-slate-900" data-testid="webcam-feed">
+                {webcamActive ? (
+                  <video ref={videoRef} autoPlay muted playsInline className="w-full h-auto rounded-2xl" style={{ transform: 'scaleX(-1)' }} />
+                ) : webcamError ? (
+                  <div className="p-4 flex flex-col items-center gap-2">
+                    <CameraSlash size={24} weight="duotone" className="text-slate-500" />
+                    <p className="text-xs text-slate-500 text-center">Camera access denied</p>
+                  </div>
+                ) : (
+                  <div className="p-4 flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
               <button data-testid="submit-quiz-button" onClick={handleSubmit} disabled={submitting} className="btn-primary w-full mt-4 text-sm disabled:opacity-60">
                 {submitting ? 'Submitting...' : 'Submit Quiz'}
               </button>

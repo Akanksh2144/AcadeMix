@@ -1,7 +1,7 @@
 import React from 'react';
-import { BookOpen, Plus, ChartLine, Users, Eye, SignOut, Clipboard, Calendar } from '@phosphor-icons/react';
+import { BookOpen, Plus, ChartLine, Users, Eye, SignOut, Clipboard, Calendar, PencilLine } from '@phosphor-icons/react';
 
-const TeacherDashboard = ({ navigate }) => {
+const TeacherDashboard = ({ navigate, user, onLogout }) => {
   const myQuizzes = [
     { id: 1, title: 'Data Structures - Arrays', status: 'Active', students: 45, completed: 38, avgScore: 78, date: '2024-01-28' },
     { id: 2, title: 'DBMS - Normalization', status: 'Ended', students: 42, completed: 42, avgScore: 82, date: '2024-01-20' },
@@ -36,8 +36,8 @@ const TeacherDashboard = ({ navigate }) => {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button data-testid="profile-button" className="btn-ghost !px-4 !py-2 text-sm">Dr. Sarah Johnson</button>
-              <button data-testid="logout-button" onClick={() => navigate('login')} className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
+              <button data-testid="profile-button" className="btn-ghost !px-4 !py-2 text-sm">{user?.name || 'Teacher'}</button>
+              <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
                 <SignOut size={20} weight="duotone" />
               </button>
             </div>
@@ -47,7 +47,7 @@ const TeacherDashboard = ({ navigate }) => {
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-8">
-          <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">Welcome Back, Dr. Johnson!</h2>
+          <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">Welcome Back, {user?.name?.split(' ').pop() || 'Teacher'}!</h2>
           <p className="text-base font-medium text-slate-500">Manage your quizzes and track student performance</p>
         </div>
 
@@ -66,10 +66,14 @@ const TeacherDashboard = ({ navigate }) => {
           })}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
           <button data-testid="create-quiz-button" onClick={() => navigate('quiz-builder')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
             <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center group-hover:bg-indigo-100 transition-colors"><Plus size={24} weight="duotone" className="text-indigo-500" /></div>
             <div><p className="font-extrabold text-slate-900">Create New Quiz</p><p className="text-sm font-medium text-slate-400">Build from scratch</p></div>
+          </button>
+          <button data-testid="marks-entry-button" onClick={() => navigate('marks-entry')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
+            <div className="w-12 h-12 bg-violet-50 rounded-xl flex items-center justify-center group-hover:bg-violet-100 transition-colors"><PencilLine size={24} weight="duotone" className="text-violet-500" /></div>
+            <div><p className="font-extrabold text-slate-900">Marks Entry</p><p className="text-sm font-medium text-slate-400">Mid-term marks</p></div>
           </button>
           <button data-testid="view-all-results-button" onClick={() => navigate('quiz-results')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
             <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors"><ChartLine size={24} weight="duotone" className="text-emerald-500" /></div>

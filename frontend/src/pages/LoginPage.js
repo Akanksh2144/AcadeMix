@@ -92,9 +92,11 @@ const LoginPage = ({ onLogin }) => {
             </form>
 
             <div className="mt-6 p-4 bg-amber-50 rounded-2xl">
-              <p className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-1">Demo Logins (password for all: see below)</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2">Demo Logins</p>
               <p className="text-xs font-medium text-amber-600">Student: 22WJ8A6745 / student123</p>
               <p className="text-xs font-medium text-amber-600">Teacher: T001 / teacher123</p>
+              <p className="text-xs font-medium text-amber-600">HOD: HOD001 / hod123</p>
+              <p className="text-xs font-medium text-amber-600">Exam Cell: EC001 / exam123</p>
               <p className="text-xs font-medium text-amber-600">Admin: A001 / admin123</p>
             </div>
           </div>
