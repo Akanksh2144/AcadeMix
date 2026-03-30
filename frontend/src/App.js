@@ -96,7 +96,7 @@ function App() {
       case 'analytics': return <Analytics navigate={navigate} user={user} />;
       case 'leaderboard': return <Leaderboard navigate={navigate} user={user} />;
       case 'quiz-builder': return <QuizBuilder navigate={navigate} user={user} editQuiz={selectedData} />;
-      case 'live-monitor': return <LiveMonitor quiz={selectedData} navigate={navigate} />;
+      case 'live-monitor': return <LiveMonitor quiz={selectedData} navigate={navigate} user={user} />;
       case 'user-management': return <UserManagement navigate={navigate} user={user} />;
       case 'code-playground': return <CodePlayground navigate={navigate} user={user} />;
       case 'marks-entry': return <MarksEntry navigate={navigate} user={user} />;

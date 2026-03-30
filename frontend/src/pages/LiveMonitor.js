@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Users, CheckCircle, Clock, Warning, Eye, Camera } from '@phosphor-icons/react';
 
-const LiveMonitor = ({ quiz, navigate }) => {
+const LiveMonitor = ({ quiz, navigate, user }) => {
   const [activeTab, setActiveTab] = useState('active');
   const students = [
     { id: 1, name: 'Rajesh Kumar', rollNo: 'S2024001', status: 'active', progress: 12, totalQuestions: 20, violations: 0, timeElapsed: 25, startTime: '10:05 AM' },
@@ -21,7 +21,7 @@ const LiveMonitor = ({ quiz, navigate }) => {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button data-testid="back-button" onClick={() => navigate('teacher-dashboard')} className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
+              <button data-testid="back-button" onClick={() => navigate(user?.role === 'hod' ? 'hod-dashboard' : user?.role === 'exam_cell' ? 'examcell-dashboard' : user?.role === 'admin' ? 'admin-dashboard' : 'teacher-dashboard')} className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
                 <ArrowLeft size={22} weight="duotone" />
               </button>
               <div>
