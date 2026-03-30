@@ -295,8 +295,13 @@ const StudentProfileView = ({ studentId, onBack }) => {
 const StudentResultsSearch = ({ user, departmentLocked }) => {
   const [search, setSearch] = useState('');
   const [students, setStudents] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [activeSection, setActiveSection] = useState('All');
+  
+  // ET sections
+  const sections = ['All', 'DS-1', 'DS-2', 'CS', 'AIML-1', 'AIML-2', 'AIML-3', 'IT-1', 'IT-2'];
 
   useEffect(() => {
     // Load all students initially
@@ -304,6 +309,7 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
       setLoading(true);
       try {
         const { data } = await studentsAPI.search('', departmentLocked ? undefined : undefined);
+        setAllStudents(data);
         setStudents(data);
       } catch (err) { console.error(err); }
       setLoading(false);
@@ -313,12 +319,31 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
 
   const handleSearch = async (value) => {
     setSearch(value);
-    setLoading(true);
-    try {
-      const { data } = await studentsAPI.search(value);
-      setStudents(data);
-    } catch (err) { console.error(err); }
-    setLoading(false);
+    filterStudents(value, activeSection);
+  };
+  
+  const handleSectionChange = (section) => {
+    setActiveSection(section);
+    filterStudents(search, section);
+  };
+  
+  const filterStudents = (searchValue, section) => {
+    let filtered = allStudents;
+    
+    // Filter by section
+    if (section !== 'All') {
+      filtered = filtered.filter(s => s.section === section);
+    }
+    
+    // Filter by search
+    if (searchValue) {
+      filtered = filtered.filter(s => 
+        s.name.toLowerCase().includes(searchValue.toLowerCase()) ||
+        s.college_id.toLowerCase().includes(searchValue.toLowerCase())
+      );
+    }
+    
+    setStudents(filtered);
   };
 
   if (selectedStudent) {
@@ -327,10 +352,29 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
 
   return (
     <div data-testid="student-results-search">
-      <h3 className="text-2xl font-bold text-slate-800 mb-2">Student Results</h3>
+      <h3 className="text-2xl font-bold text-slate-800 mb-2">Student Management</h3>
       <p className="text-sm text-slate-500 mb-6">
-        {departmentLocked ? `Showing students in ${user?.department || 'your'} department` : 'Search across all departments'}
+        {departmentLocked ? `Manage students in ${user?.department || 'your'} department` : 'Search across all departments'}
       </p>
+      
+      {/* Section Tabs */}
+      {user?.department === 'ET' && (
+        <div className="mb-6">
+          <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Filter by Section</label>
+          <div className="flex flex-wrap gap-2">
+            {sections.map(section => (
+              <button
+                key={section}
+                onClick={() => handleSectionChange(section)}
+                className={`pill-tab ${activeSection === section ? 'pill-tab-active' : 'pill-tab-inactive'}`}
+                data-testid={`section-tab-${section.toLowerCase()}`}
+              >
+                {section}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="relative mb-6">
@@ -348,8 +392,8 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">College ID</th>
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Name</th>
-              <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Department</th>
-              <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Batch / Sec</th>
+              <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Section</th>
+              <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Batch</th>
               <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Action</th>
             </tr>
           </thead>
@@ -358,8 +402,10 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
               <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors" data-testid={`result-student-${s.college_id}`}>
                 <td className="py-3 px-4 font-bold text-indigo-600">{s.college_id}</td>
                 <td className="py-3 px-4 font-medium text-slate-800">{s.name}</td>
-                <td className="py-3 px-4 text-sm text-slate-600">{s.department || '-'}</td>
-                <td className="py-3 px-4 text-sm text-slate-600">{s.batch || '-'} / {s.section || '-'}</td>
+                <td className="py-3 px-4 text-sm">
+                  <span className="soft-badge bg-indigo-50 text-indigo-600">{s.section || '-'}</span>
+                </td>
+                <td className="py-3 px-4 text-sm text-slate-600">{s.batch || '-'}</td>
                 <td className="py-3 px-4 text-center">
                   <button data-testid={`view-profile-${s.college_id}`} onClick={() => setSelectedStudent(s.id)}
                     className="btn-primary !px-4 !py-1.5 text-xs">
@@ -372,7 +418,7 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
         </table>
         {students.length === 0 && (
           <div className="p-8 text-center">
-            <p className="text-slate-400 font-medium">{loading ? 'Searching...' : 'No students found'}</p>
+            <p className="text-slate-400 font-medium">{loading ? 'Loading...' : 'No students found'}</p>
           </div>
         )}
       </div>

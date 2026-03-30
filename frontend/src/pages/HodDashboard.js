@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Users, ClipboardText, CheckCircle, Clock, SignOut, Plus, Trash, UserPlus, ChartLine, Eye, GraduationCap } from '@phosphor-icons/react';
+import { BookOpen, Users, ClipboardText, CheckCircle, Clock, SignOut, Plus, Trash, UserPlus, ChartLine, Eye, GraduationCap, X } from '@phosphor-icons/react';
 import { facultyAPI, examCellAPI, marksAPI } from '../services/api';
 import { StudentResultsSearch } from '../components/StudentResultsSearch';
 
@@ -11,16 +11,16 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newAssignment, setNewAssignment] = useState({ teacher_id: '', subject_code: '', subject_name: '', department: user?.department || 'DS', batch: '2024', section: 'A', semester: 3 });
+  const [newAssignment, setNewAssignment] = useState({ teacher_id: '', subject_code: '', subject_name: '', department: user?.department || 'ET', batch: '2024', section: 'DS-1', semester: 3 });
   
   // Mock subjects data (prepopulated)
   const mockSubjects = [
-    { code: '22DS201', name: 'Data Structures and Algorithms', department: 'DS', semester: 2 },
-    { code: '22DS301', name: 'Machine Learning Fundamentals', department: 'DS', semester: 3 },
-    { code: '22DS302', name: 'Database Management Systems', department: 'DS', semester: 3 },
-    { code: '22DS401', name: 'Deep Learning', department: 'DS', semester: 4 },
-    { code: '22DS402', name: 'Natural Language Processing', department: 'DS', semester: 4 },
-    { code: '22DS501', name: 'Big Data Analytics', department: 'DS', semester: 5 },
+    { code: '22ET201', name: 'Data Structures and Algorithms', department: 'ET', semester: 2 },
+    { code: '22ET301', name: 'Machine Learning Fundamentals', department: 'ET', semester: 3 },
+    { code: '22ET302', name: 'Database Management Systems', department: 'ET', semester: 3 },
+    { code: '22ET401', name: 'Deep Learning', department: 'ET', semester: 4 },
+    { code: '22ET402', name: 'Natural Language Processing', department: 'ET', semester: 4 },
+    { code: '22ET501', name: 'Big Data Analytics', department: 'ET', semester: 5 },
     { code: '22CSE201', name: 'Operating Systems', department: 'CSE', semester: 2 },
     { code: '22CSE301', name: 'Computer Networks', department: 'CSE', semester: 3 },
     { code: '22CSE401', name: 'Software Engineering', department: 'CSE', semester: 4 },
@@ -70,6 +70,23 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
     setTeacherSearch(teacher.name);
     setShowTeacherDropdown(false);
   };
+  
+  const handleClearSubject = () => {
+    setSubjectSearch('');
+    setNewAssignment({ ...newAssignment, subject_code: '', subject_name: '', semester: 3 });
+  };
+  
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('[data-dropdown-container]')) {
+        setShowSubjectDropdown(false);
+        setShowTeacherDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   const filteredSubjects = departmentSubjects.filter(s => 
     s.code.toLowerCase().includes(subjectSearch.toLowerCase()) || 
@@ -138,7 +155,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
 
         {/* Tabs */}
         <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit mb-8" data-testid="hod-tabs">
-          {[{ id: 'overview', label: 'Overview' }, { id: 'faculty', label: 'Faculty Management' }, { id: 'review', label: 'Mark Reviews' }, { id: 'results', label: 'Student Results' }].map(tab => (
+          {[{ id: 'overview', label: 'Overview' }, { id: 'faculty', label: 'Faculty Management' }, { id: 'review', label: 'Mark Reviews' }, { id: 'results', label: 'Student Management' }].map(tab => (
             <button key={tab.id} data-testid={`tab-${tab.id}`} onClick={() => setActiveTab(tab.id)}
               className={`pill-tab ${activeTab === tab.id ? 'pill-tab-active' : 'pill-tab-inactive'}`}>{tab.label}</button>
           ))}
@@ -193,7 +210,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   {/* Teacher Dropdown with Search */}
-                  <div className="relative">
+                  <div className="relative" data-dropdown-container>
                     <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Teacher</label>
                     <input 
                       data-testid="teacher-search-input" 
@@ -215,6 +232,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                               key={t.id}
                               onClick={() => handleTeacherSelect(t)}
                               className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 transition-colors border-b border-slate-50 last:border-0"
+                              type="button"
                             >
                               <p className="font-bold text-slate-800 text-sm">{t.name}</p>
                               <p className="text-xs text-slate-500">{t.college_id} - {t.department}</p>
@@ -228,20 +246,36 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                   </div>
 
                   {/* Subject Code Dropdown with Search */}
-                  <div className="relative">
+                  <div className="relative" data-dropdown-container>
                     <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Subject Code</label>
-                    <input 
-                      data-testid="subject-code-search" 
-                      type="text"
-                      value={subjectSearch} 
-                      onFocus={() => setShowSubjectDropdown(true)}
-                      onChange={(e) => {
-                        setSubjectSearch(e.target.value);
-                        setShowSubjectDropdown(true);
-                      }}
-                      placeholder="Search subject code..."
-                      className="soft-input w-full"
-                    />
+                    <div className="relative">
+                      <input 
+                        data-testid="subject-code-search" 
+                        type="text"
+                        value={subjectSearch} 
+                        onFocus={() => setShowSubjectDropdown(true)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSubjectSearch(value);
+                          setShowSubjectDropdown(true);
+                          // Clear subject name if input is cleared
+                          if (!value) {
+                            setNewAssignment({ ...newAssignment, subject_code: '', subject_name: '', semester: 3 });
+                          }
+                        }}
+                        placeholder="Search subject code..."
+                        className="soft-input w-full pr-10"
+                      />
+                      {subjectSearch && (
+                        <button
+                          onClick={handleClearSubject}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-slate-100 transition-colors"
+                          type="button"
+                        >
+                          <X size={16} weight="bold" className="text-slate-400" />
+                        </button>
+                      )}
+                    </div>
                     {showSubjectDropdown && (
                       <div className="absolute z-10 mt-1 w-full bg-white rounded-xl shadow-lg border border-slate-100 max-h-60 overflow-y-auto">
                         {filteredSubjects.length > 0 ? (
@@ -250,6 +284,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                               key={s.code}
                               onClick={() => handleSubjectSelect(s)}
                               className="w-full text-left px-4 py-2.5 hover:bg-indigo-50 transition-colors border-b border-slate-50 last:border-0"
+                              type="button"
                             >
                               <p className="font-bold text-slate-800 text-sm">{s.code}</p>
                               <p className="text-xs text-slate-500">{s.name} - Sem {s.semester}</p>
@@ -311,10 +346,14 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                       onChange={(e) => setNewAssignment({ ...newAssignment, section: e.target.value })} 
                       className="soft-input w-full"
                     >
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                      <option value="C">C</option>
-                      <option value="D">D</option>
+                      <option value="DS-1">DS-1</option>
+                      <option value="DS-2">DS-2</option>
+                      <option value="CS">CS (Cyber Security)</option>
+                      <option value="AIML-1">AIML-1</option>
+                      <option value="AIML-2">AIML-2</option>
+                      <option value="AIML-3">AIML-3</option>
+                      <option value="IT-1">IT-1</option>
+                      <option value="IT-2">IT-2</option>
                     </select>
                   </div>
 
