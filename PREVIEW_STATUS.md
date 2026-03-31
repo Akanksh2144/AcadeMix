@@ -2,7 +2,7 @@
 
 ## ✅ Status: All Services Running
 
-**Preview URL**: https://0abea750-1767-480f-9231-55702261d418.preview.emergentagent.com
+**Preview URL**: https://repo-analyzer-208.preview.emergentagent.com
 
 ---
 
@@ -62,7 +62,7 @@ All users are created and ready to use:
 ## 🚀 Getting Started
 
 ### 1. Open the Preview
-Click here: **https://0abea750-1767-480f-9231-55702261d418.preview.emergentagent.com**
+Click here: **https://repo-analyzer-208.preview.emergentagent.com**
 
 ### 2. Login as Admin
 - **College ID**: A001
@@ -366,7 +366,7 @@ curl -X POST http://localhost:8001/api/auth/login \
 
 Everything is set up and running. Open the preview URL and start exploring:
 
-**🔗 https://0abea750-1767-480f-9231-55702261d418.preview.emergentagent.com**
+**🔗 https://repo-analyzer-208.preview.emergentagent.com**
 
 Enjoy exploring the College Quiz Portal! 🚀
 

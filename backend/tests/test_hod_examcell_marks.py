@@ -12,7 +12,7 @@ import requests
 import os
 import tempfile
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://quiz-portal-23.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://repo-analyzer-208.preview.emergentagent.com').rstrip('/')
 
 
 class TestHODAuth:

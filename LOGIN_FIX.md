@@ -49,7 +49,7 @@ Admin dashboard showing:
 
 ## 🚀 Ready to Use
 
-**Preview URL**: https://0abea750-1767-480f-9231-55702261d418.preview.emergentagent.com
+**Preview URL**: https://repo-analyzer-208.preview.emergentagent.com
 
 ### **Test Credentials**
 
@@ -146,7 +146,7 @@ mongodb    RUNNING   (MongoDB on :27017)
 
 The application is **100% functional** and ready to use. Enjoy exploring the College Quiz Portal!
 
-**Preview Link**: https://0abea750-1767-480f-9231-55702261d418.preview.emergentagent.com
+**Preview Link**: https://repo-analyzer-208.preview.emergentagent.com
 
 ---
 
