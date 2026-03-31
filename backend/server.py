@@ -115,6 +115,7 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     role: str = "student"
+    college: str = "GNITC"  # GNITC, GNIT, or GNU
     department: str = ""
     batch: str = ""
     section: str = ""
@@ -170,6 +171,7 @@ class MarkEntrySave(BaseModel):
     semester: int
     max_marks: float = 30
     entries: List[MarkEntryItem]
+    revision_reason: Optional[str] = None
 
 class MarkReview(BaseModel):
     action: str  # approve or reject
@@ -211,7 +213,7 @@ async def register(req: RegisterRequest, response: Response):
     doc = {
         "name": req.name, "college_id": req.college_id.upper(), "email": req.email.lower(),
         "password_hash": hash_password(req.password), "role": req.role,
-        "department": req.department, "batch": req.batch, "section": req.section,
+        "college": req.college, "department": req.department, "batch": req.batch, "section": req.section,
         "created_at": datetime.now(timezone.utc)
     }
     result = await db.users.insert_one(doc)
@@ -260,7 +262,7 @@ async def create_user(req: RegisterRequest, user: dict = Depends(require_role("a
     doc = {
         "name": req.name, "college_id": req.college_id.upper(), "email": req.email.lower(),
         "password_hash": hash_password(req.password), "role": req.role,
-        "department": req.department, "batch": req.batch, "section": req.section,
+        "college": req.college, "department": req.department, "batch": req.batch, "section": req.section,
         "created_at": datetime.now(timezone.utc)
     }
     result = await db.users.insert_one(doc)
@@ -488,18 +490,38 @@ async def list_attempts(quiz_id: Optional[str] = None, user: dict = Depends(get_
 
 # ─── Student Search & Profile (HOD / Admin) ───────────────────────────────
 @app.get("/api/students/search")
-async def search_students(q: str = "", department: Optional[str] = None, user: dict = Depends(require_role("hod", "admin", "exam_cell", "teacher"))):
+async def search_students(q: str = "", department: Optional[str] = None, college: Optional[str] = None, user: dict = Depends(require_role("hod", "admin", "exam_cell", "teacher"))):
     query = {"role": "student"}
+    
+    # Tier-based filtering
     if user["role"] == "hod":
+        # HOD sees only their department students
         query["department"] = user.get("department", "")
-    elif department:
+        query["college"] = user.get("college", "")
+    elif user["role"] == "exam_cell":
+        # Exam Cell sees only their college students
+        query["college"] = user.get("college", "")
+    elif user["role"] == "admin":
+        # Admin can filter by college (tab-based), default shows all
+        if college:
+            query["college"] = college
+    elif user["role"] == "teacher":
+        # Teachers see their college and department students
+        query["college"] = user.get("college", "")
+        if user.get("department"):
+            query["department"] = user.get("department")
+    
+    # Additional filters
+    if department and user["role"] in ["admin", "exam_cell"]:
         query["department"] = department
+    
     if q:
         query["$or"] = [
             {"name": {"$regex": q, "$options": "i"}},
             {"college_id": {"$regex": q, "$options": "i"}}
         ]
-    students = await db.users.find(query, {"password_hash": 0}).sort("college_id", 1).to_list(100)
+    
+    students = await db.users.find(query, {"password_hash": 0}).sort("college_id", 1).to_list(500)
     return [serialize_doc(s) for s in students]
 
 @app.get("/api/students/{student_id}/profile")
@@ -507,8 +529,18 @@ async def student_profile(student_id: str, user: dict = Depends(require_role("ho
     student = await db.users.find_one({"_id": ObjectId(student_id)}, {"password_hash": 0})
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
-    if user["role"] == "hod" and student.get("department") != user.get("department"):
-        raise HTTPException(status_code=403, detail="Student not in your department")
+    
+    # Tier-based access control
+    if user["role"] == "hod":
+        if student.get("department") != user.get("department") or student.get("college") != user.get("college"):
+            raise HTTPException(status_code=403, detail="Student not in your department")
+    elif user["role"] == "exam_cell":
+        if student.get("college") != user.get("college"):
+            raise HTTPException(status_code=403, detail="Student not in your college")
+    elif user["role"] == "teacher":
+        if student.get("college") != user.get("college"):
+            raise HTTPException(status_code=403, detail="Student not in your college")
+    
     semesters = await db.semester_results.find({"student_id": student_id}).sort("semester", 1).to_list(20)
     attempts = await db.quiz_attempts.find({"student_id": student_id, "status": "submitted"}).sort("submitted_at", -1).to_list(20)
     mid_marks = await db.mark_entries.find({"entries.student_id": student_id, "status": {"$in": ["approved", "submitted"]}}).to_list(50)
@@ -649,7 +681,8 @@ async def admin_dashboard(user: dict = Depends(require_role("admin"))):
 # ─── Faculty Assignment Routes (HOD) ───────────────────────────────────────
 @app.get("/api/faculty/teachers")
 async def list_department_teachers(user: dict = Depends(require_role("hod", "admin"))):
-    query = {"role": "teacher"}
+    # HOD is also a faculty member, include both teachers and HODs
+    query = {"role": {"$in": ["teacher", "hod"]}}
     if user["role"] == "hod":
         query["department"] = user.get("department", "")
     teachers = await db.users.find(query, {"password_hash": 0}).to_list(100)
@@ -696,7 +729,7 @@ async def delete_assignment(assignment_id: str, user: dict = Depends(require_rol
 
 # ─── Marks Entry Routes (Teacher) ─────────────────────────────────────────
 @app.get("/api/marks/my-assignments")
-async def my_assignments(user: dict = Depends(require_role("teacher"))):
+async def my_assignments(user: dict = Depends(require_role("teacher", "hod"))):
     assignments = await db.faculty_assignments.find({"teacher_id": user["id"]}).to_list(50)
     return [serialize_doc(a) for a in assignments]
 
@@ -706,34 +739,78 @@ async def get_students_for_marks(department: str, batch: str, section: str, user
     return [serialize_doc(s) for s in students]
 
 @app.get("/api/marks/entry/{assignment_id}/{exam_type}")
-async def get_mark_entry(assignment_id: str, exam_type: str, user: dict = Depends(require_role("teacher"))):
+async def get_mark_entry(assignment_id: str, exam_type: str, user: dict = Depends(require_role("teacher", "hod"))):
     entry = await db.mark_entries.find_one({"assignment_id": assignment_id, "exam_type": exam_type, "teacher_id": user["id"]})
     if entry:
         return serialize_doc(entry)
     return None
 
 @app.post("/api/marks/entry")
-async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role("teacher"))):
+async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role("teacher", "hod"))):
     assignment = await db.faculty_assignments.find_one({"_id": ObjectId(req.assignment_id), "teacher_id": user["id"]})
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found or not yours")
     existing = await db.mark_entries.find_one({"assignment_id": req.assignment_id, "exam_type": req.exam_type, "teacher_id": user["id"]})
     entries_data = [e.dict() for e in req.entries]
+    
     if existing:
-        if existing.get("status") in ["submitted", "approved"]:
-            raise HTTPException(status_code=400, detail="Cannot edit submitted/approved marks")
+        current_status = existing.get("status")
+        
+        # Allow editing approved marks only with revision reason
+        if current_status == "approved":
+            if not req.revision_reason or not req.revision_reason.strip():
+                raise HTTPException(status_code=400, detail="Revision reason is required to edit approved marks")
+            
+            # Create revision history entry
+            revision_history = existing.get("revision_history", [])
+            revision_history.append({
+                "revised_at": datetime.now(timezone.utc),
+                "revised_by": user["id"],
+                "reviser_name": user["name"],
+                "reason": req.revision_reason,
+                "previous_status": "approved"
+            })
+            
+            # Update with new entries and change status back to draft
+            result = await db.mark_entries.update_one(
+                {"_id": existing["_id"]}, 
+                {"$set": {
+                    "entries": entries_data, 
+                    "max_marks": req.max_marks,
+                    "status": "draft",
+                    "revision_history": revision_history,
+                    "updated_at": datetime.now(timezone.utc)
+                }}
+            )
+            if result.modified_count == 0:
+                raise HTTPException(status_code=500, detail="Failed to update marks entry")
+            
+            updated = await db.mark_entries.find_one({"_id": existing["_id"]})
+            if not updated:
+                raise HTTPException(status_code=500, detail="Failed to retrieve updated marks entry")
+            
+            return serialize_doc(updated)
+        
+        # Prevent editing submitted marks (not approved)
+        if current_status == "submitted":
+            raise HTTPException(status_code=400, detail="Cannot edit submitted marks. Wait for approval or rejection.")
+        
+        # Normal draft/rejected edit
         await db.mark_entries.update_one({"_id": existing["_id"]}, {"$set": {
             "entries": entries_data, "max_marks": req.max_marks,
             "status": "draft", "updated_at": datetime.now(timezone.utc)
         }})
         updated = await db.mark_entries.find_one({"_id": existing["_id"]})
         return serialize_doc(updated)
+    
+    # Create new entry
     doc = {
         "assignment_id": req.assignment_id, "teacher_id": user["id"], "teacher_name": user["name"],
         "subject_code": assignment["subject_code"], "subject_name": assignment["subject_name"],
         "department": assignment["department"], "batch": assignment["batch"], "section": assignment["section"],
         "exam_type": req.exam_type, "semester": req.semester, "max_marks": req.max_marks,
         "entries": entries_data, "status": "draft",
+        "revision_history": [],
         "created_at": datetime.now(timezone.utc), "updated_at": datetime.now(timezone.utc)
     }
     result = await db.mark_entries.insert_one(doc)
@@ -741,7 +818,7 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role(
     return serialize_doc(doc)
 
 @app.post("/api/marks/submit/{entry_id}")
-async def submit_marks(entry_id: str, user: dict = Depends(require_role("teacher"))):
+async def submit_marks(entry_id: str, user: dict = Depends(require_role("teacher", "hod"))):
     entry = await db.mark_entries.find_one({"_id": ObjectId(entry_id), "teacher_id": user["id"]})
     if not entry:
         raise HTTPException(status_code=404, detail="Entry not found")
@@ -995,36 +1072,54 @@ async def health():
 
 # ─── Seed Data ──────────────────────────────────────────────────────────────
 async def seed_data():
-    # Admin
+    # Admin (GNI - manages all 3 colleges)
     admin_cid = os.environ.get("ADMIN_COLLEGE_ID", "A001")
     admin_pwd = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"college_id": admin_cid})
     if not existing:
-        await db.users.insert_one({"name": "Admin", "college_id": admin_cid, "email": "admin@quizportal.edu", "password_hash": hash_password(admin_pwd), "role": "admin", "department": "Administration", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+        await db.users.insert_one({"name": "GNI Admin", "college_id": admin_cid, "email": "admin@gni.edu", "password_hash": hash_password(admin_pwd), "role": "admin", "college": "GNI", "department": "Administration", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
     elif not verify_password(admin_pwd, existing["password_hash"]):
-        await db.users.update_one({"college_id": admin_cid}, {"$set": {"password_hash": hash_password(admin_pwd)}})
+        await db.users.update_one({"college_id": admin_cid}, {"$set": {"password_hash": hash_password(admin_pwd), "college": "GNI"}})
 
-    # Teacher
+    # Teachers from different colleges
     if not await db.users.find_one({"college_id": "T001"}):
-        await db.users.insert_one({"name": "Dr. Sarah Johnson", "college_id": "T001", "email": "sarah.j@quizportal.edu", "password_hash": hash_password("teacher123"), "role": "teacher", "department": "DS", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+        await db.users.insert_one({"name": "Dr. Sarah Johnson", "college_id": "T001", "email": "sarah.j@gnitc.edu", "password_hash": hash_password("teacher123"), "role": "teacher", "college": "GNITC", "department": "DS", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
     if not await db.users.find_one({"college_id": "T002"}):
-        await db.users.insert_one({"name": "Prof. Ravi Kumar", "college_id": "T002", "email": "ravi.k@quizportal.edu", "password_hash": hash_password("teacher123"), "role": "teacher", "department": "DS", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+        await db.users.insert_one({"name": "Prof. Ravi Kumar", "college_id": "T002", "email": "ravi.k@gnit.edu", "password_hash": hash_password("teacher123"), "role": "teacher", "college": "GNIT", "department": "CSE", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+    if not await db.users.find_one({"college_id": "T003"}):
+        await db.users.insert_one({"name": "Dr. Priya Verma", "college_id": "T003", "email": "priya.v@gnu.edu", "password_hash": hash_password("teacher123"), "role": "teacher", "college": "GNU", "department": "ECE", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
 
-    # HOD
+    # HODs from different colleges
     if not await db.users.find_one({"college_id": "HOD001"}):
-        await db.users.insert_one({"name": "Dr. Venkat Rao", "college_id": "HOD001", "email": "venkat.hod@quizportal.edu", "password_hash": hash_password("hod123"), "role": "hod", "department": "DS", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+        await db.users.insert_one({"name": "Dr. Venkat Rao", "college_id": "HOD001", "email": "venkat.hod@gnitc.edu", "password_hash": hash_password("hod123"), "role": "hod", "college": "GNITC", "department": "DS", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+    if not await db.users.find_one({"college_id": "HOD002"}):
+        await db.users.insert_one({"name": "Dr. Lakshmi Iyer", "college_id": "HOD002", "email": "lakshmi.hod@gnit.edu", "password_hash": hash_password("hod123"), "role": "hod", "college": "GNIT", "department": "CSE", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+    if not await db.users.find_one({"college_id": "HOD003"}):
+        await db.users.insert_one({"name": "Dr. Ramesh Patel", "college_id": "HOD003", "email": "ramesh.hod@gnu.edu", "password_hash": hash_password("hod123"), "role": "hod", "college": "GNU", "department": "ECE", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
 
-    # Exam Cell
+    # Exam Cells for each college
     if not await db.users.find_one({"college_id": "EC001"}):
-        await db.users.insert_one({"name": "Exam Cell Office", "college_id": "EC001", "email": "examcell@quizportal.edu", "password_hash": hash_password("exam123"), "role": "exam_cell", "department": "", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+        await db.users.insert_one({"name": "GNITC Exam Cell", "college_id": "EC001", "email": "examcell@gnitc.edu", "password_hash": hash_password("exam123"), "role": "exam_cell", "college": "GNITC", "department": "", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+    if not await db.users.find_one({"college_id": "EC002"}):
+        await db.users.insert_one({"name": "GNIT Exam Cell", "college_id": "EC002", "email": "examcell@gnit.edu", "password_hash": hash_password("exam123"), "role": "exam_cell", "college": "GNIT", "department": "", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
+    if not await db.users.find_one({"college_id": "EC003"}):
+        await db.users.insert_one({"name": "GNU Exam Cell", "college_id": "EC003", "email": "examcell@gnu.edu", "password_hash": hash_password("exam123"), "role": "exam_cell", "college": "GNU", "department": "", "batch": "", "section": "", "created_at": datetime.now(timezone.utc)})
 
-    # Students from marksheets
+    # Students from different colleges
     students_data = [
-        {"name": "Rajana Akanksh", "college_id": "22WJ8A6745", "email": "akanksh@quizportal.edu", "department": "DS", "batch": "2022"},
-        {"name": "Priya Sharma", "college_id": "S2024101", "email": "priya@quizportal.edu", "department": "DS", "batch": "2024"},
-        {"name": "Amit Patel", "college_id": "S2024045", "email": "amit@quizportal.edu", "department": "ECE", "batch": "2024"},
-        {"name": "Sneha Reddy", "college_id": "S2024089", "email": "sneha@quizportal.edu", "department": "DS", "batch": "2024"},
-        {"name": "Rahul Kumar", "college_id": "S2024034", "email": "rahul@quizportal.edu", "department": "MECH", "batch": "2024"},
+        # GNITC - DS Department - Batch 2022 Section A (matches faculty assignments)
+        {"name": "Rajana Akanksh", "college_id": "22WJ8A6745", "email": "akanksh@gnitc.edu", "college": "GNITC", "department": "DS", "batch": "2022", "section": "A"},
+        {"name": "Priya Sharma", "college_id": "S2024101", "email": "priya@gnitc.edu", "college": "GNITC", "department": "DS", "batch": "2022", "section": "A"},
+        {"name": "Sneha Reddy", "college_id": "S2024089", "email": "sneha@gnitc.edu", "college": "GNITC", "department": "DS", "batch": "2022", "section": "A"},
+        {"name": "Vikram Singh", "college_id": "S2022001", "email": "vikram@gnitc.edu", "college": "GNITC", "department": "DS", "batch": "2022", "section": "A"},
+        {"name": "Ananya Gupta", "college_id": "S2022002", "email": "ananya@gnitc.edu", "college": "GNITC", "department": "DS", "batch": "2022", "section": "A"},
+        {"name": "Rohan Mehta", "college_id": "S2022003", "email": "rohan@gnitc.edu", "college": "GNITC", "department": "DS", "batch": "2022", "section": "A"},
+        {"name": "Kavya Nair", "college_id": "S2022004", "email": "kavya@gnitc.edu", "college": "GNITC", "department": "DS", "batch": "2022", "section": "A"},
+        {"name": "Arjun Reddy", "college_id": "S2022005", "email": "arjun@gnitc.edu", "college": "GNITC", "department": "DS", "batch": "2022", "section": "A"},
+        # GNIT - CSE Department
+        {"name": "Amit Patel", "college_id": "S2024045", "email": "amit@gnit.edu", "college": "GNIT", "department": "CSE", "batch": "2024", "section": "A"},
+        # GNU - ECE Department
+        {"name": "Rahul Kumar", "college_id": "S2024034", "email": "rahul@gnu.edu", "college": "GNU", "department": "ECE", "batch": "2024", "section": "A"},
     ]
     for s in students_data:
         if not await db.users.find_one({"college_id": s["college_id"]}):
@@ -1128,13 +1223,13 @@ async def seed_data():
         hod = await db.users.find_one({"college_id": "HOD001"})
         hod_id = str(hod["_id"]) if hod else ""
         t1id = str(teacher1["_id"])
-        teacher2 = await db.users.find_one({"college_id": "T002"})
-        t2id = str(teacher2["_id"]) if teacher2 else t1id
         assignments = [
             {"teacher_id": t1id, "teacher_name": "Dr. Sarah Johnson", "subject_code": "22PC0DS17", "subject_name": "Automata Theory and Compiler Design", "department": "DS", "batch": "2022", "section": "A", "semester": 3, "assigned_by": hod_id, "created_at": datetime.now(timezone.utc)},
             {"teacher_id": t1id, "teacher_name": "Dr. Sarah Johnson", "subject_code": "22PC0DS18", "subject_name": "Machine Learning", "department": "DS", "batch": "2022", "section": "A", "semester": 3, "assigned_by": hod_id, "created_at": datetime.now(timezone.utc)},
-            {"teacher_id": t2id, "teacher_name": "Prof. Ravi Kumar", "subject_code": "22PC0DS19", "subject_name": "Big Data Analytics", "department": "DS", "batch": "2022", "section": "A", "semester": 3, "assigned_by": hod_id, "created_at": datetime.now(timezone.utc)},
         ]
+        # HOD is also a faculty - assign a subject to HOD
+        if hod:
+            assignments.append({"teacher_id": hod_id, "teacher_name": "Dr. Venkat Rao", "subject_code": "22PC0DS19", "subject_name": "Big Data Analytics", "department": "DS", "batch": "2022", "section": "A", "semester": 3, "assigned_by": hod_id, "created_at": datetime.now(timezone.utc)})
         await db.faculty_assignments.insert_many(assignments)
 
     # Write credentials
@@ -1149,32 +1244,57 @@ async def seed_data():
 - College ID: HOD001
 - Password: hod123
 - Role: hod
-- Department: DS
+- Department: DS (GNITC)
+
+- College ID: HOD002
+- Password: hod123
+- Role: hod
+- Department: CSE (GNIT)
+
+- College ID: HOD003
+- Password: hod123
+- Role: hod
+- Department: ECE (GNU)
 
 ## Exam Cell
 - College ID: EC001
 - Password: exam123
-- Role: exam_cell
+- Role: exam_cell (GNITC)
+
+- College ID: EC002
+- Password: exam123
+- Role: exam_cell (GNIT)
+
+- College ID: EC003
+- Password: exam123
+- Role: exam_cell (GNU)
 
 ## Teacher
 - College ID: T001
 - Password: teacher123
-- Role: teacher (Dr. Sarah Johnson)
+- Role: teacher (Dr. Sarah Johnson, GNITC, DS)
 
 - College ID: T002
 - Password: teacher123
-- Role: teacher (Prof. Ravi Kumar)
+- Role: teacher (Prof. Ravi Kumar, GNIT, CSE)
 
-## Student (from marksheet)
-- College ID: 22WJ8A6745
-- Password: student123
-- Role: student (Rajana Akanksh)
+- College ID: T003
+- Password: teacher123
+- Role: teacher (Dr. Priya Verma, GNU, ECE)
 
-## Other Students
-- S2024101 / student123 (Priya Sharma, DS)
-- S2024045 / student123 (Amit Patel, ECE)
-- S2024089 / student123 (Sneha Reddy, DS)
-- S2024034 / student123 (Rahul Kumar, MECH)
+## Students - DS Department (GNITC, Batch 2022, Section A)
+- 22WJ8A6745 / student123 (Rajana Akanksh)
+- S2024101 / student123 (Priya Sharma)
+- S2024089 / student123 (Sneha Reddy)
+- S2022001 / student123 (Vikram Singh)
+- S2022002 / student123 (Ananya Gupta)
+- S2022003 / student123 (Rohan Mehta)
+- S2022004 / student123 (Kavya Nair)
+- S2022005 / student123 (Arjun Reddy)
+
+## Students - Other Departments
+- S2024045 / student123 (Amit Patel, GNIT, CSE)
+- S2024034 / student123 (Rahul Kumar, GNU, ECE)
 """
     Path("/app/memory").mkdir(exist_ok=True)
     Path("/app/memory/test_credentials.md").write_text(creds)

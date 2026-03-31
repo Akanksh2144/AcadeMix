@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, PaperPlaneTilt, FloppyDisk, CheckCircle, Clock, Warning, Percent, ChartBar } from '@phosphor-icons/react';
+import { ArrowLeft, PaperPlaneTilt, FloppyDisk, CheckCircle, Clock, Warning, Percent, ChartBar, PencilLine } from '@phosphor-icons/react';
 import { marksAPI } from '../services/api';
 
-const MarksEntry = ({ navigate, user }) => {
+const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
   const [assignments, setAssignments] = useState([]);
-  const [selectedAssignment, setSelectedAssignment] = useState(null);
+  const [selectedAssignment, setSelectedAssignment] = useState(preselectedAssignment || null);
   const [examType, setExamType] = useState('mid1');
   const [students, setStudents] = useState([]);
   const [marks, setMarks] = useState({});
@@ -13,17 +13,30 @@ const MarksEntry = ({ navigate, user }) => {
   const [status, setStatus] = useState('new');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [isDirectNavigation, setIsDirectNavigation] = useState(!!preselectedAssignment);
+  const [isEditingApproved, setIsEditingApproved] = useState(false);
+  const [revisionReason, setRevisionReason] = useState('');
 
   useEffect(() => {
     const fetchAssignments = async () => {
       try {
         const { data } = await marksAPI.myAssignments();
         setAssignments(data);
+        
+        // If preselected assignment is provided, load students and marks
+        if (preselectedAssignment) {
+          const matchingAssignment = data.find(a => a.id === preselectedAssignment.id);
+          if (matchingAssignment) {
+            setSelectedAssignment(matchingAssignment);
+            // Load students and marks for this assignment
+            await loadStudentsAndMarks(matchingAssignment, 'mid1');
+          }
+        }
       } catch (err) { console.error(err); }
       setLoading(false);
     };
     fetchAssignments();
-  }, []);
+  }, [preselectedAssignment]);
 
   const loadStudentsAndMarks = async (assignment, exam) => {
     setLoading(true);
@@ -51,6 +64,7 @@ const MarksEntry = ({ navigate, user }) => {
 
   const handleClassSelect = (a) => {
     setSelectedAssignment(a);
+    setIsDirectNavigation(false); // Mark as manual selection
     loadStudentsAndMarks(a, examType);
   };
 
@@ -73,28 +87,64 @@ const MarksEntry = ({ navigate, user }) => {
         student_id: s.id, college_id: s.college_id, student_name: s.name,
         marks: marks[s.id] ?? null
       }));
-      const { data } = await marksAPI.saveEntry({
+      const payload = {
         assignment_id: selectedAssignment.id, exam_type: examType,
         semester: selectedAssignment.semester, max_marks: maxMarks, entries
-      });
+      };
+      
+      // If editing approved marks, include revision reason
+      if (isEditingApproved && revisionReason) {
+        payload.revision_reason = revisionReason;
+      }
+      
+      const { data } = await marksAPI.saveEntry(payload);
+      
+      // Update state with response from backend
       setEntryId(data.id);
-      setStatus('draft');
-      alert('Marks saved as draft');
-    } catch (err) { alert(err.response?.data?.detail || 'Save failed'); }
+      setStatus(data.status || 'draft'); // Use status from backend response
+      
+      if (isEditingApproved) {
+        alert('Revised marks saved as draft. Submit for re-approval.');
+      } else {
+        alert('Marks saved as draft');
+      }
+    } catch (err) { 
+      console.error('Save error:', err);
+      alert(err.response?.data?.detail || 'Save failed'); 
+    }
     setSaving(false);
   };
 
   const handleSubmit = async () => {
     if (!entryId) return alert('Save marks first');
+    
+    // Check if all students have marks filled
+    const allStudentsGraded = students.every(s => marks[s.id] !== null && marks[s.id] !== undefined);
+    if (!allStudentsGraded) {
+      return alert('Please fill marks for all students before submitting for approval.');
+    }
+    
     if (!window.confirm('Submit marks for HOD approval? You cannot edit after submission.')) return;
     try {
       await marksAPI.submit(entryId);
       setStatus('submitted');
+      setIsEditingApproved(false);
+      setRevisionReason('');
       alert('Marks submitted for HOD approval');
     } catch (err) { alert(err.response?.data?.detail || 'Submit failed'); }
   };
 
-  const isEditable = status === 'new' || status === 'draft' || status === 'rejected';
+  const handleEnableEditApproved = () => {
+    const reason = prompt('Enter reason for editing approved marks:');
+    if (!reason || reason.trim() === '') {
+      alert('Reason is required to edit approved marks');
+      return;
+    }
+    setRevisionReason(reason.trim());
+    setIsEditingApproved(true);
+  };
+
+  const isEditable = status === 'new' || status === 'draft' || status === 'rejected' || isEditingApproved;
 
   // Compute average marks and percentage
   const stats = useMemo(() => {
@@ -121,7 +171,16 @@ const MarksEntry = ({ navigate, user }) => {
     <div className="min-h-screen bg-[#F8FAFC]">
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button data-testid="back-button" onClick={() => selectedAssignment ? setSelectedAssignment(null) : navigate('teacher-dashboard')}
+          <button data-testid="back-button" onClick={() => {
+            if (selectedAssignment && !isDirectNavigation) {
+              // Only go to assignment list if user manually selected from list
+              setSelectedAssignment(null);
+            } else {
+              // Go back to dashboard (for direct navigation or from assignment list)
+              const dashboardRoute = user?.role === 'hod' ? 'hod-dashboard' : 'teacher-dashboard';
+              navigate(dashboardRoute);
+            }
+          }}
             className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
             <ArrowLeft size={22} weight="duotone" />
           </button>
@@ -268,7 +327,19 @@ const MarksEntry = ({ navigate, user }) => {
             {/* Actions */}
             {isEditable && students.length > 0 && (
               <div className="flex items-center justify-between mt-6">
-                <p className="text-sm text-slate-500">{stats.gradedCount} / {students.length} students graded</p>
+                <p className="text-sm text-slate-500">
+                  {stats.gradedCount} / {students.length} students graded
+                  {stats.gradedCount < students.length && (
+                    <span className="text-amber-600 font-bold ml-2">
+                      ⚠ Fill all students' marks to submit
+                    </span>
+                  )}
+                  {isEditingApproved && revisionReason && (
+                    <span className="text-purple-600 font-bold ml-2">
+                      📝 Revision: {revisionReason}
+                    </span>
+                  )}
+                </p>
                 <div className="flex items-center gap-3">
                   <span className={`soft-badge ${
                     status === 'approved' ? 'bg-emerald-50 text-emerald-600' :
@@ -276,28 +347,42 @@ const MarksEntry = ({ navigate, user }) => {
                     status === 'rejected' ? 'bg-red-50 text-red-600' :
                     'bg-slate-100 text-slate-500'
                   }`}>
-                    {status === 'new' ? 'Not Started' : status.charAt(0).toUpperCase() + status.slice(1)}
+                    {status === 'new' ? 'Not Started' : isEditingApproved ? 'Editing Approved' : status.charAt(0).toUpperCase() + status.slice(1)}
                   </span>
                   <button data-testid="save-marks-button" onClick={handleSave} disabled={saving} className="btn-ghost !py-2.5 text-sm flex items-center gap-2 disabled:opacity-60">
                     <FloppyDisk size={16} weight="duotone" /> {saving ? 'Saving...' : 'Save Draft'}
                   </button>
-                  <button data-testid="submit-marks-button" onClick={handleSubmit} disabled={!entryId || status !== 'draft'} className="btn-primary !py-2.5 text-sm flex items-center gap-2 disabled:opacity-60">
-                    <PaperPlaneTilt size={16} weight="duotone" /> Submit for Approval
+                  <button 
+                    data-testid="submit-marks-button" 
+                    onClick={handleSubmit} 
+                    disabled={!entryId || (status !== 'draft' && !isEditingApproved) || stats.gradedCount < students.length} 
+                    className="btn-primary !py-2.5 text-sm flex items-center gap-2 disabled:opacity-60"
+                    title={stats.gradedCount < students.length ? 'Fill marks for all students before submitting' : ''}
+                  >
+                    <PaperPlaneTilt size={16} weight="duotone" /> {isEditingApproved ? 'Re-submit for Approval' : 'Submit for Approval'}
                   </button>
                 </div>
               </div>
             )}
 
-            {status === 'submitted' && (
+            {status === 'submitted' && !isEditingApproved && (
               <div className="mt-6 p-4 bg-amber-50 rounded-2xl flex items-center gap-3">
                 <Clock size={20} weight="duotone" className="text-amber-500" />
                 <p className="text-sm font-medium text-amber-700">Marks submitted. Waiting for HOD approval.</p>
               </div>
             )}
-            {status === 'approved' && (
-              <div className="mt-6 p-4 bg-emerald-50 rounded-2xl flex items-center gap-3">
-                <CheckCircle size={20} weight="duotone" className="text-emerald-500" />
-                <p className="text-sm font-medium text-emerald-700">Marks approved by HOD.</p>
+            {status === 'approved' && !isEditingApproved && (
+              <div className="mt-6 p-4 bg-emerald-50 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <CheckCircle size={20} weight="duotone" className="text-emerald-500" />
+                  <p className="text-sm font-medium text-emerald-700">Marks approved by HOD. These will reflect in final results.</p>
+                </div>
+                <button 
+                  onClick={handleEnableEditApproved}
+                  className="btn-secondary !py-2 !px-4 text-sm flex items-center gap-2"
+                >
+                  <PencilLine size={16} weight="duotone" /> Edit Approved Marks
+                </button>
               </div>
             )}
           </div>

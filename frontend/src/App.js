@@ -18,6 +18,7 @@ import UserManagement from './pages/UserManagement';
 import CodePlayground from './pages/CodePlayground';
 import MarksEntry from './pages/MarksEntry';
 import StudentManagement from './pages/StudentManagement';
+import ClassResults from './pages/ClassResults';
 
 const ROLE_DASHBOARD = {
   student: 'student-dashboard',
@@ -99,8 +100,9 @@ function App() {
       case 'live-monitor': return <LiveMonitor quiz={selectedData} navigate={navigate} user={user} />;
       case 'user-management': return <UserManagement navigate={navigate} user={user} />;
       case 'code-playground': return <CodePlayground navigate={navigate} user={user} />;
-      case 'marks-entry': return <MarksEntry navigate={navigate} user={user} />;
+      case 'marks-entry': return <MarksEntry navigate={navigate} user={user} preselectedAssignment={selectedData} />;
       case 'student-management': return <StudentManagement navigate={navigate} user={user} />;
+      case 'class-results': return <ClassResults navigate={navigate} user={user} />;
       default: return <LoginPage onLogin={handleLogin} />;
     }
   };

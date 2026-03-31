@@ -9,6 +9,14 @@ const LoginPage = ({ onLogin }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const quickLoginRoles = [
+    { role: 'Admin', collegeId: 'A001', password: 'admin123', color: 'bg-purple-500 hover:bg-purple-600', icon: '👑' },
+    { role: 'Teacher', collegeId: 'T001', password: 'teacher123', color: 'bg-indigo-500 hover:bg-indigo-600', icon: '👨‍🏫' },
+    { role: 'Student', collegeId: '22WJ8A6745', password: 'student123', color: 'bg-teal-500 hover:bg-teal-600', icon: '🎓' },
+    { role: 'HOD', collegeId: 'HOD001', password: 'hod123', color: 'bg-amber-500 hover:bg-amber-600', icon: '👔' },
+    { role: 'Exam Cell', collegeId: 'EC001', password: 'exam123', color: 'bg-rose-500 hover:bg-rose-600', icon: '📋' },
+  ];
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -18,6 +26,18 @@ const LoginPage = ({ onLogin }) => {
       onLogin(data);
     } catch (err) {
       setError(formatApiError(err.response?.data?.detail) || 'Login failed');
+    }
+    setLoading(false);
+  };
+
+  const handleQuickLogin = async (id, pass) => {
+    setError('');
+    setLoading(true);
+    try {
+      const { data } = await authAPI.login(id, pass);
+      onLogin(data);
+    } catch (err) {
+      setError(formatApiError(err.response?.data?.detail) || 'Quick login failed');
     }
     setLoading(false);
   };
@@ -91,13 +111,32 @@ const LoginPage = ({ onLogin }) => {
               </button>
             </form>
 
-            <div className="mt-6 p-4 bg-amber-50 rounded-2xl">
-              <p className="text-xs font-bold uppercase tracking-widest text-amber-700 mb-2">Demo Logins</p>
-              <p className="text-xs font-medium text-amber-600">Student: 22WJ8A6745 / student123</p>
-              <p className="text-xs font-medium text-amber-600">Teacher: T001 / teacher123</p>
-              <p className="text-xs font-medium text-amber-600">HOD: HOD001 / hod123</p>
-              <p className="text-xs font-medium text-amber-600">Exam Cell: EC001 / exam123</p>
-              <p className="text-xs font-medium text-amber-600">Admin: A001 / admin123</p>
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs">
+                  <span className="bg-white px-3 text-slate-400 font-bold uppercase tracking-widest">Quick Login</span>
+                </div>
+              </div>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                {quickLoginRoles.map((roleData) => (
+                  <button
+                    key={roleData.role}
+                    onClick={() => handleQuickLogin(roleData.collegeId, roleData.password)}
+                    disabled={loading}
+                    className={`${roleData.color} text-white rounded-2xl px-4 py-3 font-bold text-sm transition-all duration-200 active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2 shadow-sm`}
+                    data-testid={`quick-login-${roleData.role.toLowerCase().replace(' ', '-')}`}
+                  >
+                    <span className="text-lg">{roleData.icon}</span>
+                    <span>{roleData.role}</span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-4 text-xs text-center font-medium text-slate-400">Click any role to login instantly</p>
             </div>
           </div>
         </div>
