@@ -33,18 +33,30 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
   // ── Excel Template Download ─────────────────────────────
   const handleDownloadTemplate = () => {
     if (!students.length) return showToast('Load a class first to download template', 'error');
-    const rows = students.map((s, i) => ({
-      'S.No': i + 1,
-      'College ID': s.college_id,
-      'Student Name': s.name,
-      [`Max Marks (${maxMarks})`]: maxMarks,
-      'Marks Obtained': marks[s.id] ?? '',
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    // Set column widths
-    ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 16 }];
+
     const wb = XLSX.utils.book_new();
     const sheetName = `${selectedAssignment?.subject_code || 'Marks'}_${examType}`;
+
+    // Row 1: Max Marks header (single value, editable by teacher)
+    // Row 2: blank separator
+    // Row 3: column headers
+    // Row 4+: student data
+    const wsData = [
+      ['Max Marks', maxMarks],              // Row 1 — fill this value once
+      [],                                   // Row 2 — blank
+      ['S.No', 'College ID', 'Student Name', 'Marks Obtained'], // Row 3 — headers
+      ...students.map((s, i) => [
+        i + 1,
+        s.college_id,
+        s.name,
+        marks[s.id] ?? '',
+      ]),
+    ];
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    ws['!cols'] = [{ wch: 6 }, { wch: 16 }, { wch: 32 }, { wch: 18 }];
+    // Bold the Max Marks label
+    if (!ws['!fonts']) ws['!fonts'] = [];
     XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31));
     XLSX.writeFile(wb, `${sheetName}_template.xlsx`);
   };
@@ -58,10 +70,38 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
       try {
         const wb = XLSX.read(evt.target.result, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(ws);
-        if (!rows.length) return showToast('The spreadsheet appears to be empty.', 'error');
 
-        // Build a lookup: college_id -> student obj
+        // Read raw rows as arrays to check for our header layout
+        const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        if (!raw.length) return showToast('The spreadsheet appears to be empty.', 'error');
+
+        // --- Detect max marks from Row 1 (our template layout: ['Max Marks', value]) ---
+        let parsedMax = null;
+        if (String(raw[0]?.[0] || '').toLowerCase().includes('max marks')) {
+          const v = parseFloat(raw[0][1]);
+          if (!isNaN(v) && v > 0) parsedMax = v;
+        }
+
+        // --- Find the header row (the row containing 'College ID') ---
+        let headerRowIdx = raw.findIndex(row =>
+          row.some(cell => String(cell).toLowerCase().includes('college id'))
+        );
+        // Fallback: treat row 0 as header if not found (old template format)
+        if (headerRowIdx === -1) headerRowIdx = 0;
+
+        const headers = raw[headerRowIdx].map(h => String(h).trim());
+        const colIdx = {
+          collegeId: headers.findIndex(h => h.toLowerCase().includes('college id')),
+          marks: headers.findIndex(h => h.toLowerCase().includes('marks obtained')),
+        };
+
+        if (colIdx.collegeId === -1 || colIdx.marks === -1) {
+          return showToast('Could not find required columns. Please use the downloaded template.', 'error');
+        }
+
+        if (parsedMax) setMaxMarks(parsedMax);
+
+        // Build lookup
         const idMap = {};
         students.forEach(s => { idMap[String(s.college_id).trim().toLowerCase()] = s; });
 
@@ -69,27 +109,12 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
         let skipped = 0;
         const newMarks = { ...marks };
 
-        // Detect the marks column (any key containing 'marks obtained' case-insensitive)
-        const marksKey = rows.length > 0
-          ? Object.keys(rows[0]).find(k => k.toLowerCase().includes('marks obtained'))
-          : null;
-        const maxKey = rows.length > 0
-          ? Object.keys(rows[0]).find(k => k.toLowerCase().startsWith('max marks'))
-          : null;
-
-        if (!marksKey) return showToast('Could not find "Marks Obtained" column. Use the downloaded template.', 'error');
-
-        // Optionally update max marks from first row
-        if (maxKey && rows[0][maxKey]) {
-          const parsedMax = parseFloat(rows[0][maxKey]);
-          if (!isNaN(parsedMax) && parsedMax > 0) setMaxMarks(parsedMax);
-        }
-
-        rows.forEach(row => {
-          const collegeId = String(row['College ID'] || '').trim().toLowerCase();
+        const dataRows = raw.slice(headerRowIdx + 1);
+        dataRows.forEach(row => {
+          const collegeId = String(row[colIdx.collegeId] || '').trim().toLowerCase();
           const student = idMap[collegeId];
-          if (!student) { skipped++; return; }
-          const marksVal = row[marksKey];
+          if (!student) { if (collegeId) skipped++; return; }
+          const marksVal = row[colIdx.marks];
           if (marksVal === '' || marksVal === null || marksVal === undefined) return;
           const num = parseFloat(marksVal);
           if (!isNaN(num)) { newMarks[student.id] = num; updated++; }
@@ -103,7 +128,6 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
       }
     };
     reader.readAsArrayBuffer(file);
-    // Reset so the same file can be re-imported
     e.target.value = '';
   };
 
