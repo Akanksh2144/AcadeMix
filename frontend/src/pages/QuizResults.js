@@ -50,7 +50,7 @@ const QuizResults = ({ navigate, user }) => {
     <div className="min-h-screen bg-[#F8FAFC]">
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button data-testid="back-button" onClick={() => navigate(user?.role === 'student' ? 'student-dashboard' : user?.role === 'hod' ? 'hod-dashboard' : user?.role === 'exam_cell' ? 'examcell-dashboard' : user?.role === 'admin' ? 'admin-dashboard' : 'teacher-dashboard')} className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors"><ArrowLeft size={22} weight="duotone" /></button>
+          <button data-testid="back-button" onClick={() => navigate(user?.role === 'student' ? 'student-dashboard' : user?.role === 'hod' ? 'hod-dashboard' : user?.role === 'exam_cell' ? 'examcell-dashboard' : user?.role === 'admin' ? 'admin-dashboard' : 'teacher-dashboard')} className="p-2.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back"><ArrowLeft size={22} weight="duotone" /></button>
           <div><h1 className="text-2xl font-extrabold tracking-tight text-slate-900">Quiz Results</h1><p className="text-sm font-medium text-slate-400">Your performance overview</p></div>
         </div>
       </header>

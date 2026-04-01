@@ -22,7 +22,7 @@ const UserManagement = ({ navigate }) => {
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center gap-4">
-            <button data-testid="back-button" onClick={() => navigate('admin-dashboard')} className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
+            <button data-testid="back-button" onClick={() => navigate('admin-dashboard')} className="p-2.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
               <ArrowLeft size={22} weight="duotone" />
             </button>
             <div><h1 className="text-2xl font-extrabold tracking-tight text-slate-900">User Management</h1><p className="text-sm font-medium text-slate-400">Manage students and faculty</p></div>

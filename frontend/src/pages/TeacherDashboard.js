@@ -137,7 +137,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user?.designation || 'Assistant Professor'}</p>
               </div>
             </div>
-            <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
+            <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors" aria-label="Sign out">
               <SignOut size={20} weight="duotone" />
             </button>
           </div>

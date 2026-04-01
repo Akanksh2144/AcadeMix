@@ -117,7 +117,7 @@ const CodePlayground = ({ navigate, user }) => {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button data-testid="back-button" onClick={() => navigate(dashboardPage)}
-                className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
+                className="p-2.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
                 <ArrowLeft size={22} weight="duotone" />
               </button>
               <div className="flex items-center gap-3">

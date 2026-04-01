@@ -71,7 +71,7 @@ const Analytics = ({ navigate, user, userRole }) => {
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center gap-4">
             <button data-testid="back-button" onClick={() => navigate(role === 'student' ? 'student-dashboard' : role === 'hod' ? 'hod-dashboard' : role === 'exam_cell' ? 'examcell-dashboard' : role === 'admin' ? 'admin-dashboard' : 'teacher-dashboard')}
-              className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
+              className="p-2.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
               <ArrowLeft size={22} weight="duotone" />
             </button>
             <div>

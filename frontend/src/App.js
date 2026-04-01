@@ -67,6 +67,7 @@ function App() {
   };
 
   const handleLogout = async () => {
+    if (!window.confirm('Are you sure you want to sign out?')) return;
     try { await authAPI.logout(); } catch {}
     setUser(null);
     clearAuthToken();

@@ -72,7 +72,7 @@ const ClassResults = ({ navigate, user }) => {
               <button 
                 data-testid="back-button" 
                 onClick={() => navigate('teacher-dashboard')} 
-                className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors"
+                className="p-2.5 rounded-full bg-indigo-50 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back"
               >
                 <ArrowLeft size={22} weight="duotone" />
               </button>

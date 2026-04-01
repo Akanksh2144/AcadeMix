@@ -73,7 +73,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
     <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
       <div className="text-center">
         <div className="w-14 h-14 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-sm font-bold text-slate-400">Loading your dashboard...</p>
+        <p className="text-sm font-bold text-slate-500">Loading your dashboard...</p>
       </div>
     </div>
   );
@@ -108,11 +108,11 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-slate-700 truncate">{item.title}</p>
-                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">{item.subtitle} • {timeAgo(item.timestamp)}</p>
+                    <p className="text-xs font-medium text-slate-500 mt-0.5">{item.subtitle} • {timeAgo(item.timestamp)}</p>
                   </div>
                   {item.score !== undefined && (
                     <span className={`text-sm font-extrabold flex-shrink-0 ${
-                      item.score >= 60 ? 'text-emerald-500' : item.score >= 40 ? 'text-amber-500' : 'text-red-500'
+                      item.score >= 60 ? 'text-emerald-600' : item.score >= 40 ? 'text-amber-600' : 'text-red-600'
                     }`}>{item.score?.toFixed(0)}%</span>
                   )}
                 </div>
@@ -129,7 +129,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
             </div>
             <div>
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900">AcadeMix</h1>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Student</p>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Student</p>
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
@@ -140,6 +140,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                   data-testid="notification-bell"
                   onClick={() => setShowNotifications(!showNotifications)}
                   className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors relative"
+                  aria-label="Notifications"
                 >
                   <Bell size={20} weight={showNotifications ? 'fill' : 'duotone'} />
                   {!notifRead && (
@@ -154,10 +155,10 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
               <GraduationCap size={18} weight="duotone" className="text-indigo-500" />
               <div className="text-right">
                 <p className="text-sm font-bold text-slate-800">{user?.name}</p>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{user?.college_id} • {user?.department} • {user?.section}</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{user?.college_id} • {user?.department} • {user?.section}</p>
               </div>
             </div>
-            <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors">
+            <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors" aria-label="Sign out">
               <SignOut size={20} weight="duotone" />
             </button>
           </div>
@@ -180,8 +181,8 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
               <Trophy size={24} weight="fill" className="text-white hidden sm:block" />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">CGPA</p>
-              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{dashboard?.cgpa?.toFixed(1) || '-'} <span className="text-xs sm:text-sm font-bold text-slate-400">/ 10</span></p>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-500">CGPA</p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{dashboard?.cgpa?.toFixed(1) || '-'} <span className="text-xs sm:text-sm font-bold text-slate-500">/ 10</span></p>
             </div>
           </div>
         </div>
@@ -196,12 +197,12 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                 style={{animation: `fadeInUp ${0.2 + i * 0.1}s ease`}}>
                 <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity`}></div>
                 <div className="flex items-center justify-between mb-3 sm:mb-4">
-                  <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-400">{stat.label}</span>
+                  <span className="text-xs font-bold uppercase tracking-widest text-slate-500">{stat.label}</span>
                   <div className={`${stat.color} p-2 sm:p-2.5 rounded-xl`}><Icon size={18} weight="duotone" /></div>
                 </div>
                 <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{stat.value}</p>
-                <p className="text-[10px] sm:text-xs font-medium text-slate-400 mt-1">{stat.sub}</p>
-                {stat.onClick && <p className="text-[10px] font-bold text-indigo-500 mt-2 flex items-center gap-1">View all <ArrowRight size={10} weight="bold" /></p>}
+                <p className="text-xs font-medium text-slate-500 mt-1">{stat.sub}</p>
+                {stat.onClick && <p className="text-xs font-bold text-indigo-600 mt-2 flex items-center gap-1">View all <ArrowRight size={10} weight="bold" /></p>}
               </Wrapper>
             );
           })}
@@ -225,7 +226,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                 </div>
                 <div className="min-w-0">
                   <p className="font-extrabold text-sm sm:text-base text-slate-900 truncate">{item.label}</p>
-                  <p className="text-xs sm:text-sm font-medium text-slate-400 truncate">{item.sub}</p>
+                  <p className="text-xs sm:text-sm font-bold text-slate-500 truncate">{item.sub}</p>
                 </div>
               </button>
             );
@@ -291,7 +292,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex items-center gap-3 text-[10px] font-bold text-slate-400">
+                <div className="flex items-center gap-3 text-xs font-bold text-slate-500">
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-500"></span>Needs Work</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-amber-500"></span>Average</span>
                   <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-500"></span>Strong</span>
@@ -302,8 +303,8 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                 <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <ChartLine size={24} weight="duotone" className="text-slate-400" />
                 </div>
-                <p className="text-sm font-bold text-slate-400">Take some quizzes first</p>
-                <p className="text-xs text-slate-400 mt-1">Topic analysis will appear after completing quizzes</p>
+                <p className="text-sm font-bold text-slate-500">Take some quizzes first</p>
+                <p className="text-xs text-slate-500 mt-1">Topic analysis will appear after completing quizzes</p>
               </div>
             )}
           </div>
@@ -330,14 +331,14 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-slate-700 truncate">{item.title}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {item.subtitle && <span className="text-xs font-medium text-slate-400">{item.subtitle}</span>}
-                        <span className="text-[10px] text-slate-300">•</span>
-                        <span className="text-[10px] font-medium text-slate-400">{timeAgo(item.timestamp)}</span>
+                        {item.subtitle && <span className="text-xs font-medium text-slate-500">{item.subtitle}</span>}
+                        <span className="text-xs text-slate-400">•</span>
+                        <span className="text-xs font-medium text-slate-500">{timeAgo(item.timestamp)}</span>
                       </div>
                     </div>
                     {item.score !== undefined && (
                       <span className={`text-sm font-extrabold flex-shrink-0 ${
-                        item.score >= 60 ? 'text-emerald-500' : item.score >= 40 ? 'text-amber-500' : 'text-red-500'
+                        item.score >= 60 ? 'text-emerald-600' : item.score >= 40 ? 'text-amber-600' : 'text-red-600'
                       }`}>{item.score?.toFixed(0)}%</span>
                     )}
                   </div>
@@ -348,8 +349,8 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                 <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-3">
                   <Lightning size={24} weight="duotone" className="text-slate-400" />
                 </div>
-                <p className="text-sm font-bold text-slate-400">No activity yet</p>
-                <p className="text-xs text-slate-400 mt-1">Your quiz activity will show up here</p>
+                <p className="text-sm font-bold text-slate-500">No activity yet</p>
+                <p className="text-xs text-slate-500 mt-1">Your quiz activity will show up here</p>
               </div>
             )}
           </div>
