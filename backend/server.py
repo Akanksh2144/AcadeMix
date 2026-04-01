@@ -7,6 +7,7 @@ import os
 import bcrypt
 import jwt
 import secrets
+import httpx
 import subprocess
 import tempfile
 from datetime import datetime, timezone, timedelta
@@ -1467,46 +1468,6 @@ def _validate_code(code: str, language: str):
                 detail=f"Blocked: '{match.group()}' is not allowed for security reasons."
             )
 
-async def _run_process(cmd, stdin_data="", timeout=5, cwd=None):
-    """Run a subprocess in a thread executor (Windows-compatible)."""
-    import concurrent.futures
-    def _exec():
-        try:
-            result = subprocess.run(
-                cmd,
-                input=stdin_data or None,
-                capture_output=True, text=True,
-                timeout=timeout,
-                cwd=cwd,
-            )
-            return result.stdout, result.stderr, result.returncode
-        except subprocess.TimeoutExpired:
-            return "", f"Execution timed out ({timeout} second limit)", -1
-        except Exception as e:
-            return "", str(e), -1
-
-    loop = _asyncio.get_event_loop()
-    with concurrent.futures.ThreadPoolExecutor() as pool:
-        return await loop.run_in_executor(pool, _exec)
-
-# Detect available runtimes
-def _find_runtime(names):
-    for name in names:
-        path = _shutil.which(name)
-        if path and 'WindowsApps' not in path:  # Skip Windows Store stubs
-            return path
-    return None
-
-import sys as _sys
-_RUNTIMES = {
-    "python": _find_runtime(["python", "python3"]) or _sys.executable,  # fallback to current interpreter
-    "javascript": _find_runtime(["node"]),
-    "java": _find_runtime(["java"]),
-    "javac": _find_runtime(["javac"]),
-    "c": _find_runtime(["gcc"]),
-    "cpp": _find_runtime(["g++"]),
-}
-
 @app.post("/api/code/execute")
 async def execute_code(req: CodeExecuteRequest, user: dict = Depends(get_current_user)):
     if len(req.code) > 10000:
@@ -1520,70 +1481,53 @@ async def execute_code(req: CodeExecuteRequest, user: dict = Depends(get_current
     # Validate code for dangerous patterns
     _validate_code(req.code, language)
 
+    # Map languages to Piston Engine
+    lang_map = {
+        "python": "python",
+        "javascript": "javascript",
+        "java": "java",
+        "c": "c",
+        "cpp": "c++"
+    }
+    
+    version_map = {
+        "python": "3.10.0",
+        "javascript": "18.15.0",
+        "java": "15.0.2",
+        "c": "10.2.0",
+        "cpp": "10.2.0"
+    }
+
+    payload = {
+        "language": lang_map[language],
+        "version": version_map[language],
+        "files": [{"content": req.code}],
+        "stdin": req.test_input or "",
+        "compile_timeout": 10000,
+        "run_timeout": 5000,
+        "compile_memory_limit": -1,
+        "run_memory_limit": -1
+    }
+
     try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            if language == "python":
-                rt = _RUNTIMES.get("python")
-                if not rt:
-                    raise HTTPException(status_code=500, detail="Python runtime not available on server")
-                filepath = os.path.join(tmpdir, "solution.py")
-                with open(filepath, "w") as f:
-                    f.write(req.code)
-                stdout, stderr, code = await _run_process([rt, filepath], req.test_input, timeout=5, cwd=tmpdir)
-
-            elif language == "javascript":
-                rt = _RUNTIMES.get("javascript")
-                if not rt:
-                    raise HTTPException(status_code=500, detail="Node.js runtime not available on server")
-                filepath = os.path.join(tmpdir, "solution.js")
-                with open(filepath, "w") as f:
-                    f.write(req.code)
-                stdout, stderr, code = await _run_process([rt, filepath], req.test_input, timeout=5, cwd=tmpdir)
-
-            elif language == "java":
-                javac = _RUNTIMES.get("javac")
-                java = _RUNTIMES.get("java")
-                if not javac or not java:
-                    raise HTTPException(status_code=500, detail="Java runtime not available on server")
-                filepath = os.path.join(tmpdir, "Solution.java")
-                with open(filepath, "w") as f:
-                    f.write(req.code)
-                # Compile
-                cout, cerr, ccode = await _run_process([javac, filepath], timeout=10, cwd=tmpdir)
-                if ccode != 0:
-                    return {"output": "", "error": cerr[:2000], "exit_code": ccode}
-                # Run
-                stdout, stderr, code = await _run_process([java, "-cp", tmpdir, "Solution"], req.test_input, timeout=5, cwd=tmpdir)
-
-            elif language == "c":
-                gcc = _RUNTIMES.get("c")
-                if not gcc:
-                    raise HTTPException(status_code=500, detail="GCC (C compiler) not available on server. Install MinGW or GCC.")
-                src = os.path.join(tmpdir, "solution.c")
-                out = os.path.join(tmpdir, "solution.exe" if os.name == "nt" else "solution")
-                with open(src, "w") as f:
-                    f.write(req.code)
-                # Compile
-                cout, cerr, ccode = await _run_process([gcc, src, "-o", out, "-lm"], timeout=10, cwd=tmpdir)
-                if ccode != 0:
-                    return {"output": "", "error": cerr[:2000], "exit_code": ccode}
-                # Run
-                stdout, stderr, code = await _run_process([out], req.test_input, timeout=5, cwd=tmpdir)
-
-            elif language == "cpp":
-                gpp = _RUNTIMES.get("cpp")
-                if not gpp:
-                    raise HTTPException(status_code=500, detail="G++ (C++ compiler) not available on server. Install MinGW or G++.")
-                src = os.path.join(tmpdir, "solution.cpp")
-                out = os.path.join(tmpdir, "solution.exe" if os.name == "nt" else "solution")
-                with open(src, "w") as f:
-                    f.write(req.code)
-                # Compile
-                cout, cerr, ccode = await _run_process([gpp, src, "-o", out, "-lm"], timeout=10, cwd=tmpdir)
-                if ccode != 0:
-                    return {"output": "", "error": cerr[:2000], "exit_code": ccode}
-                # Run
-                stdout, stderr, code = await _run_process([out], req.test_input, timeout=5, cwd=tmpdir)
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.post("https://emkc.org/api/v2/piston/execute", json=payload)
+            response.raise_for_status()
+            
+            data = response.json()
+            compile_result = data.get("compile", {})
+            run_result = data.get("run", {})
+            
+            if compile_result.get("code", 0) != 0:
+                return {
+                    "output": "",
+                    "error": compile_result.get("stderr", "")[:2000],
+                    "exit_code": compile_result.get("code", -1)
+                }
+            
+            stdout = run_result.get("stdout", "")
+            stderr = run_result.get("stderr", "")
+            code = run_result.get("code", 0)
 
             if code != 0 and not stdout:
                 stdout = stderr
@@ -1594,8 +1538,11 @@ async def execute_code(req: CodeExecuteRequest, user: dict = Depends(get_current
                 "error": stderr[:2000],
                 "exit_code": code
             }
-    except HTTPException:
-        raise
+            
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 429:
+            return {"output": "", "error": "Rate Limit Exceeded. The Piston Engine is currently busy (Too many students). Please try again in 5 seconds.", "exit_code": -1}
+        return {"output": "", "error": f"API Error: {e.response.text}"[:500], "exit_code": -1}
     except Exception as e:
         return {"output": "", "error": str(e)[:500], "exit_code": -1}
 
