@@ -63,7 +63,7 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .pill-tab {
-    @apply px-5 py-2.5 rounded-full font-bold text-sm transition-all duration-200;
+    @apply px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-200;
   }
 
   .pill-tab-active {
