@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Plus, ChartLine, Users, Eye, SignOut, Clipboard, Calendar, PencilLine, Bell, GraduationCap, ArrowRight, Exam, Fire } from '@phosphor-icons/react';
+import { BookOpen, NotePencil, ChartLine, Users, Eye, SignOut, Clipboard, Calendar, PencilLine, Bell, GraduationCap, ArrowRight, Exam, Fire } from '@phosphor-icons/react';
 import { analyticsAPI } from '../services/api';
 
 const getGreeting = () => {
@@ -183,7 +183,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
         {/* ── Quick Actions ────────────────────────── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-5 mb-6 sm:mb-8">
           {[
-            { id: 'quiz-builder', icon: Plus, label: 'Create Quiz', sub: 'Build from scratch', color: 'indigo', testId: 'create-quiz-button' },
+            { id: 'quiz-builder', icon: NotePencil, label: 'Create Quiz', sub: 'Build from scratch', color: 'indigo', testId: 'create-quiz-button' },
             { id: 'marks-entry', icon: PencilLine, label: 'Marks Entry', sub: 'Mid-term marks', color: 'violet', testId: 'marks-entry-button' },
             { id: 'class-results', icon: ChartLine, label: 'View Results', sub: 'Class-wise analytics', color: 'emerald', testId: 'view-all-results-button' },
             { id: 'student-management', icon: Users, label: 'Students', sub: 'Manage enrollment', color: 'amber', testId: 'manage-students-button' },
