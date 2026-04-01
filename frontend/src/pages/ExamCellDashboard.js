@@ -3,7 +3,8 @@ import { BookOpen, Upload, CheckCircle, Clock, SignOut, FileText, ChartBar, Eye,
 import { examCellAPI, marksAPI } from '../services/api';
 
 const ExamCellDashboard = ({ navigate, user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('examcell_tab') || 'overview');
+  useEffect(() => { sessionStorage.setItem('examcell_tab', activeTab); }, [activeTab]);
   const [dashboard, setDashboard] = useState(null);
   const [approvedMarks, setApprovedMarks] = useState([]);
   const [endtermEntries, setEndtermEntries] = useState([]);

@@ -32,7 +32,11 @@ const ROLE_DASHBOARD = {
 };
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('login');
+  const [currentPage, setCurrentPage] = useState(() => sessionStorage.getItem('academix_page') || 'login');
+
+  useEffect(() => {
+    sessionStorage.setItem('academix_page', currentPage);
+  }, [currentPage]);
   const [user, setUser] = useState(null);
   const [selectedData, setSelectedData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -43,7 +47,7 @@ function App() {
     try {
       const { data } = await authAPI.me();
       setUser(data);
-      setCurrentPage(ROLE_DASHBOARD[data.role] || 'login');
+      setCurrentPage((prev) => prev === 'login' ? (ROLE_DASHBOARD[data.role] || 'login') : prev);
     } catch {
       clearAuthToken();
       localStorage.removeItem('auth_token');

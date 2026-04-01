@@ -4,7 +4,8 @@ import { facultyAPI, examCellAPI, marksAPI } from '../services/api';
 import { StudentResultsSearch } from '../components/StudentResultsSearch';
 
 const HodDashboard = ({ navigate, user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('hod_tab') || 'overview');
+  useEffect(() => { sessionStorage.setItem('hod_tab', activeTab); }, [activeTab]);
   const [analyticsTab, setAnalyticsTab] = useState('quiz');
   const [dashboard, setDashboard] = useState(null);
   const [assignments, setAssignments] = useState([]);

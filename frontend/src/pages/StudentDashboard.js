@@ -174,13 +174,14 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
             </p>
           </div>
           {/* CGPA Card */}
-          <div className="soft-card px-7 py-4 flex items-center gap-4" style={{animation: 'fadeInUp 0.25s ease'}}>
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-500">
-              <Trophy size={24} weight="fill" className="text-white" />
+          <div className="soft-card px-4 py-4 flex items-center gap-4 w-[calc(50%-0.375rem)] sm:w-[calc(50%-0.75rem)] md:w-auto" style={{animation: 'fadeInUp 0.25s ease'}}>
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-amber-400 to-orange-500 flex-shrink-0">
+              <Trophy size={20} weight="fill" className="text-white sm:hidden" />
+              <Trophy size={24} weight="fill" className="text-white hidden sm:block" />
             </div>
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">CGPA</p>
-              <p className="text-3xl font-extrabold tracking-tight text-slate-900">{dashboard?.cgpa?.toFixed(1) || '-'} <span className="text-sm font-bold text-slate-400">/ 10</span></p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{dashboard?.cgpa?.toFixed(1) || '-'} <span className="text-xs sm:text-sm font-bold text-slate-400">/ 10</span></p>
             </div>
           </div>
         </div>

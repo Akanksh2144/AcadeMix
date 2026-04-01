@@ -17,7 +17,8 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 const AdminDashboard = ({ navigate, user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('admin_tab') || 'overview');
+  useEffect(() => { sessionStorage.setItem('admin_tab', activeTab); }, [activeTab]);
   const [dashboardData, setDashboardData] = useState(null);
 
   useEffect(() => {
