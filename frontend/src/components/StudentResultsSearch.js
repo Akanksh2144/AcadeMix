@@ -315,6 +315,7 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
       setLoading(false);
     };
     init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSearch = async (value) => {

@@ -42,6 +42,7 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
     code.toLowerCase().includes(subjectCodeSearch.toLowerCase())
   );
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchData(); }, [activeTab]);
   
   useEffect(() => {

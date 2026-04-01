@@ -116,3 +116,5 @@ data/
 artifacts/
 backend/venv/
 .gemini/
+
+.emergent/

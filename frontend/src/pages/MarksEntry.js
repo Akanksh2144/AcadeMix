@@ -47,6 +47,7 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
       setLoading(false);
     };
     fetchAssignments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preselectedAssignment]);
 
   const loadStudentsAndMarks = async (assignment, exam) => {
