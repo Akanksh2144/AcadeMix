@@ -84,6 +84,7 @@ const QuizBuilder = ({ navigate, user }) => {
         'Option B': 'Stack',
         'Option C': 'Linked List',
         'Option D': 'Tree',
+        'Option E': '',
         'Correct Answer(s)': 'B',
         'Marks': 2,
         'Expected Answer / Max Length': '',
@@ -94,8 +95,9 @@ const QuizBuilder = ({ navigate, user }) => {
         'Option A': 'Bubble Sort',
         'Option B': 'Binary Search',
         'Option C': 'Merge Sort',
-        'Option D': 'DFS',
-        'Correct Answer(s)': 'A,C',
+        'Option D': 'Quick Sort',
+        'Option E': 'DFS',
+        'Correct Answer(s)': 'A,C,D',
         'Marks': 3,
         'Expected Answer / Max Length': '',
       },
@@ -106,6 +108,7 @@ const QuizBuilder = ({ navigate, user }) => {
         'Option B': '',
         'Option C': '',
         'Option D': '',
+        'Option E': '',
         'Correct Answer(s)': 'O(log n)',
         'Marks': 2,
         'Expected Answer / Max Length': 200,
@@ -114,7 +117,7 @@ const QuizBuilder = ({ navigate, user }) => {
     const ws = XLSX.utils.json_to_sheet(exampleRows);
     ws['!cols'] = [
       { wch: 14 }, { wch: 50 }, { wch: 22 }, { wch: 22 },
-      { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 8 }, { wch: 28 },
+      { wch: 22 }, { wch: 22 }, { wch: 22 }, { wch: 20 }, { wch: 8 }, { wch: 28 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Quiz Questions');
@@ -137,39 +140,46 @@ const QuizBuilder = ({ navigate, user }) => {
         const errors = [];
 
         rows.forEach((row, idx) => {
-          const rowNum = idx + 2; // 1-indexed + header row
+          const rowNum = idx + 2;
           const typeRaw = String(row['Type'] || '').trim().toLowerCase();
           const questionText = String(row['Question'] || '').trim();
           const marksVal = parseInt(row['Marks']) || 2;
           const correctRaw = String(row['Correct Answer(s)'] || '').trim().toUpperCase();
-          const letterToIdx = { A: 0, B: 1, C: 2, D: 3, E: 4 };
 
           if (!questionText) { errors.push(`Row ${rowNum}: Question text is empty — skipped.`); return; }
 
+          // Dynamically find all "Option X" columns in this row (A, B, C, D, E, F...)
+          const optionKeys = Object.keys(row)
+            .filter(k => /^Option\s+[A-Z]$/i.test(k.trim()))
+            .sort();  // alphabetical sort ensures A < B < C...
+          const optionValues = optionKeys.map(k => String(row[k] || '').trim()).filter(o => o !== '');
+
+          // Build letter→index from the option keys that actually had values
+          const letterToIdx = {};
+          optionKeys.forEach((k, i) => {
+            const letter = k.trim().slice(-1).toUpperCase(); // last char, e.g. 'A'
+            letterToIdx[letter] = i;
+          });
+
           if (typeRaw === 'mcq-single' || typeRaw === 'mcq single') {
-            const options = ['Option A', 'Option B', 'Option C', 'Option D']
-              .map(k => String(row[k] || '').trim())
-              .filter(o => o !== '');
-            if (options.length < 2) { errors.push(`Row ${rowNum}: MCQ-Single needs at least 2 options — skipped.`); return; }
-            const correctIdx = letterToIdx[correctRaw];
-            if (correctIdx === undefined || correctIdx >= options.length) {
-              errors.push(`Row ${rowNum}: Invalid correct answer "${correctRaw}" — defaulting to A.`);
+            if (optionValues.length < 2) { errors.push(`Row ${rowNum}: MCQ-Single needs at least 2 options — skipped.`); return; }
+            const correctLetter = correctRaw.trim();
+            const correctIdx = letterToIdx[correctLetter];
+            if (correctIdx === undefined || correctIdx >= optionValues.length) {
+              errors.push(`Row ${rowNum}: Invalid correct answer "${correctLetter}" — defaulting to A.`);
             }
             imported.push({
               id: questions.length + imported.length + 1,
               type: 'mcq-single',
               text: questionText,
-              options,
+              options: optionValues,
               correctAnswer: correctIdx ?? 0,
               marks: marksVal,
             });
           } else if (typeRaw === 'mcq-multiple' || typeRaw === 'mcq multiple') {
-            const options = ['Option A', 'Option B', 'Option C', 'Option D']
-              .map(k => String(row[k] || '').trim())
-              .filter(o => o !== '');
-            if (options.length < 2) { errors.push(`Row ${rowNum}: MCQ-Multiple needs at least 2 options — skipped.`); return; }
-            const correctAnswers = correctRaw.split(',').map(l => letterToIdx[l.trim()]).filter(i => i !== undefined && i < options.length);
-            if (!correctAnswers.length) { errors.push(`Row ${rowNum}: No valid correct answers for MCQ-Multiple — defaulting to A.`); correctAnswers.push(0); }
+            if (optionValues.length < 2) { errors.push(`Row ${rowNum}: MCQ-Multiple needs at least 2 options — skipped.`); return; }
+            const correctAnswers = correctRaw.split(',').map(l => letterToIdx[l.trim()]).filter(i => i !== undefined && i < optionValues.length);
+            if (!correctAnswers.length) { errors.push(`Row ${rowNum}: No valid correct answers — defaulting to A.`); correctAnswers.push(0); }
             imported.push({
               id: questions.length + imported.length + 1,
               type: 'mcq-multiple',
