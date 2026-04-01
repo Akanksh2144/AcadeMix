@@ -49,7 +49,9 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifRead, setNotifRead] = useState(false);
+  const notifKey = `academix_notif_read_${user?.id || 'default'}`;
+  const [notifRead, setNotifReadState] = useState(() => localStorage.getItem(notifKey) === 'true');
+  const setNotifRead = (val) => { setNotifReadState(val); localStorage.setItem(notifKey, String(val)); };
 
   useEffect(() => {
     const fetchData = async () => {
