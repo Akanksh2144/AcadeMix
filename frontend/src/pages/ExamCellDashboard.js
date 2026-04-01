@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { BookOpen, Upload, CheckCircle, Clock, SignOut, FileText, ChartBar, Eye, PaperPlaneTilt } from '@phosphor-icons/react';
 import { examCellAPI, marksAPI } from '../services/api';
+import AlertModal from '../components/AlertModal';
 
 const ExamCellDashboard = ({ navigate, user, onLogout }) => {
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('examcell_tab') || 'overview');
   useEffect(() => { sessionStorage.setItem('examcell_tab', activeTab); }, [activeTab]);
   const [dashboard, setDashboard] = useState(null);
+  const [alertModal, setAlertModal] = useState({ open: false, title: '', message: '', type: 'info' });
+  const showAlert = (title, message, type = 'info') => setAlertModal({ open: true, title, message, type });
+  const closeAlert = () => setAlertModal(prev => ({ ...prev, open: false }));
+  const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', type: 'warning', onConfirm: null });
   const [approvedMarks, setApprovedMarks] = useState([]);
   const [endtermEntries, setEndtermEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -78,27 +83,30 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
   };
 
   const handleUpload = async () => {
-    if (!uploadFile) return alert('Please select a file');
-    if (!uploadForm.subject_code) return alert('Please fill all fields');
+    if (!uploadFile) return showAlert('Missing File', 'Please select a file.', 'warning');
+    if (!uploadForm.subject_code) return showAlert('Missing Fields', 'Please fill all fields.', 'warning');
     setUploading(true);
     try {
       const fd = new FormData();
       fd.append('file', uploadFile);
       Object.entries(uploadForm).forEach(([k, v]) => fd.append(k, v));
       const { data } = await examCellAPI.uploadFile(fd);
-      alert(data.message);
+      showAlert('Upload Successful', data.message, 'success');
       setUploadFile(null);
       fetchData();
-    } catch (err) { alert(err.response?.data?.detail || 'Upload failed'); }
+    } catch (err) { showAlert('Upload Failed', err.response?.data?.detail || 'Upload failed', 'danger'); }
     setUploading(false);
   };
 
   const handlePublish = async (entryId) => {
-    if (!window.confirm('Publish these results? Students will be able to view them.')) return;
-    try {
-      await examCellAPI.publish(entryId);
-      fetchData();
-    } catch (err) { alert(err.response?.data?.detail || 'Publish failed'); }
+    setConfirmModal({
+      open: true, title: 'Publish Results', message: 'Publish these results? Students will be able to view them.', type: 'warning',
+      onConfirm: async () => {
+        setConfirmModal(prev => ({ ...prev, open: false }));
+        try { await examCellAPI.publish(entryId); fetchData(); }
+        catch (err) { showAlert('Publish Failed', err.response?.data?.detail || 'Publish failed', 'danger'); }
+      },
+    });
   };
 
   const stats = dashboard ? [
@@ -408,6 +416,25 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
           </div>
         )}
       </div>
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+        onConfirm={closeAlert}
+        onCancel={closeAlert}
+      />
+      <AlertModal
+        open={confirmModal.open}
+        type={confirmModal.type}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText="Publish"
+        cancelText="Cancel"
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+      />
     </div>
   );
 };

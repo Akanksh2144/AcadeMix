@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ArrowLeft, Plus, Trash, Copy, Eye, CalendarBlank, Clock, X, WarningCircle, CaretDown, CaretUp, DownloadSimple, UploadSimple } from '@phosphor-icons/react';
 import { facultyAPI, quizzesAPI } from '../services/api';
 import * as XLSX from 'xlsx';
+import AlertModal from '../components/AlertModal';
 
 const QuizBuilder = ({ navigate, user }) => {
   const [quizTitle, setQuizTitle] = useState('New Quiz');
@@ -25,6 +26,9 @@ const QuizBuilder = ({ navigate, user }) => {
   const [showAnswersAfter, setShowAnswersAfter] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const importQuizRef = useRef(null);
+  const [alertModal, setAlertModal] = useState({ open: false, title: '', message: '', type: 'info', onConfirm: null });
+  const showAlert = (title, message, type = 'info') => setAlertModal({ open: true, title, message, type, onConfirm: null });
+  const closeAlert = () => setAlertModal(prev => ({ ...prev, open: false }));
 
   useEffect(() => {
     const fetchAssignments = async () => {
@@ -139,7 +143,7 @@ const QuizBuilder = ({ navigate, user }) => {
         const wb = XLSX.read(evt.target.result, { type: 'array' });
         const ws = wb.Sheets[wb.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-        if (!rows.length) { alert('The spreadsheet appears to be empty.'); return; }
+        if (!rows.length) { showAlert('Import Failed', 'The spreadsheet appears to be empty.', 'warning'); return; }
 
         const imported = [];
         const errors = [];
@@ -213,16 +217,16 @@ const QuizBuilder = ({ navigate, user }) => {
           }
         });
 
-        if (!imported.length) { alert('No valid questions were imported. Check your template.\n\n' + errors.join('\n')); return; }
+        if (!imported.length) { showAlert('Import Failed', 'No valid questions were imported. Check your template.\n\n' + errors.join('\n'), 'warning'); return; }
 
         setQuestions(prev => [...prev, ...imported]);
         setCurrentQuestion(questions.length); // jump to first imported
         const summary = `✓ Imported ${imported.length} question${imported.length !== 1 ? 's' : ''}.`;
         const warn = errors.length ? `\n\nWarnings:\n${errors.join('\n')}` : '';
-        alert(summary + warn);
+        showAlert('Import Successful', summary + warn, 'success');
       } catch (err) {
         console.error(err);
-        alert('Failed to read file. Make sure it is a valid .xlsx file.');
+        showAlert('Import Error', 'Failed to read file. Make sure it is a valid .xlsx file.', 'danger');
       }
     };
     reader.readAsArrayBuffer(file);
@@ -260,23 +264,23 @@ const QuizBuilder = ({ navigate, user }) => {
   };
 
   const handlePublish = async (isDraft = false) => {
-    if (!quizTitle.trim()) { alert('Please enter a quiz title'); return; }
-    if (!subject) { alert('Please select a subject'); return; }
-    if (!isDraft && questions.length === 0) { alert('Please add at least one question'); return; }
-    if (!isDraft && selectedClasses.length === 0) { alert('Please select at least one assigned class.'); return; }
+    if (!quizTitle.trim()) { showAlert('Missing Title', 'Please enter a quiz title.', 'warning'); return; }
+    if (!subject) { showAlert('Missing Subject', 'Please select a subject.', 'warning'); return; }
+    if (!isDraft && questions.length === 0) { showAlert('No Questions', 'Please add at least one question.', 'warning'); return; }
+    if (!isDraft && selectedClasses.length === 0) { showAlert('No Classes', 'Please select at least one assigned class.', 'warning'); return; }
     
     if (!isDraft) {
       const emptyQuestions = questions.filter(q => !q.text.trim());
-      if (emptyQuestions.length > 0) { alert('Please fill in all question texts'); return; }
+      if (emptyQuestions.length > 0) { showAlert('Incomplete Questions', 'Please fill in all question texts.', 'warning'); return; }
       const mcqQuestions = questions.filter(q => q.type === 'mcq-single' || q.type === 'mcq-multiple');
       for (let q of mcqQuestions) {
-        if (q.options.some(o => !o.trim())) { alert('Please fill in all MCQ options'); return; }
+        if (q.options.some(o => !o.trim())) { showAlert('Incomplete Options', 'Please fill in all MCQ options.', 'warning'); return; }
         if (q.type === 'mcq-multiple' && (!q.correctAnswers || q.correctAnswers.length === 0)) {
-          alert('Select at least one correct answer for multiple choice questions'); return;
+          showAlert('No Correct Answer', 'Select at least one correct answer for multiple choice questions.', 'warning'); return;
         }
       }
       for (let q of questions.filter(q => q.type === 'coding')) {
-        if (!q.language) { alert('Select a language for coding questions'); return; }
+        if (!q.language) { showAlert('Missing Language', 'Select a language for coding questions.', 'warning'); return; }
       }
     }
 
@@ -311,16 +315,16 @@ const QuizBuilder = ({ navigate, user }) => {
         // Publish logic with future status ideally handled backend if we had a dedicated status field in QuizCreate. 
         // Backend overrides create_quiz status to "draft" by default, then we can publish it.
         await quizzesAPI.publish(res.data.id);
-        alert('Quiz scheduled successfully!');
+        showAlert('Scheduled', 'Quiz scheduled successfully!', 'success');
       } else if (!isDraft) {
         await quizzesAPI.publish(res.data.id);
-        alert('Quiz published successfully!');
+        showAlert('Published', 'Quiz published successfully!', 'success');
       } else {
-        alert('Draft saved successfully!');
+        showAlert('Saved', 'Draft saved successfully!', 'success');
       }
       navigate(user?.role === 'hod' ? 'hod-dashboard' : 'teacher-dashboard');
     } catch (err) {
-      alert('Error saving quiz: ' + err.message);
+      showAlert('Error', 'Error saving quiz: ' + err.message, 'danger');
       setSubmitting(false);
     }
   };
@@ -468,7 +472,7 @@ const QuizBuilder = ({ navigate, user }) => {
                     <span className="text-sm font-bold text-slate-500">marks</span>
                     <button
                       type="button"
-                      onClick={() => { const val = parseFloat(negativeMarks) || 0; setQuestions(qs => qs.map(q => ({ ...q, negativeMarks: val }))); alert(`Set −${val} negative marks on all ${questions.length} questions.`); }}
+                      onClick={() => { const val = parseFloat(negativeMarks) || 0; setQuestions(qs => qs.map(q => ({ ...q, negativeMarks: val }))); showAlert('Applied', `Set −${val} negative marks on all ${questions.length} questions.`, 'success'); }}
                       className="text-xs font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap"
                     >
                       Apply to all
@@ -659,6 +663,15 @@ const QuizBuilder = ({ navigate, user }) => {
           </div>
         </div>
       </div>
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+        onConfirm={closeAlert}
+        onCancel={closeAlert}
+      />
     </div>
   );
 };

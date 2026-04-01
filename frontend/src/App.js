@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import AlertModal from './components/AlertModal';
 import './App.css';
 import { authAPI, setAuthToken, clearAuthToken } from './services/api';
 import LoginPage from './pages/LoginPage';
@@ -40,6 +41,7 @@ function App() {
   const [user, setUser] = useState(null);
   const [selectedData, setSelectedData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const checkAuth = useCallback(async () => {
     const savedToken = localStorage.getItem('auth_token');
@@ -66,8 +68,10 @@ function App() {
     setCurrentPage(ROLE_DASHBOARD[userData.role] || 'login');
   };
 
-  const handleLogout = async () => {
-    if (!window.confirm('Are you sure you want to sign out?')) return;
+  const handleLogout = () => setShowLogoutModal(true);
+
+  const confirmLogout = async () => {
+    setShowLogoutModal(false);
     try { await authAPI.logout(); } catch {}
     setUser(null);
     clearAuthToken();
@@ -118,7 +122,21 @@ function App() {
     }
   };
 
-  return <div className="App">{renderPage()}</div>;
+  return (
+    <div className="App">
+      {renderPage()}
+      <AlertModal
+        open={showLogoutModal}
+        type="logout"
+        title="Sign Out"
+        message="Are you sure you want to sign out? You will need to log in again to access your dashboard."
+        confirmText="Sign Out"
+        cancelText="Cancel"
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutModal(false)}
+      />
+    </div>
+  );
 }
 
 export default App;

@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Users, ClipboardText, CheckCircle, Clock, SignOut, Plus, Trash, UserPlus, ChartLine, Eye, GraduationCap, X } from '@phosphor-icons/react';
 import { facultyAPI, examCellAPI, marksAPI } from '../services/api';
 import { StudentResultsSearch } from '../components/StudentResultsSearch';
+import AlertModal from '../components/AlertModal';
 
 const HodDashboard = ({ navigate, user, onLogout }) => {
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('hod_tab') || 'overview');
   useEffect(() => { sessionStorage.setItem('hod_tab', activeTab); }, [activeTab]);
   const [analyticsTab, setAnalyticsTab] = useState('quiz');
   const [dashboard, setDashboard] = useState(null);
+  const [alertModal, setAlertModal] = useState({ open: false, title: '', message: '', type: 'info' });
+  const showAlert = (title, message, type = 'info') => setAlertModal({ open: true, title, message, type });
+  const closeAlert = () => setAlertModal(prev => ({ ...prev, open: false }));
+  const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', type: 'warning', onConfirm: null });
   const [assignments, setAssignments] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [submissions, setSubmissions] = useState([]);
@@ -115,12 +120,14 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
       setShowAddForm(false);
       setNewAssignment({ ...newAssignment, teacher_id: '', subject_code: '', subject_name: '' });
       fetchData();
-    } catch (err) { alert(err.response?.data?.detail || 'Failed to create assignment'); }
+    } catch (err) { showAlert('Assignment Error', err.response?.data?.detail || 'Failed to create assignment', 'danger'); }
   };
 
   const handleDeleteAssignment = async (id) => {
-    if (!window.confirm('Remove this assignment?')) return;
-    try { await facultyAPI.deleteAssignment(id); fetchData(); } catch {}
+    setConfirmModal({
+      open: true, title: 'Remove Assignment', message: 'Are you sure you want to remove this assignment?', type: 'danger',
+      onConfirm: async () => { setConfirmModal(prev => ({ ...prev, open: false })); try { await facultyAPI.deleteAssignment(id); fetchData(); } catch {} },
+    });
   };
 
   const handleReview = async (entryId, action) => {
@@ -128,7 +135,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
     try {
       await marksAPI.review(entryId, { action, remarks });
       fetchData();
-    } catch (err) { alert(err.response?.data?.detail || 'Review failed'); }
+    } catch (err) { showAlert('Review Failed', err.response?.data?.detail || 'Review failed', 'danger'); }
   };
 
 
@@ -754,6 +761,25 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           </div>
         )}
       </div>
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+        onConfirm={closeAlert}
+        onCancel={closeAlert}
+      />
+      <AlertModal
+        open={confirmModal.open}
+        type={confirmModal.type}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        confirmText="Remove"
+        cancelText="Cancel"
+        onConfirm={confirmModal.onConfirm}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+      />
     </div>
   );
 };

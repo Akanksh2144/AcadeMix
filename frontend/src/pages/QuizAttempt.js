@@ -3,6 +3,7 @@ import { Clock, Warning, Camera, CheckCircle, XCircle, Play, Code, ArrowsOut, Ca
 import { attemptsAPI, quizzesAPI } from '../services/api';
 import Editor from '@monaco-editor/react';
 import api from '../services/api';
+import AlertModal from '../components/AlertModal';
 
 const MOBILE_WIDTH = 768;
 
@@ -249,6 +250,9 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
   const violationRef = useRef(0);
   const fullscreenInitialized = useRef(false);
   const isSubmittingRef = useRef(false);
+  const [alertModal, setAlertModal] = useState({ open: false, title: '', message: '', type: 'info', onClose: null });
+  const showAlert = (title, message, type = 'info', onClose = null) => setAlertModal({ open: true, title, message, type, onClose });
+  const closeAlert = () => { const cb = alertModal.onClose; setAlertModal(prev => ({ ...prev, open: false })); if (cb) cb(); };
 
   // ── Report violation to backend ──
   const reportViolation = useCallback(async (type) => {
@@ -350,8 +354,7 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
         setViolations(att.violations || 0);
         violationRef.current = att.violations || 0;
       } catch (err) {
-        alert(err.response?.data?.detail || 'Failed to start quiz');
-        navigate('student-dashboard');
+        showAlert('Quiz Error', err.response?.data?.detail || 'Failed to start quiz', 'danger', () => navigate('student-dashboard'));
       }
       setLoading(false);
     };
@@ -435,7 +438,7 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
       exitFullscreen();
       navigate('quiz-results');
     } catch (err) {
-      alert(err.response?.data?.detail || 'Submit failed');
+      showAlert('Submit Failed', err.response?.data?.detail || 'Submit failed', 'danger');
       isSubmittingRef.current = false;
     }
     setSubmitting(false);
@@ -687,6 +690,16 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
           </div>
         </div>
       </div>
+
+      <AlertModal
+        open={alertModal.open}
+        type={alertModal.type}
+        title={alertModal.title}
+        message={alertModal.message}
+        confirmText="OK"
+        onConfirm={closeAlert}
+        onCancel={closeAlert}
+      />
 
       <style>{`
         @keyframes slideDown {
