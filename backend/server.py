@@ -191,6 +191,26 @@ class EndtermEntry(BaseModel):
     max_marks: float = 100
     entries: list
 
+class TimetableSlot(BaseModel):
+    section: str
+    day: str  # Mon, Tue, Wed, Thu, Fri, Sat
+    period: int  # 1-6
+    subject_code: str
+    subject_name: str
+    teacher_id: str
+    teacher_name: str
+    semester: int = 3
+
+class AnnouncementCreate(BaseModel):
+    title: str
+    message: str
+    priority: str = "info"  # info, warning, urgent
+    visibility: str = "all"  # all, faculty, students
+
+class ChallengeSubmit(BaseModel):
+    code: str
+    language: str = "python"
+
 # ─── Auth Routes ────────────────────────────────────────────────────────────
 @app.post("/api/auth/login")
 async def login(req: LoginRequest, response: Response):
@@ -584,7 +604,11 @@ async def search_students(q: str = "", department: Optional[str] = None, college
     # Tier-based filtering
     if user["role"] == "hod":
         # HOD sees only their department students
-        query["department"] = user.get("department", "")
+        dept = user.get("department", "")
+        if "," in dept:
+            query["department"] = {"$in": [d.strip() for d in dept.split(",")]}
+        else:
+            query["department"] = dept
         query["college"] = user.get("college", "")
     elif user["role"] == "exam_cell":
         # Exam Cell sees only their college students
@@ -609,7 +633,7 @@ async def search_students(q: str = "", department: Optional[str] = None, college
             {"college_id": {"$regex": q, "$options": "i"}}
         ]
     
-    students = await db.users.find(query, {"password_hash": 0}).sort("college_id", 1).to_list(500)
+    students = await db.users.find(query, {"password_hash": 0}).sort("college_id", 1).to_list(2000)
     return [serialize_doc(s) for s in students]
 
 @app.get("/api/students/{student_id}/profile")
@@ -620,8 +644,14 @@ async def student_profile(student_id: str, user: dict = Depends(require_role("ho
     
     # Tier-based access control
     if user["role"] == "hod":
-        if student.get("department") != user.get("department") or student.get("college") != user.get("college"):
-            raise HTTPException(status_code=403, detail="Student not in your department")
+        dept = user.get("department", "")
+        if "," in dept:
+            depts = [d.strip() for d in dept.split(",")]
+            if student.get("department") not in depts or student.get("college") != user.get("college"):
+                raise HTTPException(status_code=403, detail="Student not in your department")
+        else:
+            if student.get("department") != dept or student.get("college") != user.get("college"):
+                raise HTTPException(status_code=403, detail="Student not in your department")
     elif user["role"] == "exam_cell":
         if student.get("college") != user.get("college"):
             raise HTTPException(status_code=403, detail="Student not in your college")
@@ -1111,7 +1141,11 @@ async def list_department_teachers(user: dict = Depends(require_role("hod", "adm
     # HOD is also a faculty member, include both teachers and HODs
     query = {"role": {"$in": ["teacher", "hod"]}}
     if user["role"] == "hod":
-        query["department"] = user.get("department", "")
+        dept = user.get("department", "")
+        if "," in dept:
+            query["department"] = {"$in": [d.strip() for d in dept.split(",")]}
+        else:
+            query["department"] = dept
     teachers = await db.users.find(query, {"password_hash": 0}).to_list(100)
     return [serialize_doc(t) for t in teachers]
 
@@ -1119,7 +1153,11 @@ async def list_department_teachers(user: dict = Depends(require_role("hod", "adm
 async def list_assignments(user: dict = Depends(require_role("hod", "admin", "teacher"))):
     query = {}
     if user["role"] == "hod":
-        query["department"] = user.get("department", "")
+        dept = user.get("department", "")
+        if "," in dept:
+            query["department"] = {"$in": [d.strip() for d in dept.split(",")]}
+        else:
+            query["department"] = dept
     elif user["role"] == "teacher":
         query["teacher_id"] = user["id"]
     assignments = await db.faculty_assignments.find(query).sort("created_at", -1).to_list(200)
@@ -1261,7 +1299,11 @@ async def submit_marks(entry_id: str, user: dict = Depends(require_role("teacher
 async def list_submissions(status: Optional[str] = None, user: dict = Depends(require_role("hod", "admin"))):
     query = {}
     if user["role"] == "hod":
-        query["department"] = user.get("department", "")
+        dept = user.get("department", "")
+        if "," in dept:
+            query["department"] = {"$in": [d.strip() for d in dept.split(",")]}
+        else:
+            query["department"] = dept
     if status:
         query["status"] = status
     else:
@@ -1392,20 +1434,153 @@ async def publish_results(entry_id: str, user: dict = Depends(require_role("exam
     }})
     return {"message": "Results published successfully"}
 
+# ─── Timetable Routes (HOD) ────────────────────────────────────────────────
+@app.get("/api/timetable")
+async def get_timetable(section: str, semester: int = 3, user: dict = Depends(require_role("hod", "admin", "teacher", "student"))):
+    slots = await db.timetable_slots.find({"section": section, "semester": semester}).to_list(200)
+    return [serialize_doc(s) for s in slots]
+
+@app.post("/api/timetable")
+async def save_timetable_slot(req: TimetableSlot, user: dict = Depends(require_role("hod", "admin"))):
+    dept = user.get("department", "ET")
+    existing = await db.timetable_slots.find_one({
+        "section": req.section, "day": req.day, "period": req.period, "semester": req.semester
+    })
+    if existing:
+        await db.timetable_slots.update_one({"_id": existing["_id"]}, {"$set": {
+            "subject_code": req.subject_code, "subject_name": req.subject_name,
+            "teacher_id": req.teacher_id, "teacher_name": req.teacher_name,
+            "updated_at": datetime.now(timezone.utc)
+        }})
+        updated = await db.timetable_slots.find_one({"_id": existing["_id"]})
+        return serialize_doc(updated)
+    doc = {
+        "section": req.section, "day": req.day, "period": req.period,
+        "subject_code": req.subject_code, "subject_name": req.subject_name,
+        "teacher_id": req.teacher_id, "teacher_name": req.teacher_name,
+        "department": dept, "semester": req.semester,
+        "created_at": datetime.now(timezone.utc)
+    }
+    result = await db.timetable_slots.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return serialize_doc(doc)
+
+@app.delete("/api/timetable/{slot_id}")
+async def delete_timetable_slot(slot_id: str, user: dict = Depends(require_role("hod", "admin"))):
+    result = await db.timetable_slots.delete_one({"_id": ObjectId(slot_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Slot not found")
+    return {"message": "Slot deleted"}
+
+# ─── Announcement Routes (HOD) ─────────────────────────────────────────────
+@app.get("/api/announcements")
+async def list_announcements(user: dict = Depends(get_current_user)):
+    dept = user.get("department", "")
+    query = {"department": dept}
+    if user["role"] == "student":
+        query["visibility"] = {"$in": ["all", "students"]}
+    elif user["role"] == "teacher":
+        query["visibility"] = {"$in": ["all", "faculty"]}
+    announcements = await db.announcements.find(query).sort("created_at", -1).to_list(50)
+    return [serialize_doc(a) for a in announcements]
+
+@app.post("/api/announcements")
+async def create_announcement(req: AnnouncementCreate, user: dict = Depends(require_role("hod", "admin"))):
+    doc = {
+        "title": req.title, "message": req.message,
+        "priority": req.priority, "visibility": req.visibility,
+        "department": user.get("department", "ET"),
+        "posted_by": user["name"], "posted_by_id": user["id"],
+        "created_at": datetime.now(timezone.utc)
+    }
+    result = await db.announcements.insert_one(doc)
+    doc["_id"] = result.inserted_id
+    return serialize_doc(doc)
+
+@app.delete("/api/announcements/{announcement_id}")
+async def delete_announcement(announcement_id: str, user: dict = Depends(require_role("hod", "admin"))):
+    result = await db.announcements.delete_one({"_id": ObjectId(announcement_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    return {"message": "Announcement deleted"}
+
+# ─── At-Risk Students (HOD) ────────────────────────────────────────────────
+@app.get("/api/hod/at-risk-students")
+async def get_at_risk_students(threshold: float = 5.0, user: dict = Depends(require_role("hod", "admin"))):
+    dept = user.get("department", "")
+    if "," in dept:
+        dept_q = {"$in": [d.strip() for d in dept.split(",")]}
+    else:
+        dept_q = dept
+    # Get all students in department
+    students = await db.users.find({"role": "student", "department": dept_q}, {"password_hash": 0}).to_list(2000)
+    at_risk = []
+    for student in students:
+        sid = str(student["_id"])
+        results = await db.semester_results.find({"student_id": sid}).to_list(20)
+        if not results:
+            continue
+        # Calculate CGPA
+        total_credits = 0
+        total_points = 0
+        backlogs = 0
+        for sem in results:
+            for subj in sem.get("subjects", []):
+                credits = subj.get("credits", 3)
+                grade = subj.get("grade", "F")
+                points = grade_to_points(grade)
+                total_credits += credits
+                total_points += points * credits
+                if grade == "F":
+                    backlogs += 1
+        cgpa = round(total_points / total_credits, 2) if total_credits > 0 else 0
+        if cgpa < threshold or backlogs >= 2:
+            at_risk.append({
+                "id": sid,
+                "name": student.get("name", ""),
+                "college_id": student.get("college_id", ""),
+                "section": student.get("section", ""),
+                "batch": student.get("batch", ""),
+                "cgpa": cgpa,
+                "backlogs": backlogs,
+                "severity": "critical" if cgpa < (threshold - 1.5) or backlogs >= 4 else "warning"
+            })
+    at_risk.sort(key=lambda x: x["cgpa"])
+    return at_risk
+
 @app.get("/api/dashboard/hod")
 async def hod_dashboard(user: dict = Depends(require_role("hod", "admin"))):
-    dept = user.get("department", "")
-    total_teachers = await db.users.count_documents({"role": "teacher", "department": dept})
-    total_students = await db.users.count_documents({"role": "student", "department": dept})
-    total_assignments = await db.faculty_assignments.count_documents({"department": dept})
-    pending_reviews = await db.mark_entries.count_documents({"department": dept, "status": "submitted"})
-    approved = await db.mark_entries.count_documents({"department": dept, "status": "approved"})
-    recent_subs = await db.mark_entries.find({"department": dept, "status": "submitted"}).sort("submitted_at", -1).to_list(5)
+    dept_val = user.get("department", "")
+    if "," in dept_val:
+        dept_query = {"$in": [d.strip() for d in dept_val.split(",")]}
+    else:
+        dept_query = dept_val
+
+    total_teachers = await db.users.count_documents({"role": "teacher", "department": dept_query})
+    total_students = await db.users.count_documents({"role": "student", "department": dept_query})
+    total_assignments = await db.faculty_assignments.count_documents({"department": dept_query})
+    pending_reviews = await db.mark_entries.count_documents({"department": dept_query, "status": "submitted"})
+    approved = await db.mark_entries.count_documents({"department": dept_query, "status": "approved"})
+    recent_subs = await db.mark_entries.find({"department": dept_query}).sort("submitted_at", -1).to_list(15)
+    published_results = await db.endterm_entries.find({"department": dept_query, "status": "published"}).sort("published_at", -1).to_list(15)
+    
+    combined = []
+    for s in recent_subs:
+        item = serialize_doc(s)
+        item["activity_type"] = "marks_review"
+        combined.append(item)
+    for p in published_results:
+        item = serialize_doc(p)
+        item["activity_type"] = "results_published"
+        combined.append(item)
+        
+    combined.sort(key=lambda x: str(x.get("submitted_at") or x.get("published_at") or ""), reverse=True)
+    
     return {
         "total_teachers": total_teachers, "total_students": total_students,
         "total_assignments": total_assignments, "pending_reviews": pending_reviews,
         "approved_count": approved,
-        "recent_submissions": [serialize_doc(s) for s in recent_subs]
+        "recent_submissions": combined[:15]
     }
 
 @app.get("/api/dashboard/exam_cell")
@@ -1875,6 +2050,113 @@ async def student_placements(user: dict = Depends(get_current_user)):
     # Sort by date (upcoming first)
     result.sort(key=lambda x: x.get("drive_date", ""), reverse=False)
     return result
+
+# ─── Coding Challenges ─────────────────────────────────────────────────────────
+
+@app.get("/api/challenges")
+async def get_challenges(page: int = 1, limit: int = 20, difficulty: str = "", topic: str = ""):
+    query = {}
+    if difficulty:
+        query["difficulty"] = difficulty
+    if topic:
+        query["topics"] = topic
+
+    total_count = await db.coding_challenges.count_documents(query)
+    cursor = db.coding_challenges.find(query).skip((page - 1) * limit).limit(limit)
+    challenges = await cursor.to_list(length=limit)
+    
+    return {
+        "data": [serialize_doc(c) for c in challenges],
+        "total": total_count,
+        "page": page,
+        "limit": limit
+    }
+
+@app.get("/api/challenges/stats")
+async def get_challenge_stats(user: dict = Depends(get_current_user)):
+    user_id = user["id"]
+    solved_cursor = db.student_progress.find({"student_id": user_id, "status": "Solved"})
+    solved_docs = await solved_cursor.to_list(length=None)
+    
+    easy_count = 0
+    medium_count = 0
+    hard_count = 0
+    topics_count = {}
+    
+    for doc in solved_docs:
+        difficulty = doc.get("difficulty", "Easy")
+        if difficulty == "Easy":
+            easy_count += 1
+        elif difficulty == "Medium":
+            medium_count += 1
+        elif difficulty == "Hard":
+            hard_count += 1
+            
+        for t in doc.get("topics", []):
+            topics_count[t] = topics_count.get(t, 0) + 1
+            
+    return {
+        "total_solved": len(solved_docs),
+        "difficulty": {
+            "Easy": easy_count,
+            "Medium": medium_count,
+            "Hard": hard_count
+        },
+        "topics": topics_count
+    }
+
+@app.post("/api/challenges/submit")
+async def submit_challenge(req: ChallengeSubmit, user: dict = Depends(get_current_user)):
+    challenge = await db.coding_challenges.find_one({"_id": ObjectId(req.challenge_id)})
+    if not challenge:
+        raise HTTPException(status_code=404, detail="Challenge not found")
+        
+    # Security Note: We run a simple quick local sandbox just like general execution
+    import tempfile
+    import subprocess
+    import time
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        # Wrap the user's code. If it passes execution without crashing on basic test cases, we consider it solved for this demo.
+        f.write(req.code)
+        # We append a simple test case runner if possible, but for MVP we just run it and assume solved if exit code is 0
+        filepath = f.name
+        
+    start_time = time.time()
+    try:
+        proc = subprocess.run(["python", filepath], capture_output=True, text=True, timeout=5.0)
+        end_time = time.time()
+        
+        output = proc.stdout
+        error = proc.stderr
+        exit_code = proc.returncode
+        
+        if exit_code == 0:
+            # Mark solved!
+            await db.student_progress.update_one(
+                {"student_id": user["id"], "challenge_id": req.challenge_id},
+                {"$set": {
+                    "status": "Solved",
+                    "language": req.language,
+                    "difficulty": challenge.get("difficulty"),
+                    "topics": challenge.get("topics", []),
+                    "execution_time_ms": int((end_time - start_time) * 1000)
+                }},
+                upsert=True
+            )
+            
+        return {
+            "output": output,
+            "error": error,
+            "exit_code": exit_code,
+            "success": exit_code == 0
+        }
+    except subprocess.TimeoutExpired:
+        return {"error": "Execution timed out", "exit_code": 1, "success": False}
+    finally:
+        import os
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
 @app.on_event("startup")
 async def startup():

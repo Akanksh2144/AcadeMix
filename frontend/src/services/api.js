@@ -138,4 +138,23 @@ export const placementsAPI = {
   studentPlacements: () => api.get('/api/placements/student'),
 };
 
+// Timetable (HOD)
+export const timetableAPI = {
+  get: (section, semester = 3) => api.get('/api/timetable', { params: { section, semester } }),
+  save: (data) => api.post('/api/timetable', data),
+  delete: (slotId) => api.delete(`/api/timetable/${slotId}`),
+};
+
+// Announcements (HOD)
+export const announcementsAPI = {
+  list: () => api.get('/api/announcements'),
+  create: (data) => api.post('/api/announcements', data),
+  delete: (id) => api.delete(`/api/announcements/${id}`),
+};
+
+// HOD Tools
+export const hodToolsAPI = {
+  atRiskStudents: (threshold = 5.0) => api.get('/api/hod/at-risk-students', { params: { threshold } }),
+};
+
 export default api;

@@ -1,8 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Users, ClipboardText, CheckCircle, Clock, SignOut, Plus, Trash, UserPlus, ChartLine, Eye, GraduationCap, X, Bell, CalendarDots, PresentationChart } from '@phosphor-icons/react';
+import { BookOpen, Users, ClipboardText, CheckCircle, Clock, SignOut, Plus, Trash, UserPlus, ChartLine, Eye, GraduationCap, X, Bell, CalendarDots, PresentationChart, Megaphone, Calendar, WarningOctagon, ChartBar, Download } from '@phosphor-icons/react';
 import { facultyAPI, examCellAPI, marksAPI } from '../services/api';
 import { StudentResultsSearch } from '../components/StudentResultsSearch';
 import AlertModal from '../components/AlertModal';
+import WorkloadMatrix from '../components/hod/WorkloadMatrix';
+import TimetableManager from '../components/hod/TimetableManager';
+import AnnouncementBoard from '../components/hod/AnnouncementBoard';
+import AtRiskAlerts from '../components/hod/AtRiskAlerts';
+import AnalyticsDashboard from '../components/hod/AnalyticsDashboard';
+import ExportReports from '../components/hod/ExportReports';
+import FacultyActivityLog from '../components/hod/FacultyActivityLog';
+
+const timeAgo = (dateStr) => {
+  if (!dateStr) return '';
+  const diff = new Date() - new Date(dateStr);
+  if (diff < 0) return 'just now';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+};
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -15,6 +34,8 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('hod_tab') || 'overview');
   useEffect(() => { sessionStorage.setItem('hod_tab', activeTab); }, [activeTab]);
   const [analyticsTab, setAnalyticsTab] = useState('quiz');
+  const [showExportPanel, setShowExportPanel] = useState(false);
+  const [facultySubView, setFacultySubView] = useState('assignments');
   const [dashboard, setDashboard] = useState(null);
   const [alertModal, setAlertModal] = useState({ open: false, title: '', message: '', type: 'info' });
   const showAlert = (title, message, type = 'info') => setAlertModal({ open: true, title, message, type });
@@ -25,7 +46,12 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newAssignment, setNewAssignment] = useState({ teacher_id: '', subject_code: '', subject_name: '', department: user?.department || 'DS', batch: '2022', section: 'A', semester: 3 });
+  const [newAssignment, setNewAssignment] = useState({ teacher_id: '', subject_code: '', subject_name: '', department: user?.department || 'ET', batch: '2022', section: 'DS', semester: 3 });
+  
+  const [showNotifications, setShowNotifications] = useState(false);
+  const notifKey = `academix_notif_read_${user?.id || 'default'}`;
+  const [notifRead, setNotifReadState] = useState(() => localStorage.getItem(notifKey) === 'true');
+  const setNotifRead = (val) => { setNotifReadState(val); localStorage.setItem(notifKey, String(val)); };
   
   // Mock subjects data (prepopulated)
   const mockSubjects = [
@@ -51,8 +77,8 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
     { code: '22ECE401', name: 'VLSI Design', department: 'ECE', semester: 4 },
   ];
   
-  // Filter subjects by department
-  const departmentSubjects = mockSubjects.filter(s => s.department === (user?.department || 'DS'));
+  // ET department encompasses all sections, show all subjects
+  const departmentSubjects = mockSubjects;
   
   const [subjectSearch, setSubjectSearch] = useState('');
   const [teacherSearch, setTeacherSearch] = useState('');
@@ -146,15 +172,67 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   };
 
 
+  const recentActivity = (dashboard?.recent_submissions || []).slice(0, 10).map((r, i) => ({
+    type: r.activity_type || 'submission',
+    title: r.activity_type === 'results_published' ? 'Semester Results' : (r.teacher_name || 'Teacher'),
+    subtitle: r.activity_type === 'results_published' ? `Published: ${r.batch} - Sem ${r.semester}` : `Marks for ${r.subject_code || 'Subject'}`,
+    timestamp: r.published_at || r.submitted_at || r.created_at,
+    status: r.status,
+  }));
+
   const stats = dashboard ? [
     { label: 'Teachers', value: String(dashboard.total_teachers), sub: 'in department', icon: Users, color: 'bg-indigo-50 text-indigo-500', gradient: 'from-indigo-500 to-blue-500', onClick: () => setActiveTab('teachers') },
     { label: 'Students', value: String(dashboard.total_students), sub: 'enrolled', icon: BookOpen, color: 'bg-emerald-50 text-emerald-500', gradient: 'from-emerald-500 to-teal-500', onClick: () => setActiveTab('results') },
     { label: 'Analytics', value: '2', sub: 'reports', icon: ChartLine, color: 'bg-purple-50 text-purple-500', gradient: 'from-purple-500 to-fuchsia-500', onClick: () => setActiveTab('analytics') },
     { label: 'Pending Reviews', value: String(dashboard.pending_reviews), sub: 'needs action', icon: Clock, color: 'bg-rose-50 text-rose-500', gradient: 'from-rose-500 to-pink-500', onClick: () => setActiveTab('review') },
+    { label: 'Timetable', value: '6', sub: 'periods/day', icon: Calendar, color: 'bg-blue-50 text-blue-500', gradient: 'from-blue-500 to-cyan-500', onClick: () => setActiveTab('timetable') },
+    { label: 'Announcements', value: '—', sub: 'board', icon: Megaphone, color: 'bg-violet-50 text-violet-500', gradient: 'from-violet-500 to-purple-500', onClick: () => setActiveTab('announcements') },
+    { label: 'At-Risk', value: '!', sub: 'student alerts', icon: WarningOctagon, color: 'bg-red-50 text-red-500', gradient: 'from-red-500 to-orange-500', onClick: () => setActiveTab('at-risk') },
+    { label: 'Activity Log', value: '📋', sub: 'audit trail', icon: ClipboardText, color: 'bg-slate-100 text-slate-500', gradient: 'from-slate-500 to-slate-700', onClick: () => setActiveTab('activity-log') },
   ] : [];
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
+      {/* Notification overlay */}
+      {showNotifications && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setShowNotifications(false)}></div>
+          <div className="fixed top-16 right-4 sm:right-8 z-[61] w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden" style={{animation: 'fadeInUp 0.15s ease'}}>
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h4 className="font-extrabold text-slate-800">Recent Activity</h4>
+              <button
+                onClick={() => { setNotifRead(true); setShowNotifications(false); }}
+                className="text-xs font-bold text-amber-500 hover:text-amber-600 transition-colors"
+              >
+                Mark all as read
+              </button>
+            </div>
+            <div className="max-h-80 overflow-y-auto divide-y divide-slate-50">
+              {recentActivity.length > 0 ? recentActivity.map((item, i) => (
+                <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => { setActiveTab('review'); setShowNotifications(false); }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-amber-50">
+                    <ClipboardText size={14} weight="duotone" className="text-amber-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-slate-700 truncate">{item.title}</p>
+                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">{item.subtitle} • {timeAgo(item.timestamp)}</p>
+                  </div>
+                  {item.status && (
+                    <span className={`text-xs font-bold flex-shrink-0 ${
+                      item.status === 'approved' ? 'text-emerald-500' : item.status === 'submitted' ? 'text-amber-500' : 'text-red-500'
+                    }`}>{item.status.charAt(0).toUpperCase() + item.status.slice(1)}</span>
+                  )}
+                </div>
+              )) : (
+                <div className="px-5 py-8 text-center">
+                  <p className="text-sm text-slate-400">No recent submissions</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 sm:gap-4">
@@ -167,6 +245,19 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Notification Bell */}
+            <button
+              data-testid="notification-bell"
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-500 transition-colors relative"
+            >
+              <Bell size={20} weight={showNotifications ? 'fill' : 'duotone'} />
+              {!notifRead && recentActivity.length > 0 && (
+                <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                  {Math.min(recentActivity.length, 9)}
+                </div>
+              )}
+            </button>
             <div className="hidden sm:flex items-center gap-2 bg-slate-50 rounded-2xl px-4 py-2">
               <GraduationCap size={18} weight="duotone" className="text-amber-500" />
               <div className="text-right">
@@ -183,27 +274,63 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* ── Hero Greeting ───────────────────────── */}
-        <div className="mb-6 sm:mb-8" style={{animation: 'fadeInUp 0.2s ease'}}>
-          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 mb-1">
-            {getGreeting()}, {user?.name?.split(' ').pop() || 'HOD'}!
-          </h2>
-          <p className="text-sm sm:text-base font-medium text-slate-500">
-            {user?.designation || 'Head of Department'} • {user?.department || 'DS'} Department
-          </p>
+        <div className="mb-6 sm:mb-8 flex items-start justify-between" style={{animation: 'fadeInUp 0.2s ease'}}>
+          <div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 mb-1">
+              {getGreeting()}, {user?.name?.split(' ').pop() || 'HOD'}!
+            </h2>
+            <p className="text-sm sm:text-base font-medium text-slate-500">
+              {user?.designation || 'Head of Department'} • {user?.department || 'DS'} Department
+            </p>
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setShowExportPanel(!showExportPanel)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-indigo-300 hover:shadow-md text-slate-600 hover:text-indigo-600 text-sm font-semibold transition-all shadow-sm"
+            >
+              <Download size={16} weight="duotone" />
+              Export
+            </button>
+            {showExportPanel && (
+              <div className="absolute right-0 top-full mt-2 z-50 w-[480px] bg-white rounded-2xl shadow-2xl border border-slate-200 p-1 animate-in">
+                <div className="flex items-center justify-between p-4 pb-2">
+                  <h4 className="font-bold text-slate-800">Export Reports</h4>
+                  <button onClick={() => setShowExportPanel(false)} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400"><X size={16} weight="bold" /></button>
+                </div>
+                <div className="max-h-[400px] overflow-y-auto">
+                  <ExportReports students={[]} assignments={assignments} submissions={submissions} compact={true} />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit mb-8" data-testid="hod-tabs">
-          {[{ id: 'overview', label: 'Overview' }, { id: 'marks-entry', label: 'Marks Entry' }, { id: 'faculty', label: 'Faculty Management' }, { id: 'review', label: 'Mark Reviews' }, { id: 'results', label: 'Student Management' }].map(tab => (
-            <button key={tab.id} data-testid={`tab-${tab.id}`} onClick={() => setActiveTab(tab.id)}
-              className={`pill-tab ${activeTab === tab.id ? 'pill-tab-active' : 'pill-tab-inactive'}`}>{tab.label}</button>
-          ))}
+        {/* Unified Navigation */}
+        <div className="mb-8 overflow-x-auto" data-testid="hod-tabs">
+          <div className="flex items-center gap-1.5 bg-white/60 backdrop-blur-md border border-slate-200/80 rounded-2xl p-1.5 shadow-sm w-fit min-w-full sm:min-w-0">
+            {[
+              { id: 'overview', label: 'Overview' },
+              { id: 'marks-entry', label: 'Marks Entry' },
+              { id: 'review', label: 'Mark Reviews' },
+              { id: 'faculty', label: 'Faculty Management' },
+              { id: 'results', label: 'Student Management' },
+            ].map(tab => (
+              <button key={tab.id} data-testid={`tab-${tab.id}`} onClick={() => setActiveTab(tab.id)}
+                className={`px-3.5 py-2 rounded-[14px] text-xs font-semibold transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
+                  activeTab === tab.id
+                    ? 'bg-slate-900 text-white shadow-md'
+                    : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                }`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Overview */}
         {activeTab === 'overview' && (
           <div data-testid="overview-content">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
               {stats.map((stat, i) => {
                 const Icon = stat.icon;
                 const Wrapper = stat.onClick ? 'button' : 'div';
@@ -300,11 +427,28 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
         {activeTab === 'faculty' && (
           <div data-testid="faculty-content">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-slate-800">Faculty Assignments</h3>
-              <button data-testid="add-assignment-button" onClick={() => setShowAddForm(!showAddForm)} className="btn-primary !px-4 !py-2.5 text-sm flex items-center gap-2">
-                <UserPlus size={18} weight="duotone" /> Add Assignment
-              </button>
+              <div className="flex items-center gap-1 bg-slate-100 rounded-2xl p-1.5">
+                <button onClick={() => setFacultySubView('assignments')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${facultySubView === 'assignments' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  Assignments
+                </button>
+                <button onClick={() => setFacultySubView('workload')}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${facultySubView === 'workload' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+                  Workload Matrix
+                </button>
+              </div>
+              {facultySubView === 'assignments' && (
+                <button data-testid="add-assignment-button" onClick={() => setShowAddForm(!showAddForm)} className="btn-primary !px-4 !py-2.5 text-sm flex items-center gap-2">
+                  <UserPlus size={18} weight="duotone" /> Add Assignment
+                </button>
+              )}
             </div>
+
+            {facultySubView === 'workload' && (
+              <WorkloadMatrix teachers={teachers} assignments={assignments} />
+            )}
+
+            {facultySubView === 'assignments' && (<>
 
             {showAddForm && (
               <div className="soft-card p-6 mb-6" data-testid="add-assignment-form">
@@ -448,16 +592,15 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                       onChange={(e) => setNewAssignment({ ...newAssignment, section: e.target.value })} 
                       className="soft-input w-full"
                     >
-                      <option value="A">A</option>
-                      <option value="B">B</option>
-                      <option value="DS-1">DS-1</option>
-                      <option value="DS-2">DS-2</option>
+                      <option value="DS">DS</option>
                       <option value="CS">CS (Cyber Security)</option>
-                      <option value="AIML-1">AIML-1</option>
-                      <option value="AIML-2">AIML-2</option>
-                      <option value="AIML-3">AIML-3</option>
-                      <option value="IT-1">IT-1</option>
-                      <option value="IT-2">IT-2</option>
+                      <option value="IT">IT</option>
+                      <option value="AIML">AIML</option>
+                      <option value="CSE">CSE</option>
+                      <option value="CSM">CSM</option>
+                      <option value="CSD">CSD</option>
+                      <option value="CSC">CSC</option>
+                      <option value="ECE">ECE</option>
                     </select>
                   </div>
 
@@ -511,6 +654,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
               ))}
               {assignments.length === 0 && <div className="soft-card p-8 text-center"><p className="text-slate-400 font-medium">No faculty assignments yet</p></div>}
             </div>
+            </>)}
           </div>
         )}
 
@@ -581,8 +725,28 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                       </div>
                     </div>
                   )}
+                  {s.revision_history && s.revision_history.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {s.revision_history.map((rev, ri) => (
+                        <div key={ri} className="flex items-start gap-3 p-3 rounded-xl bg-amber-50 border border-amber-200/60">
+                          <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-amber-600 text-[10px] font-bold">✏️</span>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-amber-800">
+                              Revised by {rev.reviser_name}
+                              <span className="font-normal text-amber-600 ml-2 text-xs">
+                                {rev.revised_at ? new Date(rev.revised_at).toLocaleString() : ''}
+                              </span>
+                            </p>
+                            <p className="text-sm text-amber-700 mt-0.5">Reason: {rev.reason}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {s.status === 'submitted' && (
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 mt-3">
                       <button data-testid={`approve-${s.id}`} onClick={() => handleReview(s.id, 'approve')} className="btn-primary !py-2 text-sm flex items-center gap-2">
                         <CheckCircle size={16} weight="duotone" /> Approve
                       </button>
@@ -683,7 +847,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                   
                   <h5 className="text-lg font-bold text-slate-700 mb-3">Section-wise Performance</h5>
                   <div className="space-y-3">
-                    {['DS-1', 'DS-2', 'CS', 'AIML-1', 'AIML-2', 'AIML-3', 'IT-1', 'IT-2'].map(section => {
+                    {['DS', 'CS', 'IT', 'AIML', 'CSE', 'CSM', 'CSD', 'ECE'].map(section => {
                       const score = 75 + Math.floor(Math.random() * 15);
                       return (
                         <div key={section} className="flex items-center gap-4">
@@ -745,7 +909,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                         </tr>
                       </thead>
                       <tbody>
-                        {['DS-1', 'DS-2', 'CS', 'AIML-1', 'AIML-2', 'AIML-3', 'IT-1', 'IT-2'].map(section => {
+                        {['DS', 'CS', 'IT', 'AIML', 'CSE', 'CSM', 'CSD', 'ECE'].map(section => {
                           const avgSgpa = (7.5 + Math.random() * 1.5).toFixed(2);
                           const passRate = 92 + Math.floor(Math.random() * 8);
                           const firstClass = 70 + Math.floor(Math.random() * 20);
@@ -781,6 +945,37 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
             <StudentResultsSearch user={user} departmentLocked={true} />
           </div>
         )}
+
+        {activeTab === 'timetable' && (
+          <div data-testid="timetable-content">
+            <TimetableManager user={user} mockSubjects={departmentSubjects} />
+          </div>
+        )}
+
+        {activeTab === 'announcements' && (
+          <div data-testid="announcements-content">
+            <AnnouncementBoard user={user} />
+          </div>
+        )}
+
+        {activeTab === 'analytics' && (
+          <div data-testid="analytics-content">
+            <AnalyticsDashboard />
+          </div>
+        )}
+
+        {activeTab === 'at-risk' && (
+          <div data-testid="at-risk-content">
+            <AtRiskAlerts user={user} />
+          </div>
+        )}
+
+        {activeTab === 'activity-log' && (
+          <div data-testid="activity-log-content">
+            <FacultyActivityLog submissions={submissions} />
+          </div>
+        )}
+
       </div>
       <AlertModal
         open={alertModal.open}

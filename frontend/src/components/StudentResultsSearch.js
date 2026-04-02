@@ -299,9 +299,14 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
   const [loading, setLoading] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [activeSection, setActiveSection] = useState('All');
+  const [activeDepartment, setActiveDepartment] = useState('All');
   
-  // ET sections
-  const sections = ['All', 'DS-1', 'DS-2', 'CS', 'AIML-1', 'AIML-2', 'AIML-3', 'IT-1', 'IT-2'];
+  // Dynamically compute available departments and sections from the loaded student data
+  const availableDepartments = ['All', ...Array.from(new Set(allStudents.map(s => s.department))).filter(Boolean).sort()];
+  
+  // Only show sections relevant to the currently selected department (if not 'All')
+  const studentsForSectionFilter = activeDepartment === 'All' ? allStudents : allStudents.filter(s => s.department === activeDepartment);
+  const availableSections = ['All', ...Array.from(new Set(studentsForSectionFilter.map(s => s.section))).filter(Boolean).sort()];
 
   useEffect(() => {
     // Load all students initially
@@ -320,16 +325,27 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
 
   const handleSearch = async (value) => {
     setSearch(value);
-    filterStudents(value, activeSection);
+    filterStudents(value, activeDepartment, activeSection);
   };
   
+  const handleDepartmentChange = (dept) => {
+    setActiveDepartment(dept);
+    setActiveSection('All'); // Reset section when changing department
+    filterStudents(search, dept, 'All');
+  };
+
   const handleSectionChange = (section) => {
     setActiveSection(section);
-    filterStudents(search, section);
+    filterStudents(search, activeDepartment, section);
   };
   
-  const filterStudents = (searchValue, section) => {
+  const filterStudents = (searchValue, dept, section) => {
     let filtered = allStudents;
+    
+    // Filter by department
+    if (dept !== 'All') {
+      filtered = filtered.filter(s => s.department === dept);
+    }
     
     // Filter by section
     if (section !== 'All') {
@@ -358,24 +374,45 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
         {departmentLocked ? `Manage students in ${user?.department || 'your'} department` : 'Search across all departments'}
       </p>
       
-      {/* Section Tabs */}
-      {user?.department === 'ET' && (
-        <div className="mb-6">
-          <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Filter by Section</label>
-          <div className="flex flex-wrap gap-2">
-            {sections.map(section => (
-              <button
-                key={section}
-                onClick={() => handleSectionChange(section)}
-                className={`pill-tab ${activeSection === section ? 'pill-tab-active' : 'pill-tab-inactive'}`}
-                data-testid={`section-tab-${section.toLowerCase()}`}
-              >
-                {section}
-              </button>
-            ))}
+      <div className="flex flex-col sm:flex-row gap-4 sm:gap-8 mb-6">
+        {/* Dynamic Department Tabs */}
+        {availableDepartments.length > 2 && (
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Department</label>
+            <div className="flex flex-wrap gap-2">
+              {availableDepartments.map(dept => (
+                <button
+                  key={dept}
+                  onClick={() => handleDepartmentChange(dept)}
+                  className={`pill-tab ${activeDepartment === dept ? 'pill-tab-active' : 'pill-tab-inactive'}`}
+                  data-testid={`dept-tab-${dept.toLowerCase()}`}
+                >
+                  {dept}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Dynamic Section Tabs */}
+        {availableSections.length > 1 && (
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Section</label>
+            <div className="flex flex-wrap gap-2">
+              {availableSections.map(section => (
+                <button
+                  key={section}
+                  onClick={() => handleSectionChange(section)}
+                  className={`pill-tab ${activeSection === section ? 'pill-tab-active' : 'pill-tab-inactive'}`}
+                  data-testid={`section-tab-${section.toLowerCase()}`}
+                >
+                  {section === 'All' ? 'All Sections' : `${section}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Search Bar */}
       <div className="relative mb-6">
@@ -393,6 +430,7 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
             <tr className="bg-slate-50 border-b border-slate-100">
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">College ID</th>
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Name</th>
+              <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Department</th>
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Section</th>
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Batch</th>
               <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Action</th>
@@ -403,6 +441,7 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
               <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors" data-testid={`result-student-${s.college_id}`}>
                 <td className="py-3 px-4 font-bold text-indigo-600">{s.college_id}</td>
                 <td className="py-3 px-4 font-medium text-slate-800">{s.name}</td>
+                <td className="py-3 px-4 text-sm font-bold text-slate-500">{s.department || '-'}</td>
                 <td className="py-3 px-4 text-sm">
                   <span className="soft-badge bg-indigo-50 text-indigo-600">{s.section || '-'}</span>
                 </td>
