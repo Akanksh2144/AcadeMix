@@ -54,6 +54,8 @@ function App() {
     } catch {
       clearAuthToken();
       localStorage.removeItem('auth_token');
+      setUser(null);
+      setCurrentPage('login');
     }
     setLoading(false);
   }, []);
