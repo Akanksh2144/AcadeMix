@@ -337,8 +337,8 @@ const CodePlayground = ({ navigate, user }) => {
       ) : (
         // Original layout (Grid) for ad-hoc coding (No challenge active)
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-[1600px] mx-auto px-6 py-6 h-full">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full">
+          <div className="max-w-[1600px] mx-auto px-4 lg:px-6 py-6 lg:h-full">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-full">
               {/* Left Column: Editor Panel */}
               <div className="lg:col-span-2 flex flex-col space-y-4">
                 <div className="soft-card p-3 flex items-center justify-between shrink-0">
@@ -407,8 +407,8 @@ const CodePlayground = ({ navigate, user }) => {
               </div>
 
               {/* Right Column: Output & History Panel */}
-              <div className="space-y-4 flex flex-col h-full overflow-hidden">
-                <div className="soft-card flex flex-col flex-1 min-h-[250px]">
+              <div className="space-y-4 flex flex-col lg:h-full lg:overflow-hidden pb-10 lg:pb-0">
+                <div className="soft-card flex flex-col flex-1 min-h-[300px]">
                   <div className="p-5 pb-3 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-2">
                       <Terminal size={18} weight="duotone" className="text-slate-500" />
