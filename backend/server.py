@@ -441,6 +441,62 @@ async def publish_quiz(quiz_id: str, user: dict = Depends(require_role("teacher"
         raise HTTPException(status_code=404, detail="Quiz not found")
     return {"message": "Quiz published"}
 
+@app.post("/api/quizzes/{quiz_id}/extend-time")
+async def extend_quiz_time(quiz_id: str, user: dict = Depends(require_role("teacher", "admin", "hod"))):
+    """Add 10 minutes to the quiz duration for all active attempts."""
+    q = await db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+    if not q:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    new_duration = q.get("duration_mins", 60) + 10
+    await db.quizzes.update_one({"_id": ObjectId(quiz_id)}, {"$set": {"duration_mins": new_duration}})
+    return {"message": f"Extended by 10 mins. New duration: {new_duration} mins", "duration_mins": new_duration}
+
+@app.post("/api/quizzes/{quiz_id}/end")
+async def end_quiz_now(quiz_id: str, user: dict = Depends(require_role("teacher", "admin", "hod"))):
+    """Force-submit all in-progress attempts for this quiz."""
+    quiz = await db.quizzes.find_one({"_id": ObjectId(quiz_id)})
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    in_progress = await db.quiz_attempts.find({"quiz_id": quiz_id, "status": "in_progress"}).to_list(1000)
+    force_submitted = 0
+    for attempt in in_progress:
+        # Run the same grading logic inline
+        score = 0
+        results = []
+        questions = quiz.get("questions", [])
+        answers = attempt.get("answers", [])
+        for i, q in enumerate(questions):
+            student_answer = answers[i] if i < len(answers) else None
+            is_correct = False
+            marks_awarded = 0
+            if q["type"] in ("mcq", "mcq-single", "boolean"):
+                correct_ans = q.get("correctAnswer") if "correctAnswer" in q else q.get("correct_answer")
+                if student_answer is not None and student_answer == correct_ans:
+                    is_correct = True
+                    marks_awarded = q.get("marks", 0)
+            elif q["type"] in ("multiple", "mcq-multiple"):
+                correct_ans = q.get("correctAnswers") if "correctAnswers" in q else q.get("correct_answers", [])
+                correct = set(correct_ans)
+                selected = set(student_answer) if isinstance(student_answer, list) else set()
+                if correct == selected:
+                    is_correct = True
+                    marks_awarded = q.get("marks", 0)
+            elif q["type"] == "short":
+                if student_answer:
+                    marks_awarded = round(q.get("marks", 0) * 0.5)
+            score += marks_awarded
+            results.append({"question_index": i, "is_correct": is_correct, "marks_awarded": marks_awarded, "max_marks": q.get("marks", 0)})
+        percentage = round((score / quiz["total_marks"]) * 100, 1) if quiz.get("total_marks", 0) > 0 else 0
+        await db.quiz_attempts.update_one(
+            {"_id": attempt["_id"]},
+            {"$set": {"status": "submitted", "score": score, "percentage": percentage,
+                       "results": results, "submitted_at": datetime.now(timezone.utc), "force_submitted": True}}
+        )
+        force_submitted += 1
+    # Mark quiz as ended
+    await db.quizzes.update_one({"_id": ObjectId(quiz_id)}, {"$set": {"status": "ended", "ended_at": datetime.now(timezone.utc)}})
+    return {"message": f"Quiz ended. {force_submitted} attempts force-submitted.", "force_submitted": force_submitted}
+
 # ─── Quiz Attempt Routes ───────────────────────────────────────────────────
 @app.post("/api/quizzes/{quiz_id}/start")
 async def start_attempt(quiz_id: str, user: dict = Depends(get_current_user)):
