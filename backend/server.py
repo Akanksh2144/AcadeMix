@@ -264,7 +264,7 @@ async def logout(response: Response):
 
 # ─── User Routes ────────────────────────────────────────────────────────────
 @app.get("/api/users")
-async def list_users(role: Optional[str] = None, user: dict = Depends(require_role("admin", "teacher"))):
+async def list_users(role: Optional[str] = None, user: dict = Depends(require_role("admin", "teacher", "hod", "exam_cell"))):
     query = {}
     if role:
         query["role"] = role
@@ -272,7 +272,7 @@ async def list_users(role: Optional[str] = None, user: dict = Depends(require_ro
     return [serialize_doc(u) for u in users]
 
 @app.get("/api/users/{user_id}")
-async def get_user(user_id: str, user: dict = Depends(require_role("admin", "teacher"))):
+async def get_user(user_id: str, user: dict = Depends(require_role("admin", "teacher", "hod", "exam_cell"))):
     u = await db.users.find_one({"_id": ObjectId(user_id)}, {"password_hash": 0})
     if not u:
         raise HTTPException(status_code=404, detail="User not found")
