@@ -17,7 +17,7 @@ function getWorkloadStyle(count) {
   return style;
 }
 
-const SECTIONS = ['DS', 'CS', 'IT', 'AIML', 'CSE', 'CSM', 'CSD', 'CSC', 'ECE'];
+const SECTIONS = ['ECE', 'IT-1', 'IT-2', 'CSC', 'AIML-1', 'AIML-2', 'AIML-3', 'DS-1', 'DS-2'];
 
 export default function WorkloadMatrix({ teachers = [], assignments = [] }) {
 

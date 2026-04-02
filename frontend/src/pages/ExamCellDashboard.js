@@ -40,7 +40,7 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
   // Mock data for dropdowns
   const subjectCodes = Object.keys(subjectMapping);
   const departments = ['DS', 'CS', 'ET', 'AIML', 'IT', 'ECE', 'EEE'];
-  const sections = ['A', 'B', 'C', 'DS-1', 'DS-2', 'AIML-1', 'AIML-2'];
+  const sections = ['ECE', 'IT-1', 'IT-2', 'CSC', 'AIML-1', 'AIML-2', 'AIML-3', 'DS-1', 'DS-2'];
   const batches = ['2021', '2022', '2023', '2024'];
   const semesters = [1, 2, 3, 4, 5, 6, 7, 8];
   

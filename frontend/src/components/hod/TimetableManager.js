@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, Trash, Plus, X, BookOpen, User } from '@phosphor-icons/react';
 import { timetableAPI, facultyAPI } from '../../services/api';
 
-const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const PERIODS = [
   { num: 1, time: '9:00 – 9:50', session: 'morning' },
   { num: 2, time: '9:50 – 10:40', session: 'morning' },
@@ -12,7 +12,7 @@ const PERIODS = [
   { num: 6, time: '2:20 – 3:10', session: 'afternoon' },
 ];
 
-const SECTIONS = ['DS', 'CS', 'IT', 'AIML', 'CSE', 'CSM', 'CSD', 'CSC', 'ECE'];
+const SECTIONS = ['ECE', 'IT-1', 'IT-2', 'CSC', 'AIML-1', 'AIML-2', 'AIML-3', 'DS-1', 'DS-2'];
 
 const SLOT_COLORS = [
   'bg-indigo-100 text-indigo-800 border-indigo-200',
