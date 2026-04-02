@@ -75,6 +75,7 @@ const CodePlayground = ({ navigate, user }) => {
   useEffect(() => {
     fetchChallenges();
     fetchStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [difficultyFilter]);
 
   const fetchChallenges = async () => {
