@@ -17,15 +17,16 @@ function getWorkloadStyle(count) {
   return style;
 }
 
+const SECTIONS = ['DS', 'CS', 'IT', 'AIML', 'CSE', 'CSM', 'CSD', 'CSC', 'ECE'];
+
 export default function WorkloadMatrix({ teachers = [], assignments = [] }) {
-  const sections = ['DS', 'CS', 'IT', 'AIML', 'CSE', 'CSM', 'CSD', 'CSC', 'ECE'];
 
   const matrix = useMemo(() => {
     return teachers.map(teacher => {
       const teacherAssignments = assignments.filter(a => a.teacher_id === teacher.id);
       const sectionCounts = {};
       let total = 0;
-      sections.forEach(sec => {
+      SECTIONS.forEach(sec => {
         const count = teacherAssignments.filter(a => a.section === sec).length;
         sectionCounts[sec] = count;
         total += count;
@@ -41,7 +42,7 @@ export default function WorkloadMatrix({ teachers = [], assignments = [] }) {
 
   const totalBySection = useMemo(() => {
     const totals = {};
-    sections.forEach(sec => {
+    SECTIONS.forEach(sec => {
       totals[sec] = assignments.filter(a => a.section === sec).length;
     });
     return totals;
@@ -82,7 +83,7 @@ export default function WorkloadMatrix({ teachers = [], assignments = [] }) {
               <th className="text-left p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 rounded-tl-xl">
                 Faculty
               </th>
-              {sections.map(sec => (
+              {SECTIONS.map(sec => (
                 <th key={sec} className="p-3 text-xs font-semibold text-slate-500 uppercase tracking-wider bg-slate-50 text-center min-w-[64px]">
                   {sec}
                 </th>
@@ -101,7 +102,7 @@ export default function WorkloadMatrix({ teachers = [], assignments = [] }) {
                     <div className="font-semibold text-slate-700 text-sm">{teacher.name}</div>
                     <div className="text-xs text-slate-400">{teacher.email}</div>
                   </td>
-                  {sections.map(sec => {
+                  {SECTIONS.map(sec => {
                     const count = teacher.sectionCounts[sec];
                     const style = getWorkloadStyle(count);
                     return (
@@ -127,7 +128,7 @@ export default function WorkloadMatrix({ teachers = [], assignments = [] }) {
               <td className="p-3 text-xs font-semibold text-slate-600 uppercase rounded-bl-xl">
                 Section Total
               </td>
-              {sections.map(sec => (
+              {SECTIONS.map(sec => (
                 <td key={sec} className="p-3 text-center">
                   <span className="font-bold text-sm text-slate-700">{totalBySection[sec] || 0}</span>
                 </td>
