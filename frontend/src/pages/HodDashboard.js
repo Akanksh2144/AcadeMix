@@ -479,9 +479,9 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   const [showSubjectDropdown, setShowSubjectDropdown] = useState(false);
   const [showTeacherDropdown, setShowTeacherDropdown] = useState(false);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const fetchData = async () => {
