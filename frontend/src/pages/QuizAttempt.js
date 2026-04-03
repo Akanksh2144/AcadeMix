@@ -380,10 +380,15 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const debounceTimers = useRef({});
+
   const handleAnswer = async (questionIndex, answer) => {
     setAnswers(prev => ({ ...prev, [questionIndex]: answer }));
     if (attempt?.id) {
-      try { await attemptsAPI.answer(attempt.id, { question_index: questionIndex, answer }); } catch {}
+      if (debounceTimers.current[questionIndex]) clearTimeout(debounceTimers.current[questionIndex]);
+      debounceTimers.current[questionIndex] = setTimeout(async () => {
+        try { await attemptsAPI.answer(attempt.id, { question_index: questionIndex, answer }); } catch {}
+      }, 1000);
     }
   };
 

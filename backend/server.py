@@ -25,6 +25,11 @@ from tenant import derive_tenant_id, get_tenant_id, is_super_admin, tenant_query
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
+import redis as pyredis
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 # ─── App & DB ───────────────────────────────────────────────────────────────
 app = FastAPI(title="QuizPortal API")
 
@@ -73,6 +78,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+redis_url = os.environ.get("REDIS_URL", "")
+redis_client = pyredis.from_url(redis_url) if redis_url else None
+if redis_url:
+    limiter = Limiter(key_func=get_remote_address, storage_uri=redis_url)
+else:
+    limiter = Limiter(key_func=get_remote_address)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ─── Helpers ────────────────────────────────────────────────────────────────
 def hash_password(password: str) -> str:
@@ -243,12 +258,30 @@ class ChallengeSubmit(BaseModel):
 
 # ─── Auth Routes ────────────────────────────────────────────────────────────
 @app.post("/api/auth/login")
-async def login(req: LoginRequest, response: Response):
+async def login(req: LoginRequest, response: Response, request: Request):
+    key = f"login_failures:{req.college_id.upper()}"
+    if redis_client:
+        failures = redis_client.get(key)
+        if failures and int(failures) >= 5:
+            raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 5 minutes.")
+
     user = await db.users.find_one({"college_id": req.college_id.upper()})
+    
+    def _handle_failure():
+        if redis_client:
+            redis_client.incr(key)
+            redis_client.expire(key, 300)  # 5 minutes
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        _handle_failure()
     if not verify_password(req.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        _handle_failure()
+
+    # Success
+    if redis_client:
+        redis_client.delete(key)
+
     uid = str(user["_id"])
     tid = user.get("tenant_id", derive_tenant_id(user.get("college", "")))
     access = create_access_token(uid, user["role"], tid)
@@ -262,28 +295,7 @@ async def login(req: LoginRequest, response: Response):
 
 @app.post("/api/auth/register")
 async def register(req: RegisterRequest, response: Response):
-    existing = await db.users.find_one({"college_id": req.college_id.upper()})
-    if existing:
-        raise HTTPException(status_code=400, detail="College ID already registered")
-    tid = derive_tenant_id(req.college)
-    doc = {
-        "name": req.name, "college_id": req.college_id.upper(), "email": req.email.lower(),
-        "password_hash": hash_password(req.password), "role": req.role,
-        "college": req.college, "department": req.department, "batch": req.batch, "section": req.section,
-        "tenant_id": tid,
-        "created_at": datetime.now(timezone.utc)
-    }
-    result = await db.users.insert_one(doc)
-    doc["_id"] = result.inserted_id
-    uid = str(result.inserted_id)
-    access = create_access_token(uid, req.role, tid)
-    refresh = create_refresh_token(uid)
-    response.set_cookie("access_token", access, httponly=True, secure=False, samesite="lax", max_age=86400)
-    response.set_cookie("refresh_token", refresh, httponly=True, secure=False, samesite="lax", max_age=604800)
-    doc = serialize_doc(doc)
-    doc.pop("password_hash", None)
-    doc["access_token"] = access
-    return doc
+    raise HTTPException(status_code=403, detail="Self-registration is disabled. Please contact your college administrator.")
 
 @app.get("/api/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
@@ -537,7 +549,8 @@ async def end_quiz_now(quiz_id: str, user: dict = Depends(require_role("teacher"
 
 # ─── Quiz Attempt Routes ───────────────────────────────────────────────────
 @app.post("/api/quizzes/{quiz_id}/start")
-async def start_attempt(quiz_id: str, user: dict = Depends(get_current_user)):
+@limiter.limit("5/minute")
+async def start_attempt(quiz_id: str, request: Request, user: dict = Depends(get_current_user)):
     quiz = await db.quizzes.find_one({"_id": ObjectId(quiz_id)})
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
@@ -551,19 +564,28 @@ async def start_attempt(quiz_id: str, user: dict = Depends(get_current_user)):
     if in_progress:
         return serialize_doc(in_progress)
     num_q = len(quiz.get("questions", []))
+    prev_attempts = await db.quiz_attempts.count_documents({"quiz_id": quiz_id, "student_id": user["id"]})
     attempt = inject_tenant(user, {
         "quiz_id": quiz_id, "quiz_title": quiz["title"], "quiz_subject": quiz["subject"],
         "student_id": user["id"], "student_name": user["name"],
+        "attempt_number": prev_attempts + 1,
         "total_questions": num_q, "total_marks": quiz["total_marks"],
         "answers": [None] * num_q, "status": "in_progress", "violations": 0,
         "started_at": datetime.now(timezone.utc), "score": 0
     })
-    result = await db.quiz_attempts.insert_one(attempt)
+    try:
+        import pymongo
+        result = await db.quiz_attempts.insert_one(attempt)
+    except (pymongo.errors.DuplicateKeyError, Exception) as e:
+        if type(e).__name__ == "DuplicateKeyError":
+            raise HTTPException(status_code=400, detail="Concurrent attempt creation detected. Try again.")
+        raise
     attempt["_id"] = result.inserted_id
     return serialize_doc(attempt)
 
 @app.post("/api/attempts/{attempt_id}/answer")
-async def submit_answer(attempt_id: str, req: AnswerSubmit, user: dict = Depends(get_current_user)):
+@limiter.limit("120/minute")
+async def submit_answer(attempt_id: str, req: AnswerSubmit, request: Request, user: dict = Depends(get_current_user)):
     attempt = await db.quiz_attempts.find_one({"_id": ObjectId(attempt_id), "student_id": user["id"]})
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
@@ -593,7 +615,8 @@ async def log_violation(attempt_id: str, req: ViolationReport = ViolationReport(
     return {"message": "Violation logged", "total_violations": updated.get("violations", 0)}
 
 @app.post("/api/attempts/{attempt_id}/submit")
-async def submit_attempt(attempt_id: str, user: dict = Depends(get_current_user)):
+@limiter.limit("3/minute")
+async def submit_attempt(attempt_id: str, request: Request, user: dict = Depends(get_current_user)):
     attempt = await db.quiz_attempts.find_one({"_id": ObjectId(attempt_id), "student_id": user["id"]})
     if not attempt:
         raise HTTPException(status_code=404, detail="Attempt not found")
