@@ -492,7 +492,7 @@ const CodePlayground = ({ navigate, user }) => {
           <div className="w-full max-w-4xl max-h-[85vh] bg-white rounded-3xl dark:bg-[#1A202C] shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50/80">
               <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                 <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center">
                    <Lightning size={20} weight="fill" />
                  </div>
                  <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Problem List</h2>
@@ -509,7 +509,7 @@ const CodePlayground = ({ navigate, user }) => {
                      <option value="Hard">Hard</option>
                    </select>
                 </div>
-                <button onClick={() => setShowChallengesModal(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-400 hover:bg-slate-100 rounded-full transition-colors">
+                <button onClick={() => setShowChallengesModal(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 rounded-full transition-colors">
                   <X size={24} />
                 </button>
               </div>
@@ -521,21 +521,21 @@ const CodePlayground = ({ navigate, user }) => {
                     Loading problems...
                  </div>
                ) : (
-                 <div className="divide-y divide-slate-100">
+                 <div className="divide-y divide-slate-100 dark:divide-white/[0.06]">
                    {challenges.map((ch, i) => (
-                     <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 dark:bg-slate-800/50 transition-colors group cursor-pointer" onClick={() => handleLoadChallenge(ch)}>
+                     <div key={i} className="px-6 py-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-colors group cursor-pointer" onClick={() => handleLoadChallenge(ch)}>
                         <div className="flex-1 pr-6">
-                           <div className="flex items-center gap-3 mb-1">
-                             <h4 className="text-[15px] font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 transition-colors">{ch.title}</h4>
-                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${ch.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : ch.difficulty === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                           <div className="flex items-center gap-3 mb-2">
+                             <h4 className="text-[15px] font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{ch.title}</h4>
+                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md ${ch.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400' : ch.difficulty === 'Medium' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400'}`}>
                                {ch.difficulty}
                              </span>
                            </div>
                            <div className="flex gap-2 text-xs text-slate-400 mt-2 truncate">
-                              {ch.topics?.slice(0, 3).map(t => <span key={t} className="bg-slate-100 px-2 py-0.5 rounded">{t}</span>)}
+                              {ch.topics?.slice(0, 3).map(t => <span key={t} className="bg-slate-100 dark:bg-white/[0.06] dark:text-slate-400 px-2.5 py-1 rounded-lg font-medium">{t}</span>)}
                            </div>
                         </div>
-                        <button className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 dark:text-slate-400 font-bold text-sm group-hover:bg-indigo-600 group-hover:text-white transition-all shadow-sm">
+                        <button className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300 font-bold text-sm group-hover:bg-indigo-600 group-hover:text-white dark:group-hover:bg-indigo-500 transition-all shadow-sm">
                            Solve
                         </button>
                      </div>
