@@ -23,10 +23,10 @@ const SemesterResults = ({ navigate, user }) => {
   const allSemNumbers = semesters.map(s => s.semester);
 
   const getGradeColor = (grade) => {
-    if (!grade) return 'bg-slate-100 text-slate-600 dark:text-slate-400';
-    if (grade === 'O' || grade.startsWith('A')) return 'bg-emerald-50 text-emerald-600';
-    if (grade.startsWith('B')) return 'bg-amber-50 text-amber-600';
-    return 'bg-rose-50 text-rose-600';
+    if (!grade) return 'bg-slate-100 dark:bg-slate-500/15 text-slate-600 dark:text-slate-400';
+    if (grade === 'O' || grade.startsWith('A')) return 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400';
+    if (grade.startsWith('B')) return 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400';
+    return 'bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400';
   };
 
   if (loading) return <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300 flex items-center justify-center"><div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div></div>;
@@ -73,7 +73,7 @@ const SemesterResults = ({ navigate, user }) => {
                     <div className="flex items-center gap-2"><p className="text-3xl font-extrabold text-slate-900 dark:text-white">{currentSem.cgpa}</p></div>
                   </div>
                   <div className="soft-card p-5" data-testid="subjects-count-card"><span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">Subjects</span><p className="text-3xl font-extrabold text-slate-900 dark:text-white">{currentSem.subjects?.length || 0}</p></div>
-                  <div className="soft-card p-5" data-testid="status-card"><span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">Status</span><span className="soft-badge bg-emerald-50 text-emerald-600 text-base mt-1">
+                  <div className="soft-card p-5" data-testid="status-card"><span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">Status</span><span className="soft-badge bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-base mt-1">
                     {currentSem.subjects?.every(s => s.status === 'PASS') ? 'All Pass' : 'Has Arrears'}
                   </span></div>
                 </div>
@@ -92,11 +92,11 @@ const SemesterResults = ({ navigate, user }) => {
                       </thead>
                       <tbody>
                         {(currentSem.subjects || []).map((sub, i) => (
-                          <tr key={i} className="border-b border-slate-50 hover:bg-slate-50 dark:bg-slate-800/50/50 transition-colors" data-testid={`subject-row-${i}`}>
+                          <tr key={i} className="border-b border-slate-50 dark:border-white/[0.06] hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-colors" data-testid={`subject-row-${i}`}>
                             <td className="p-4"><p className="font-bold text-slate-800 dark:text-slate-100">{sub.name}</p><p className="text-sm font-medium text-slate-400">{sub.code}</p></td>
                             <td className="text-center p-4"><p className="font-bold text-slate-700 dark:text-slate-300">{sub.credits}</p></td>
                             <td className="text-center p-4"><span className={`soft-badge ${getGradeColor(sub.grade)}`}>{sub.grade}</span></td>
-                            <td className="text-center p-4"><span className={`soft-badge ${sub.status === 'PASS' ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>{sub.status}</span></td>
+                            <td className="text-center p-4"><span className={`soft-badge ${sub.status === 'PASS' ? 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-500/15 text-red-600 dark:text-red-400'}`}>{sub.status}</span></td>
                           </tr>
                         ))}
                       </tbody>
