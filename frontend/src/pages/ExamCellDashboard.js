@@ -1,120 +1,235 @@
-import React, { useState, useEffect } from 'react';
-import { BookOpen, Upload, CheckCircle, Clock, SignOut, FileText, ChartBar, Eye, PaperPlaneTilt } from '@phosphor-icons/react';
-import { examCellAPI, marksAPI } from '../services/api';
-import AlertModal from '../components/AlertModal';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  BookOpen,
+  Upload,
+  CheckCircle,
+  Clock,
+  SignOut,
+  FileText,
+  ChartBar,
+  Eye,
+  PaperPlaneTilt,
+  Sun,
+  Moon,
+} from "@phosphor-icons/react";
+import { examCellAPI, marksAPI } from "../services/api";
+import { useTheme } from "../contexts/ThemeContext";
+import DashboardSkeleton from "../components/DashboardSkeleton";
+import AlertModal from "../components/AlertModal";
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: { type: "spring", stiffness: 300, damping: 24 },
+  },
+};
+
+const cardHover = {
+  scale: 1.02,
+  transition: { type: "spring", stiffness: 400, damping: 17 },
+};
 
 const ExamCellDashboard = ({ navigate, user, onLogout }) => {
-  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('examcell_tab') || 'overview');
-  useEffect(() => { sessionStorage.setItem('examcell_tab', activeTab); }, [activeTab]);
+  const [activeTab, setActiveTab] = useState(
+    () => sessionStorage.getItem("examcell_tab") || "overview",
+  );
+  useEffect(() => {
+    sessionStorage.setItem("examcell_tab", activeTab);
+  }, [activeTab]);
   const [dashboard, setDashboard] = useState(null);
-  const [alertModal, setAlertModal] = useState({ open: false, title: '', message: '', type: 'info' });
-  const showAlert = (title, message, type = 'info') => setAlertModal({ open: true, title, message, type });
-  const closeAlert = () => setAlertModal(prev => ({ ...prev, open: false }));
-  const [confirmModal, setConfirmModal] = useState({ open: false, title: '', message: '', type: 'warning', onConfirm: null });
+  const [alertModal, setAlertModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+    type: "info",
+  });
+  const showAlert = (title, message, type = "info") =>
+    setAlertModal({ open: true, title, message, type });
+  const closeAlert = () => setAlertModal((prev) => ({ ...prev, open: false }));
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    title: "",
+    message: "",
+    type: "warning",
+    onConfirm: null,
+  });
   const [approvedMarks, setApprovedMarks] = useState([]);
   const [endtermEntries, setEndtermEntries] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [uploadForm, setUploadForm] = useState({ subject_code: '', subject_name: '', department: 'DS', batch: '2022', section: 'A', semester: 3 });
+  const { isDark, toggle: toggleTheme } = useTheme();
+  const [uploadForm, setUploadForm] = useState({
+    subject_code: "",
+    subject_name: "",
+    department: "DS",
+    batch: "2022",
+    section: "A",
+    semester: 3,
+  });
   const [uploadFile, setUploadFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [manualEntry, setManualEntry] = useState(null);
-  
+
   // Dropdown states
   const [showSubjectCodeDropdown, setShowSubjectCodeDropdown] = useState(false);
   const [showDepartmentDropdown, setShowDepartmentDropdown] = useState(false);
   const [showSectionDropdown, setShowSectionDropdown] = useState(false);
-  const [subjectCodeSearch, setSubjectCodeSearch] = useState('');
-  
+  const [subjectCodeSearch, setSubjectCodeSearch] = useState("");
+
   // Subject code to name mapping
   const subjectMapping = {
-    '22ET301': 'Data Structures',
-    '22ET302': 'Database Management Systems',
-    '22ET303': 'Operating Systems',
-    '22ET401': 'Computer Networks',
-    '22ET402': 'Software Engineering',
-    '22ET501': 'Machine Learning',
-    '22ET502': 'Artificial Intelligence',
-    '22ET503': 'Web Technologies'
+    "22ET301": "Data Structures",
+    "22ET302": "Database Management Systems",
+    "22ET303": "Operating Systems",
+    "22ET401": "Computer Networks",
+    "22ET402": "Software Engineering",
+    "22ET501": "Machine Learning",
+    "22ET502": "Artificial Intelligence",
+    "22ET503": "Web Technologies",
   };
-  
+
   // Mock data for dropdowns
   const subjectCodes = Object.keys(subjectMapping);
-  const departments = ['DS', 'CS', 'ET', 'AIML', 'IT', 'ECE', 'EEE'];
-  const sections = ['ECE', 'IT-1', 'IT-2', 'CSC', 'AIML-1', 'AIML-2', 'AIML-3', 'DS-1', 'DS-2'];
-  const batches = ['2021', '2022', '2023', '2024'];
+  const departments = ["DS", "CS", "ET", "AIML", "IT", "ECE", "EEE"];
+  const sections = [
+    "ECE",
+    "IT-1",
+    "IT-2",
+    "CSC",
+    "AIML-1",
+    "AIML-2",
+    "AIML-3",
+    "DS-1",
+    "DS-2",
+  ];
+  const batches = ["2021", "2022", "2023", "2024"];
   const semesters = [1, 2, 3, 4, 5, 6, 7, 8];
-  
-  const filteredSubjectCodes = subjectCodes.filter(code => 
-    code.toLowerCase().includes(subjectCodeSearch.toLowerCase())
+
+  const filteredSubjectCodes = subjectCodes.filter((code) =>
+    code.toLowerCase().includes(subjectCodeSearch.toLowerCase()),
   );
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData(); }, [activeTab]);
-  
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
+
   useEffect(() => {
     const handleClickOutside = (e) => {
-      if (!e.target.closest('.relative')) {
+      if (!e.target.closest(".relative")) {
         setShowSubjectCodeDropdown(false);
         setShowDepartmentDropdown(false);
         setShowSectionDropdown(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (activeTab === 'overview') {
+      if (activeTab === "overview") {
         const { data } = await examCellAPI.examCellDashboard();
         setDashboard(data);
       }
-      if (activeTab === 'midterm') {
+      if (activeTab === "midterm") {
         const { data } = await examCellAPI.approvedMarks();
         setApprovedMarks(data);
       }
-      if (activeTab === 'endterm') {
+      if (activeTab === "endterm") {
         const { data } = await examCellAPI.endtermList();
         setEndtermEntries(data);
       }
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
     setLoading(false);
   };
 
   const handleUpload = async () => {
-    if (!uploadFile) return showAlert('Missing File', 'Please select a file.', 'warning');
-    if (!uploadForm.subject_code) return showAlert('Missing Fields', 'Please fill all fields.', 'warning');
+    if (!uploadFile)
+      return showAlert("Missing File", "Please select a file.", "warning");
+    if (!uploadForm.subject_code)
+      return showAlert("Missing Fields", "Please fill all fields.", "warning");
     setUploading(true);
     try {
       const fd = new FormData();
-      fd.append('file', uploadFile);
+      fd.append("file", uploadFile);
       Object.entries(uploadForm).forEach(([k, v]) => fd.append(k, v));
       const { data } = await examCellAPI.uploadFile(fd);
-      showAlert('Upload Successful', data.message, 'success');
+      showAlert("Upload Successful", data.message, "success");
       setUploadFile(null);
       fetchData();
-    } catch (err) { showAlert('Upload Failed', err.response?.data?.detail || 'Upload failed', 'danger'); }
+    } catch (err) {
+      showAlert(
+        "Upload Failed",
+        err.response?.data?.detail || "Upload failed",
+        "danger",
+      );
+    }
     setUploading(false);
   };
 
   const handlePublish = async (entryId) => {
     setConfirmModal({
-      open: true, title: 'Publish Results', message: 'Publish these results? Students will be able to view them.', type: 'warning',
+      open: true,
+      title: "Publish Results",
+      message: "Publish these results? Students will be able to view them.",
+      type: "warning",
       onConfirm: async () => {
-        setConfirmModal(prev => ({ ...prev, open: false }));
-        try { await examCellAPI.publish(entryId); fetchData(); }
-        catch (err) { showAlert('Publish Failed', err.response?.data?.detail || 'Publish failed', 'danger'); }
+        setConfirmModal((prev) => ({ ...prev, open: false }));
+        try {
+          await examCellAPI.publish(entryId);
+          fetchData();
+        } catch (err) {
+          showAlert(
+            "Publish Failed",
+            err.response?.data?.detail || "Publish failed",
+            "danger",
+          );
+        }
       },
     });
   };
 
-  const stats = dashboard ? [
-    { label: 'Approved Midterms', value: dashboard.total_approved_midterms, icon: CheckCircle, color: 'bg-emerald-50 text-emerald-500' },
-    { label: 'End-term Entries', value: dashboard.total_endterm, icon: FileText, color: 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500' },
-    { label: 'Published', value: dashboard.total_published, icon: ChartBar, color: 'bg-amber-50 text-amber-500' },
-    { label: 'Draft', value: dashboard.total_draft, icon: Clock, color: 'bg-slate-100 text-slate-500 dark:text-slate-400' },
-  ] : [];
+  const stats = dashboard
+    ? [
+        {
+          label: "Approved Midterms",
+          value: dashboard.total_approved_midterms,
+          icon: CheckCircle,
+          color: "bg-emerald-50 text-emerald-500",
+        },
+        {
+          label: "End-term Entries",
+          value: dashboard.total_endterm,
+          icon: FileText,
+          color: "bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500",
+        },
+        {
+          label: "Published",
+          value: dashboard.total_published,
+          icon: ChartBar,
+          color: "bg-amber-50 text-amber-500",
+        },
+        {
+          label: "Draft",
+          value: dashboard.total_draft,
+          icon: Clock,
+          color: "bg-slate-100 text-slate-500 dark:text-slate-400",
+        },
+      ]
+    : [];
+
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -125,13 +240,45 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
               <BookOpen size={22} weight="duotone" className="text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadMix</h1>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Exam Cell</p>
+              <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                AcadMix
+              </h1>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                Exam Cell
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={toggleTheme}
+              className="p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
+              aria-label="Toggle theme"
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={isDark ? "dark" : "light"}
+                  initial={{ rotate: -90, opacity: 0 }}
+                  animate={{ rotate: 0, opacity: 1 }}
+                  exit={{ rotate: 90, opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                >
+                  {isDark ? (
+                    <Sun size={20} weight="duotone" />
+                  ) : (
+                    <Moon size={20} weight="duotone" />
+                  )}
+                </motion.div>
+              </AnimatePresence>
+            </motion.button>
             <span className="btn-ghost !px-4 !py-2 text-sm">{user?.name}</span>
-            <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors" aria-label="Sign out">
+            <button
+              data-testid="logout-button"
+              onClick={onLogout}
+              className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
+              aria-label="Sign out"
+            >
               <SignOut size={20} weight="duotone" />
             </button>
           </div>
@@ -139,109 +286,245 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-2">Exam Cell</h2>
-        <p className="text-base font-medium text-slate-500 dark:text-slate-400 mb-8">Manage end-term marks and publish results</p>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+          className="mb-2"
+        >
+          <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">
+            Exam Cell
+          </h2>
+          <p className="text-base font-medium text-slate-500 dark:text-slate-400 mb-8">
+            Manage end-term marks and publish results
+          </p>
+        </motion.div>
 
-        <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit mb-8" data-testid="examcell-tabs">
-          {[{ id: 'overview', label: 'Overview' }, { id: 'midterm', label: 'Approved Midterms' }, { id: 'endterm', label: 'End-term Marks' }, { id: 'upload', label: 'Upload Marks' }].map(tab => (
-            <button key={tab.id} data-testid={`tab-${tab.id}`} onClick={() => setActiveTab(tab.id)}
-              className={`pill-tab ${activeTab === tab.id ? 'pill-tab-active' : 'pill-tab-inactive'}`}>{tab.label}</button>
+        <div
+          className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit mb-8"
+          data-testid="examcell-tabs"
+        >
+          {[
+            { id: "overview", label: "Overview" },
+            { id: "midterm", label: "Approved Midterms" },
+            { id: "endterm", label: "End-term Marks" },
+            { id: "upload", label: "Upload Marks" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              data-testid={`tab-${tab.id}`}
+              onClick={() => setActiveTab(tab.id)}
+              className={`pill-tab ${activeTab === tab.id ? "pill-tab-active" : "pill-tab-inactive"}`}
+            >
+              {tab.label}
+            </button>
           ))}
         </div>
 
-        {activeTab === 'overview' && (
-          <div data-testid="overview-content">
+        {activeTab === "overview" && (
+          <motion.div
+            data-testid="overview-content"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+          >
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               {stats.map((stat, i) => (
-                <div key={i} className="soft-card p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{stat.label}</span>
-                    <div className={`${stat.color} p-2 rounded-xl`}><stat.icon size={18} weight="duotone" /></div>
+                <motion.div
+                  key={i}
+                  variants={itemVariants}
+                  whileHover={cardHover}
+                  className="stat-card"
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-xs font-bold uppercase tracking-widest text-slate-400">
+                      {stat.label}
+                    </span>
+                    <div className={`${stat.color} p-2.5 rounded-xl`}>
+                      <stat.icon size={20} weight="duotone" />
+                    </div>
                   </div>
-                  <p className="text-3xl font-extrabold text-slate-900 dark:text-white">{stat.value}</p>
-                </div>
+                  <p className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                    {stat.value}
+                  </p>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {activeTab === 'midterm' && (
-          <div data-testid="midterm-content">
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">HOD-Approved Mid-term Marks</h3>
+        {activeTab === "midterm" && (
+          <motion.div
+            data-testid="midterm-content"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.h3
+              variants={itemVariants}
+              className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6"
+            >
+              HOD-Approved Mid-term Marks
+            </motion.h3>
             <div className="space-y-4">
-              {approvedMarks.map(m => (
-                <div key={m.id} className="soft-card p-6" data-testid={`midterm-${m.id}`}>
+              {approvedMarks.map((m) => (
+                <motion.div
+                  key={m.id}
+                  variants={itemVariants}
+                  className="soft-card p-6"
+                  data-testid={`midterm-${m.id}`}
+                >
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <p className="font-bold text-lg text-slate-800 dark:text-slate-100">{m.subject_name} ({m.subject_code})</p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">{m.exam_type?.toUpperCase()} | Teacher: {m.teacher_name} | Batch {m.batch} Sec {m.section}</p>
+                      <p className="font-bold text-lg text-slate-800 dark:text-slate-100">
+                        {m.subject_name} ({m.subject_code})
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {m.exam_type?.toUpperCase()} | Teacher: {m.teacher_name}{" "}
+                        | Batch {m.batch} Sec {m.section}
+                      </p>
                     </div>
-                    <span className="soft-badge bg-emerald-50 text-emerald-600">Approved</span>
+                    <span className="soft-badge bg-emerald-50 text-emerald-600">
+                      Approved
+                    </span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead><tr className="border-b border-slate-100 dark:border-slate-700">
-                        <th className="text-left py-2 px-3 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">College ID</th>
-                        <th className="text-left py-2 px-3 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">Name</th>
-                        <th className="text-center py-2 px-3 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">Marks / {m.max_marks}</th>
-                      </tr></thead>
+                      <thead>
+                        <tr className="border-b border-slate-100 dark:border-slate-700">
+                          <th className="text-left py-2 px-3 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">
+                            College ID
+                          </th>
+                          <th className="text-left py-2 px-3 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">
+                            Name
+                          </th>
+                          <th className="text-center py-2 px-3 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">
+                            Marks / {m.max_marks}
+                          </th>
+                        </tr>
+                      </thead>
                       <tbody>
                         {m.entries?.map((e, i) => (
                           <tr key={i} className="border-b border-slate-50">
-                            <td className="py-2 px-3 font-medium text-slate-600 dark:text-slate-400">{e.college_id}</td>
-                            <td className="py-2 px-3 text-slate-800 dark:text-slate-100">{e.student_name}</td>
-                            <td className="py-2 px-3 text-center font-bold">{e.marks ?? '-'}</td>
+                            <td className="py-2 px-3 font-medium text-slate-600 dark:text-slate-400">
+                              {e.college_id}
+                            </td>
+                            <td className="py-2 px-3 text-slate-800 dark:text-slate-100">
+                              {e.student_name}
+                            </td>
+                            <td className="py-2 px-3 text-center font-bold">
+                              {e.marks ?? "-"}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </div>
+                </motion.div>
               ))}
-              {approvedMarks.length === 0 && <div className="soft-card p-8 text-center"><p className="text-slate-400">No approved midterm marks yet</p></div>}
+              {approvedMarks.length === 0 && (
+                <motion.div
+                  variants={itemVariants}
+                  className="soft-card p-8 text-center text-slate-400"
+                >
+                  No approved midterm marks yet
+                </motion.div>
+              )}
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {activeTab === 'endterm' && (
-          <div data-testid="endterm-content">
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">End-term Results</h3>
+        {activeTab === "endterm" && (
+          <motion.div
+            data-testid="endterm-content"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.h3
+              variants={itemVariants}
+              className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6"
+            >
+              End-term Results
+            </motion.h3>
             <div className="space-y-4">
-              {endtermEntries.map(e => (
-                <div key={e.id} className="soft-card p-6" data-testid={`endterm-${e.id}`}>
+              {endtermEntries.map((e) => (
+                <motion.div
+                  key={e.id}
+                  variants={itemVariants}
+                  className="soft-card p-6"
+                  data-testid={`endterm-${e.id}`}
+                >
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <p className="font-bold text-lg text-slate-800 dark:text-slate-100">{e.subject_name} ({e.subject_code})</p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">Sem {e.semester} | Batch {e.batch} Sec {e.section} | {e.entries?.length} students</p>
+                      <p className="font-bold text-lg text-slate-800 dark:text-slate-100">
+                        {e.subject_name} ({e.subject_code})
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Sem {e.semester} | Batch {e.batch} Sec {e.section} |{" "}
+                        {e.entries?.length} students
+                      </p>
                     </div>
-                    <span className={`soft-badge ${e.status === 'published' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{e.status}</span>
+                    <span
+                      className={`soft-badge ${e.status === "published" ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}
+                    >
+                      {e.status}
+                    </span>
                   </div>
-                  {e.status === 'draft' && (
-                    <button data-testid={`publish-${e.id}`} onClick={() => handlePublish(e.id)} className="btn-primary !py-2 text-sm flex items-center gap-2">
-                      <PaperPlaneTilt size={16} weight="duotone" /> Publish Results
+                  {e.status === "draft" && (
+                    <button
+                      data-testid={`publish-${e.id}`}
+                      onClick={() => handlePublish(e.id)}
+                      className="btn-primary !py-2 text-sm flex items-center gap-2"
+                    >
+                      <PaperPlaneTilt size={16} weight="duotone" /> Publish
+                      Results
                     </button>
                   )}
-                </div>
+                </motion.div>
               ))}
-              {endtermEntries.length === 0 && <div className="soft-card p-8 text-center"><p className="text-slate-400">No end-term entries yet. Upload marks to get started.</p></div>}
+              {endtermEntries.length === 0 && (
+                <motion.div
+                  variants={itemVariants}
+                  className="soft-card p-8 text-center text-slate-400"
+                >
+                  No end-term entries yet. Upload marks to get started.
+                </motion.div>
+              )}
             </div>
-          </div>
+          </motion.div>
         )}
 
-        {activeTab === 'upload' && (
-          <div data-testid="upload-content">
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6">Upload End-term Marks</h3>
-            <div className="soft-card p-6">
+        {activeTab === "upload" && (
+          <motion.div
+            data-testid="upload-content"
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+          >
+            <motion.h3
+              variants={itemVariants}
+              className="text-2xl font-bold text-slate-800 dark:text-slate-100 mb-6"
+            >
+              Upload End-term Marks
+            </motion.h3>
+            <motion.div variants={itemVariants} className="soft-card p-6">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 {/* Subject Code Dropdown */}
                 <div className="relative">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Subject Code</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Subject Code
+                  </label>
                   <div className="relative">
                     <input
                       data-testid="upload-subject-code"
                       value={uploadForm.subject_code}
                       onChange={(e) => {
-                        setUploadForm({ ...uploadForm, subject_code: e.target.value, subject_name: '' });
+                        setUploadForm({
+                          ...uploadForm,
+                          subject_code: e.target.value,
+                          subject_name: "",
+                        });
                         setSubjectCodeSearch(e.target.value);
                         setShowSubjectCodeDropdown(true);
                       }}
@@ -252,13 +535,27 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
                     {uploadForm.subject_code && (
                       <button
                         onClick={() => {
-                          setUploadForm({ ...uploadForm, subject_code: '', subject_name: '' });
-                          setSubjectCodeSearch('');
+                          setUploadForm({
+                            ...uploadForm,
+                            subject_code: "",
+                            subject_name: "",
+                          });
+                          setSubjectCodeSearch("");
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-lg transition-colors"
                       >
-                        <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        <svg
+                          className="w-4 h-4 text-slate-400"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M6 18L18 6M6 6l12 12"
+                          />
                         </svg>
                       </button>
                     )}
@@ -270,65 +567,102 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
                           <button
                             key={code}
                             onClick={() => {
-                              setUploadForm({ 
-                                ...uploadForm, 
+                              setUploadForm({
+                                ...uploadForm,
                                 subject_code: code,
-                                subject_name: subjectMapping[code] || ''
+                                subject_name: subjectMapping[code] || "",
                               });
                               setShowSubjectCodeDropdown(false);
-                              setSubjectCodeSearch('');
+                              setSubjectCodeSearch("");
                             }}
                             className="w-full text-left px-4 py-2.5 hover:bg-slate-50 dark:bg-slate-800/50 transition-colors"
                           >
-                            <p className="font-bold text-slate-800 dark:text-slate-100">{code}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{subjectMapping[code]}</p>
+                            <p className="font-bold text-slate-800 dark:text-slate-100">
+                              {code}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              {subjectMapping[code]}
+                            </p>
                           </button>
                         ))
                       ) : (
-                        <div className="px-4 py-2.5 text-sm text-slate-400">No results found</div>
+                        <div className="px-4 py-2.5 text-sm text-slate-400">
+                          No results found
+                        </div>
                       )}
                     </div>
                   )}
                 </div>
-                
+
                 {/* Subject Name - Display Only */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Subject Name</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Subject Name
+                  </label>
                   <div className="soft-input w-full bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-400 flex items-center">
-                    {uploadForm.subject_name || 'Auto-filled from code'}
+                    {uploadForm.subject_name || "Auto-filled from code"}
                   </div>
                 </div>
-                
+
                 {/* Semester Dropdown */}
                 <div className="relative">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Semester</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Semester
+                  </label>
                   <select
                     data-testid="upload-semester"
                     value={uploadForm.semester}
-                    onChange={(e) => setUploadForm({ ...uploadForm, semester: parseInt(e.target.value) })}
+                    onChange={(e) =>
+                      setUploadForm({
+                        ...uploadForm,
+                        semester: parseInt(e.target.value),
+                      })
+                    }
                     className="soft-input w-full"
                   >
-                    {semesters.map(sem => (
-                      <option key={sem} value={sem}>Semester {sem}</option>
+                    {semesters.map((sem) => (
+                      <option key={sem} value={sem}>
+                        Semester {sem}
+                      </option>
                     ))}
                   </select>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 {/* Department Dropdown */}
                 <div className="relative">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Department</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Department
+                  </label>
                   <div className="relative">
                     <button
-                      onClick={() => setShowDepartmentDropdown(!showDepartmentDropdown)}
+                      onClick={() =>
+                        setShowDepartmentDropdown(!showDepartmentDropdown)
+                      }
                       className="soft-input w-full text-left flex items-center justify-between"
                     >
-                      <span className={uploadForm.department ? 'text-slate-900 dark:text-white' : 'text-slate-400'}>
-                        {uploadForm.department || 'Select department...'}
+                      <span
+                        className={
+                          uploadForm.department
+                            ? "text-slate-900 dark:text-white"
+                            : "text-slate-400"
+                        }
+                      >
+                        {uploadForm.department || "Select department..."}
                       </span>
-                      <svg className={`w-4 h-4 text-slate-400 transition-transform ${showDepartmentDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      <svg
+                        className={`w-4 h-4 text-slate-400 transition-transform ${showDepartmentDropdown ? "rotate-180" : ""}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -349,34 +683,60 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Batch Dropdown */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Batch</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Batch
+                  </label>
                   <select
                     value={uploadForm.batch}
-                    onChange={(e) => setUploadForm({ ...uploadForm, batch: e.target.value })}
+                    onChange={(e) =>
+                      setUploadForm({ ...uploadForm, batch: e.target.value })
+                    }
                     className="soft-input w-full"
                   >
-                    {batches.map(batch => (
-                      <option key={batch} value={batch}>{batch}</option>
+                    {batches.map((batch) => (
+                      <option key={batch} value={batch}>
+                        {batch}
+                      </option>
                     ))}
                   </select>
                 </div>
-                
+
                 {/* Section Dropdown */}
                 <div className="relative">
-                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Section</label>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                    Section
+                  </label>
                   <div className="relative">
                     <button
-                      onClick={() => setShowSectionDropdown(!showSectionDropdown)}
+                      onClick={() =>
+                        setShowSectionDropdown(!showSectionDropdown)
+                      }
                       className="soft-input w-full text-left flex items-center justify-between"
                     >
-                      <span className={uploadForm.section ? 'text-slate-900 dark:text-white' : 'text-slate-400'}>
-                        {uploadForm.section || 'Select section...'}
+                      <span
+                        className={
+                          uploadForm.section
+                            ? "text-slate-900 dark:text-white"
+                            : "text-slate-400"
+                        }
+                      >
+                        {uploadForm.section || "Select section..."}
                       </span>
-                      <svg className={`w-4 h-4 text-slate-400 transition-transform ${showSectionDropdown ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      <svg
+                        className={`w-4 h-4 text-slate-400 transition-transform ${showSectionDropdown ? "rotate-180" : ""}`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M19 9l-7 7-7-7"
+                        />
                       </svg>
                     </button>
                   </div>
@@ -398,22 +758,50 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
                   )}
                 </div>
               </div>
-              
+
               <div className="mb-6">
-                <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Marks File (CSV or Excel)</label>
+                <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                  Marks File (CSV or Excel)
+                </label>
                 <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center">
-                  <Upload size={40} weight="duotone" className="mx-auto mb-3 text-slate-400" />
-                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">Upload CSV or XLSX file with columns: college_id, marks, grade</p>
-                  <input data-testid="file-upload" type="file" accept=".csv,.xlsx,.xls" onChange={(e) => setUploadFile(e.target.files[0])} className="text-sm" />
-                  {uploadFile && <p className="mt-2 text-sm font-bold text-indigo-600">{uploadFile.name}</p>}
+                  <Upload
+                    size={40}
+                    weight="duotone"
+                    className="mx-auto mb-3 text-slate-400"
+                  />
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-3">
+                    Upload CSV or XLSX file with columns: college_id, marks,
+                    grade
+                  </p>
+                  <input
+                    data-testid="file-upload"
+                    type="file"
+                    accept=".csv,.xlsx,.xls"
+                    onChange={(e) => setUploadFile(e.target.files[0])}
+                    className="text-sm"
+                  />
+                  {uploadFile && (
+                    <p className="mt-2 text-sm font-bold text-indigo-600">
+                      {uploadFile.name}
+                    </p>
+                  )}
                 </div>
               </div>
-              <button data-testid="upload-submit-button" onClick={handleUpload} disabled={uploading} className="btn-primary !py-2.5 text-sm flex items-center gap-2 disabled:opacity-60">
-                {uploading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Upload size={16} weight="duotone" />}
-                {uploading ? 'Uploading...' : 'Upload Marks'}
+              <button
+                data-testid="upload-submit-button"
+                onClick={handleUpload}
+                disabled={uploading}
+                className="btn-primary !py-2.5 text-sm flex items-center gap-2 disabled:opacity-60"
+              >
+                {uploading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <Upload size={16} weight="duotone" />
+                )}
+                {uploading ? "Uploading..." : "Upload Marks"}
               </button>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
       </div>
       <AlertModal
@@ -433,7 +821,7 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
         confirmText="Publish"
         cancelText="Cancel"
         onConfirm={confirmModal.onConfirm}
-        onCancel={() => setConfirmModal(prev => ({ ...prev, open: false }))}
+        onCancel={() => setConfirmModal((prev) => ({ ...prev, open: false }))}
       />
     </div>
   );

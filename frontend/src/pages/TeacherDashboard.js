@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, NotePencil, ChartLine, Users, Eye, SignOut, Clipboard, Calendar, CalendarDots, PencilLine, Bell, GraduationCap, ArrowRight, Exam, Fire } from '@phosphor-icons/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BookOpen, NotePencil, ChartLine, Users, Eye, SignOut, Clipboard, Calendar, CalendarDots, PencilLine, Bell, GraduationCap, ArrowRight, Exam, Fire, Sun, Moon } from '@phosphor-icons/react';
 import { analyticsAPI } from '../services/api';
+import { useTheme } from '../contexts/ThemeContext';
+import DashboardSkeleton from '../components/DashboardSkeleton';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
+
+const cardHover = {
+  scale: 1.02,
+  transition: { type: 'spring', stiffness: 400, damping: 17 }
+};
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -23,6 +41,7 @@ const timeAgo = (ts) => {
 const TeacherDashboard = ({ navigate, user, onLogout }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const { isDark, toggle: toggleTheme } = useTheme();
   const [showNotifications, setShowNotifications] = useState(false);
   const notifKey = `acadmix_notif_read_${user?.id || 'default'}`;
   const [notifRead, setNotifReadState] = useState(() => localStorage.getItem(notifKey) === 'true');
@@ -56,56 +75,51 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
     { label: 'Active Quizzes', value: String(activeQuizzes), sub: 'live now', icon: Fire, color: 'bg-rose-50 dark:bg-rose-500/15 text-rose-500 dark:text-rose-400', gradient: 'from-rose-500 to-pink-500', onClick: () => navigate('teacher-quizzes') },
   ];
 
-  if (loading) return (
-    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300 flex items-center justify-center">
-      <div className="text-center">
-        <div className="w-14 h-14 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-        <p className="text-sm font-bold text-slate-400">Loading your dashboard...</p>
-      </div>
-    </div>
-  );
+  if (loading) return <DashboardSkeleton />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       {/* Notification overlay */}
-      {showNotifications && (
-        <>
-          <div className="fixed inset-0 z-[60]" onClick={() => setShowNotifications(false)}></div>
-          <div className="fixed top-16 right-4 sm:right-8 z-[61] w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 dark:bg-[#1A202C] dark:border-white/[0.06] overflow-hidden" style={{animation: 'fadeInUp 0.15s ease'}}>
-            <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
-              <h4 className="font-extrabold text-slate-800 dark:text-slate-100">Recent Activity</h4>
-              <button
-                onClick={() => { setNotifRead(true); setShowNotifications(false); }}
-                className="text-xs font-bold text-emerald-500 hover:text-emerald-600 transition-colors"
-              >
-                Mark all as read
-              </button>
-            </div>
-            <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-white/[0.04]">
-              {recentActivity.length > 0 ? recentActivity.map((item, i) => (
-                <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-emerald-50 dark:bg-emerald-500/15">
-                    <Exam size={14} weight="duotone" className="text-emerald-500 dark:text-emerald-400" />
+      <AnimatePresence>
+        {showNotifications && (
+          <>
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60]" onClick={() => setShowNotifications(false)}></motion.div>
+            <motion.div initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="fixed top-16 right-4 sm:right-8 z-[61] w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 dark:bg-[#1A202C] dark:border-white/[0.06] overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                <h4 className="font-extrabold text-slate-800 dark:text-slate-100">Recent Activity</h4>
+                <button
+                  onClick={() => { setNotifRead(true); setShowNotifications(false); }}
+                  className="text-xs font-bold text-emerald-500 hover:text-emerald-600 transition-colors"
+                >
+                  Mark all as read
+                </button>
+              </div>
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-white/[0.04]">
+                {recentActivity.length > 0 ? recentActivity.map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-emerald-50 dark:bg-emerald-500/15">
+                      <Exam size={14} weight="duotone" className="text-emerald-500 dark:text-emerald-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{item.title}</p>
+                      <p className="text-[10px] font-medium text-slate-400 mt-0.5">{item.subtitle} • {timeAgo(item.timestamp)}</p>
+                    </div>
+                    {item.score !== undefined && item.score !== null && (
+                      <span className={`text-sm font-extrabold flex-shrink-0 ${
+                        item.score >= 60 ? 'text-emerald-500' : item.score >= 40 ? 'text-amber-500' : 'text-red-500'
+                      }`}>{item.score?.toFixed(0)}%</span>
+                    )}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">{item.title}</p>
-                    <p className="text-[10px] font-medium text-slate-400 mt-0.5">{item.subtitle} • {timeAgo(item.timestamp)}</p>
+                )) : (
+                  <div className="px-5 py-8 text-center">
+                    <p className="text-sm text-slate-400">No recent submissions</p>
                   </div>
-                  {item.score !== undefined && item.score !== null && (
-                    <span className={`text-sm font-extrabold flex-shrink-0 ${
-                      item.score >= 60 ? 'text-emerald-500' : item.score >= 40 ? 'text-amber-500' : 'text-red-500'
-                    }`}>{item.score?.toFixed(0)}%</span>
-                  )}
-                </div>
-              )) : (
-                <div className="px-5 py-8 text-center">
-                  <p className="text-sm text-slate-400">No recent submissions</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </>
-      )}
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -119,6 +133,19 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
             </div>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={toggleTheme}
+              className="p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors hidden sm:block"
+              aria-label="Toggle theme"
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div key={isDark ? 'dark' : 'light'} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
+                  {isDark ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
+                </motion.div>
+              </AnimatePresence>
+            </motion.button>
             {/* Notification Bell */}
             <button
               data-testid="notification-bell"
@@ -148,22 +175,22 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* ── Hero Greeting ───────────────────────── */}
-        <div className="mb-6 sm:mb-8 animate-fade-in-up">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 200, damping: 20 }} className="mb-6 sm:mb-8">
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-1">
             {getGreeting()}, <span className="gradient-text">{user?.name?.split(' ').pop() || 'Faculty'}!</span>
           </h2>
           <p className="text-sm sm:text-base font-medium text-slate-500 dark:text-slate-400">
             {user?.designation || 'Assistant Professor'}
           </p>
-        </div>
+        </motion.div>
 
         {/* ── Stat Cards ──────────────────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 sm:mb-8">
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 sm:mb-8">
           {stats.map((stat, i) => {
             const Icon = stat.icon;
-            const Wrapper = stat.onClick ? 'button' : 'div';
+            const Wrapper = stat.onClick ? motion.button : motion.div;
             return (
-              <Wrapper key={i} onClick={stat.onClick || undefined}
+              <Wrapper variants={itemVariants} whileHover={cardHover} key={i} onClick={stat.onClick || undefined}
                 className={`stat-card relative overflow-hidden group text-left ${stat.onClick ? 'cursor-pointer' : ''}`}
                 data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
                 <div className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity`}></div>
@@ -177,10 +204,10 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
               </Wrapper>
             );
           })}
-        </div>
+        </motion.div>
 
         {/* ── Quick Actions ────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5 mb-6 sm:mb-8">
+        <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5 mb-6 sm:mb-8">
           {[
             { id: 'quiz-builder', icon: NotePencil, label: 'Create Quiz', sub: 'Build from scratch', colorBg: 'bg-indigo-50 dark:bg-indigo-500/15 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/25', colorText: 'text-indigo-500 dark:text-indigo-400', testId: 'create-quiz-button' },
             { id: 'marks-entry', icon: PencilLine, label: 'Marks Entry', sub: 'Mid-term marks', colorBg: 'bg-violet-50 dark:bg-violet-500/15 group-hover:bg-violet-100 dark:group-hover:bg-violet-500/25', colorText: 'text-violet-500 dark:text-violet-400', testId: 'marks-entry-button' },
@@ -190,7 +217,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
           ].map((item, i) => {
             const Icon = item.icon;
             return (
-              <button key={item.id} data-testid={item.testId} onClick={() => navigate(item.id)}
+              <motion.button variants={itemVariants} whileHover={cardHover} key={item.id} data-testid={item.testId} onClick={() => navigate(item.id)}
                 className="soft-card-hover p-4 sm:p-6 text-left flex items-center gap-3 sm:gap-4 group">
                 <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center transition-colors ${item.colorBg}`}>
                   <Icon size={22} weight="duotone" className={item.colorText} />
@@ -199,10 +226,10 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
                   <p className="font-extrabold text-sm sm:text-base text-slate-900 dark:text-slate-100 truncate">{item.label}</p>
                   <p className="text-xs sm:text-sm font-medium text-slate-400 truncate">{item.sub}</p>
                 </div>
-              </button>
+              </motion.button>
             );
           })}
-        </div>
+        </motion.div>
       </div>
     </div>
   );

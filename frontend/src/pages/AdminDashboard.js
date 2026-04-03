@@ -1,8 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Users, ChartBar, GraduationCap, SignOut, Database } from '@phosphor-icons/react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BookOpen, Users, ChartBar, GraduationCap, SignOut, Database, Sun, Moon } from '@phosphor-icons/react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { StudentResultsSearch } from '../components/StudentResultsSearch';
 import { analyticsAPI } from '../services/api';
+import { useTheme } from '../contexts/ThemeContext';
+import DashboardSkeleton from '../components/DashboardSkeleton';
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.08 } }
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } }
+};
+
+const cardHover = {
+  scale: 1.02,
+  transition: { type: 'spring', stiffness: 400, damping: 17 }
+};
 
 const CustomTooltip = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
@@ -20,6 +38,8 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
   const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('admin_tab') || 'overview');
   useEffect(() => { sessionStorage.setItem('admin_tab', activeTab); }, [activeTab]);
   const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const { isDark, toggle: toggleTheme } = useTheme();
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -27,6 +47,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
         const { data } = await analyticsAPI.adminDashboard();
         setDashboardData(data);
       } catch (err) { console.error('Failed to load admin dashboard:', err); }
+      setLoading(false);
     };
     fetchDashboard();
   }, []);
@@ -51,6 +72,8 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
     { month: 'Dec', students: Math.max(totalStudents - 1, 0) }, { month: 'Jan', students: totalStudents },
   ];
 
+  if (loading) return <DashboardSkeleton />;
+
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <header className="glass-header">
@@ -61,7 +84,20 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
               <div><h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadMix</h1><p className="text-xs font-bold uppercase tracking-widest text-slate-400">Admin</p></div>
             </div>
             <div className="flex items-center gap-3">
-              <button data-testid="profile-button" className="btn-ghost !px-4 !py-2 text-sm">{user?.name || 'Admin Panel'}</button>
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={toggleTheme}
+                className="p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
+                aria-label="Toggle theme"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div key={isDark ? 'dark' : 'light'} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
+                    {isDark ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
+                  </motion.div>
+                </AnimatePresence>
+              </motion.button>
+              <span className="btn-ghost !px-4 !py-2 text-sm">{user?.name || 'Admin Panel'}</span>
               <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors" aria-label="Sign out"><SignOut size={20} weight="duotone" /></button>
             </div>
           </div>
@@ -69,10 +105,10 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="mb-8 animate-fade-in-up">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 200, damping: 20 }} className="mb-8">
           <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">College Overview</h2>
           <p className="text-base font-medium text-slate-500 dark:text-slate-400">Manage your institution's academic platform</p>
-        </div>
+        </motion.div>
 
         {/* Tabs */}
         <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit mb-8 overflow-x-auto" data-testid="admin-tabs">
@@ -90,40 +126,40 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
         </div>
 
         {activeTab === 'overview' && (
-          <div data-testid="overview-content">
+          <motion.div data-testid="overview-content" variants={containerVariants} initial="hidden" animate="show">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {stats.map((stat, i) => {
                 const Icon = stat.icon;
                 return (
-                  <div key={i} className="stat-card p-6" data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
+                  <motion.div variants={itemVariants} whileHover={cardHover} key={i} className="stat-card" data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, '-')}`}>
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-xs font-bold uppercase tracking-widest text-slate-400">{stat.label}</span>
                       <div className={`${stat.color} p-2.5 rounded-xl`}><Icon size={20} weight="duotone" /></div>
                     </div>
                     <p className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">{stat.value}</p>
-                  </div>
+                  </motion.div>
                 );
               })}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
-              <button data-testid="user-management-button" onClick={() => navigate('user-management')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
-                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/15 rounded-xl flex items-center justify-center group-hover:bg-indigo-100 transition-colors"><Users size={24} weight="duotone" className="text-indigo-500" /></div>
+            <motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+              <motion.button variants={itemVariants} whileHover={cardHover} data-testid="user-management-button" onClick={() => navigate('user-management')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
+                <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/15 rounded-xl flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/30 transition-colors"><Users size={24} weight="duotone" className="text-indigo-500" /></div>
                 <div><p className="font-extrabold text-slate-900 dark:text-white">User Management</p><p className="text-sm font-medium text-slate-400">Add/edit users</p></div>
-              </button>
-              <button data-testid="view-all-results-button" onClick={() => navigate('quiz-results')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
-                <div className="w-12 h-12 bg-emerald-50 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors"><ChartBar size={24} weight="duotone" className="text-emerald-500" /></div>
+              </motion.button>
+              <motion.button variants={itemVariants} whileHover={cardHover} data-testid="view-all-results-button" onClick={() => navigate('quiz-results')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
+                <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/15 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/30 transition-colors"><ChartBar size={24} weight="duotone" className="text-emerald-500" /></div>
                 <div><p className="font-extrabold text-slate-900 dark:text-white">Quiz Results</p><p className="text-sm font-medium text-slate-400">College-wide data</p></div>
-              </button>
-              <button data-testid="student-results-button" onClick={() => setActiveTab('results')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
-                <div className="w-12 h-12 bg-violet-50 rounded-xl flex items-center justify-center group-hover:bg-violet-100 transition-colors"><GraduationCap size={24} weight="duotone" className="text-violet-500" /></div>
+              </motion.button>
+              <motion.button variants={itemVariants} whileHover={cardHover} data-testid="student-results-button" onClick={() => setActiveTab('results')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
+                <div className="w-12 h-12 bg-violet-50 dark:bg-violet-500/15 rounded-xl flex items-center justify-center group-hover:bg-violet-100 dark:group-hover:bg-violet-500/30 transition-colors"><GraduationCap size={24} weight="duotone" className="text-violet-500" /></div>
                 <div><p className="font-extrabold text-slate-900 dark:text-white">Student Results</p><p className="text-sm font-medium text-slate-400">Search & view profiles</p></div>
-              </button>
-              <button data-testid="analytics-button" onClick={() => navigate('analytics')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
-                <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center group-hover:bg-amber-100 transition-colors"><Database size={24} weight="duotone" className="text-amber-500" /></div>
+              </motion.button>
+              <motion.button variants={itemVariants} whileHover={cardHover} data-testid="analytics-button" onClick={() => navigate('analytics')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
+                <div className="w-12 h-12 bg-amber-50 dark:bg-amber-500/15 rounded-xl flex items-center justify-center group-hover:bg-amber-100 dark:group-hover:bg-amber-500/30 transition-colors"><Database size={24} weight="duotone" className="text-amber-500" /></div>
                 <div><p className="font-extrabold text-slate-900 dark:text-white">Analytics</p><p className="text-sm font-medium text-slate-400">Insights & trends</p></div>
-              </button>
-            </div>
+              </motion.button>
+            </motion.div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               <div className="soft-card p-6">
@@ -183,17 +219,17 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {activeTab === 'college-metrics' && (
-          <div data-testid="college-metrics-content">
-            <h3 className="text-2xl font-bold text-slate-900 mb-6">College-wise Performance Metrics</h3>
+          <motion.div data-testid="college-metrics-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.h3 variants={itemVariants} className="text-2xl font-bold text-slate-900 dark:text-white mb-6">College-wise Performance Metrics</motion.h3>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
               {['GNITC', 'GNITR', 'GNITS'].map((college, idx) => (
-                <div key={college} className="soft-card p-6">
-                  <h4 className="text-xl font-bold text-slate-900 mb-4">{college}</h4>
+                <motion.div variants={itemVariants} whileHover={cardHover} key={college} className="soft-card p-6">
+                  <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{college}</h4>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-500/15 rounded-xl">
                       <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Total Students</span>
@@ -212,12 +248,12 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                       <span className="text-2xl font-extrabold text-purple-600">{idx === 0 ? '5' : idx === 1 ? '4' : '6'}</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
             
-            <div className="soft-card p-6">
-              <h4 className="text-lg font-bold text-slate-900 mb-4">College Comparison</h4>
+            <motion.div variants={itemVariants} className="soft-card p-6">
+              <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-4">College Comparison</h4>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={[
                   { name: 'GNITC', students: 420, avgScore: 82.5, passRate: 88 },
@@ -233,13 +269,13 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                   <Bar dataKey="passRate" fill="#10b981" name="Pass Rate (%)" radius={[8, 8, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {activeTab === 'department-metrics' && (
-          <div data-testid="department-metrics-content">
-            <h3 className="text-2xl font-bold text-slate-900 mb-6">Department-wise Performance Metrics</h3>
+          <motion.div data-testid="department-metrics-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.h3 variants={itemVariants} className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Department-wise Performance Metrics</motion.h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {[
@@ -248,7 +284,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                 { name: 'ET', students: 145, avg: 81.5, pass: 87, color: 'amber' },
                 { name: 'AIML', students: 125, avg: 86.1, pass: 93, color: 'purple' }
               ].map((dept) => (
-                <div key={dept.name} className="soft-card p-6">
+                <motion.div variants={itemVariants} whileHover={cardHover} key={dept.name} className="soft-card p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-lg font-bold text-slate-900 dark:text-white">{dept.name}</h4>
                     <div className={`w-10 h-10 bg-${dept.color}-100 rounded-xl flex items-center justify-center`}>
@@ -268,12 +304,12 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                       <div className={`bg-${dept.color}-500 h-2 rounded-full`} style={{ width: `${dept.pass}%` }}></div>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
             
-            <div className="soft-card p-6">
-              <h4 className="text-lg font-bold text-slate-900 mb-4">Department Performance Trend</h4>
+            <motion.div variants={itemVariants} className="soft-card p-6">
+              <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Department Performance Trend</h4>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={[
                   { month: 'Aug', DS: 82, CS: 80, ET: 78, AIML: 83 },
@@ -293,18 +329,18 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                   <Line type="monotone" dataKey="AIML" stroke="#a855f7" strokeWidth={3} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {activeTab === 'section-metrics' && (
-          <div data-testid="section-metrics-content">
-            <h3 className="text-2xl font-bold text-slate-900 mb-6">Section-wise Performance Metrics</h3>
+          <motion.div data-testid="section-metrics-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.h3 variants={itemVariants} className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Section-wise Performance Metrics</motion.h3>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {['DS-1', 'DS-2', 'CS-1', 'CS-2', 'AIML-1', 'AIML-2'].map((section, idx) => (
-                <div key={section} className="soft-card p-6">
-                  <h4 className="text-xl font-bold text-slate-900 mb-4">{section}</h4>
+                <motion.div variants={itemVariants} whileHover={cardHover} key={section} className="soft-card p-6">
+                  <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{section}</h4>
                   <div className="grid grid-cols-3 gap-4 mb-4">
                     <div className="p-3 bg-indigo-50 dark:bg-indigo-500/15 rounded-xl text-center">
                       <p className="text-xs font-bold text-slate-500 dark:text-slate-400 mb-1">Students</p>
@@ -334,17 +370,17 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                       <span className="font-bold text-slate-900 dark:text-white">{92 - idx}%</span>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               ))}
             </div>
-          </div>
+          </motion.div>
         )}
 
         {activeTab === 'student-profiles' && (
-          <div data-testid="student-profiles-content">
-            <h3 className="text-2xl font-bold text-slate-900 mb-6">Student Profiles Management</h3>
+          <motion.div data-testid="student-profiles-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.h3 variants={itemVariants} className="text-2xl font-bold text-slate-900 dark:text-white mb-6">Student Profiles Management</motion.h3>
             
-            <div className="soft-card p-6 mb-6">
+            <motion.div variants={itemVariants} className="soft-card p-6 mb-6">
               <div className="flex items-center gap-4 mb-6">
                 <input 
                   type="text" 
@@ -411,14 +447,16 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                   </tbody>
                 </table>
               </div>
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         )}
 
         {activeTab === 'results' && (
-          <div data-testid="results-content">
-            <StudentResultsSearch user={user} departmentLocked={false} />
-          </div>
+          <motion.div data-testid="results-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <StudentResultsSearch user={user} departmentLocked={false} />
+            </motion.div>
+          </motion.div>
         )}
       </div>
     </div>
