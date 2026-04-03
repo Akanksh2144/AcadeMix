@@ -71,9 +71,20 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const { isDark, toggle: toggleTheme } = useTheme();
 
-  const notifKey = `academix_notif_read_${user?.id || 'default'}`;
-  const [notifRead, setNotifReadState] = useState(() => localStorage.getItem(notifKey) === 'true');
-  const setNotifRead = (val) => { setNotifReadState(val); localStorage.setItem(notifKey, String(val)); };
+  const notifKey = `academix_last_notif_${user?.id || 'default'}`;
+  const [lastReadTime, setLastReadTime] = useState(() => localStorage.getItem(notifKey) || '1970-01-01T00:00:00.000Z');
+  
+  const handleBellClick = () => {
+    setShowNotifications(!showNotifications);
+    if (!showNotifications && dashboard?.activity?.length > 0) {
+      // Mark as read by storing the latest timestamp
+      const latestTs = dashboard.activity[0].timestamp || new Date().toISOString();
+      setLastReadTime(latestTs);
+      localStorage.setItem(notifKey, latestTs);
+    }
+  };
+
+  const unreadCount = dashboard?.activity?.filter(a => new Date(a.timestamp) > new Date(lastReadTime)).length || 0;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -181,14 +192,14 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
               <div className="relative">
                 <button
                   data-testid="notification-bell"
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={handleBellClick}
                   className="p-2.5 rounded-full bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 transition-colors relative"
                   aria-label="Notifications"
                 >
                   <Bell size={20} weight={showNotifications ? 'fill' : 'duotone'} />
-                  {!notifRead && (
+                  {unreadCount > 0 && (
                     <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
-                      {Math.min(dashboard.activity.length, 9)}
+                      {Math.min(unreadCount, 9)}
                     </div>
                   )}
                 </button>
@@ -347,7 +358,25 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                     <BarChart data={dashboard.weak_topics} layout="vertical" margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                       <XAxis type="number" domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: isDark ? '#64748b' : '#94a3b8' }} />
                       <YAxis type="category" dataKey="subject" width={90} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: isDark ? '#94a3b8' : '#475569', fontWeight: 600 }} />
-                      <Tooltip formatter={(v) => [`${v}%`, 'Avg Score']} contentStyle={{ borderRadius: 12, border: '1px solid #e2e8f0', fontSize: 13, background: isDark ? '#1A202C' : '#fff', color: isDark ? '#e2e8f0' : '#0f172a' }} />
+                      <Tooltip 
+                        cursor={{ fill: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9' }}
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-white dark:bg-[#1A202C] rounded-xl p-3 shadow-lg shadow-indigo-500/10 dark:shadow-none border border-slate-100 dark:border-slate-800">
+                                <p className="font-bold text-sm text-slate-800 dark:text-slate-100 mb-1.5">{label}</p>
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-md" style={{ backgroundColor: payload[0].payload.fill || payload[0].color }}></span>
+                                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                                    Avg Score: <span className="font-bold text-slate-900 dark:text-white">{payload[0].value}%</span>
+                                  </p>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }} 
+                      />
                       <Bar dataKey="avg_score" radius={[0, 6, 6, 0]} barSize={20}>
                         {dashboard.weak_topics.map((entry, i) => (
                           <Cell key={i} fill={getBarColor(entry.avg_score)} />
