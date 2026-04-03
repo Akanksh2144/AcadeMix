@@ -370,12 +370,16 @@ const QuizBuilder = ({ navigate, user }) => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div>
               <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Subject</label>
-              <select className="soft-input w-full" value={subject} onChange={(e) => { setSubject(e.target.value); setSelectedClasses([]); }}>
-                <option value="" disabled>Select Subject</option>
-                {availableSubjects.map(sub => (
-                  <option key={sub} value={sub}>{sub}</option>
-                ))}
-              </select>
+              {availableSubjects.length > 0 ? (
+                <select className="soft-input w-full" value={subject} onChange={(e) => { setSubject(e.target.value); setSelectedClasses([]); }}>
+                  <option value="" disabled>Select Subject</option>
+                  {availableSubjects.map(sub => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                </select>
+              ) : (
+                <input type="text" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Enter subject name (e.g. Machine Learning)" className="soft-input w-full" />
+              )}
             </div>
             <div>
               <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Duration (mins)</label>
@@ -387,52 +391,52 @@ const QuizBuilder = ({ navigate, user }) => {
             </div>
           </div>
           
-          {/* Target Classes Dropdown */}
-          {subject && (
-            <div className="mb-6 relative">
-              <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Target Assigned Classes</label>
-              <div 
-                className="soft-input w-full flex justify-between items-center cursor-pointer min-h-[46px]"
-                onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
-              >
-                <div className="flex flex-wrap gap-1">
-                   {selectedClasses.length === 0 ? (
-                      <span className="text-slate-400 font-medium">Select multiple target classes...</span>
-                   ) : (
-                      <span className="text-indigo-600 font-bold">{selectedClasses.length} Classes Selected</span>
-                   )}
+          {/* Target Classes */}
+          <div className="mb-6">
+            <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">Target Sections</label>
+            {classesForSubject.length > 0 ? (
+              <div className="relative">
+                <div 
+                  className="soft-input w-full flex justify-between items-center cursor-pointer min-h-[46px]"
+                  onClick={() => setIsClassDropdownOpen(!isClassDropdownOpen)}
+                >
+                  <div className="flex flex-wrap gap-1">
+                     {selectedClasses.length === 0 ? (
+                        <span className="text-slate-400 font-medium">Select target classes from assignments...</span>
+                     ) : (
+                        <span className="text-indigo-600 font-bold">{selectedClasses.length} Classes Selected</span>
+                     )}
+                  </div>
+                  {isClassDropdownOpen ? <CaretUp size={16} weight="bold" className="text-indigo-500" /> : <CaretDown size={16} weight="bold" className="text-slate-400" />}
                 </div>
-                {isClassDropdownOpen ? <CaretUp size={16} weight="bold" className="text-indigo-500" /> : <CaretDown size={16} weight="bold" className="text-slate-400" />}
+                
+                {isClassDropdownOpen && (
+                  <div className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-2 max-h-60 overflow-y-auto z-10 flex flex-col gap-1">
+                    {classesForSubject.map(cls => {
+                      const isSelected = selectedClasses.includes(cls.id);
+                      return (
+                        <label key={cls.id} className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-slate-50 border border-transparent'}`}>
+                          <input 
+                            type="checkbox" 
+                            checked={isSelected}
+                            onChange={() => {
+                              setSelectedClasses(prev => isSelected ? prev.filter(id => id !== cls.id) : [...prev, cls.id]);
+                            }}
+                            className="w-4 h-4 rounded text-indigo-500 bg-white border-slate-300 accent-indigo-500 cursor-pointer"
+                          />
+                          <span className={`text-sm font-bold ${isSelected ? 'text-indigo-700' : 'text-slate-600'}`}>
+                            {cls.department} • {cls.batch} • Sec {cls.section}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-              
-              {isClassDropdownOpen && (
-                <div className="absolute left-0 right-0 top-[100%] mt-2 bg-white border border-slate-200 shadow-xl rounded-xl p-2 max-h-60 overflow-y-auto z-10 flex flex-col gap-1">
-                  {classesForSubject.length > 0 ? classesForSubject.map(cls => {
-                    const isSelected = selectedClasses.includes(cls.id);
-                    return (
-                      <label key={cls.id} className={`flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-slate-50 border border-transparent'}`}>
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected}
-                          onChange={() => {
-                            setSelectedClasses(prev => isSelected ? prev.filter(id => id !== cls.id) : [...prev, cls.id]);
-                          }}
-                          className="w-4 h-4 rounded text-indigo-500 bg-white border-slate-300 accent-indigo-500 cursor-pointer"
-                        />
-                        <span className={`text-sm font-bold ${isSelected ? 'text-indigo-700' : 'text-slate-600'}`}>
-                          {cls.department} • {cls.batch} • Sec {cls.section}
-                        </span>
-                      </label>
-                    );
-                  }) : (
-                    <div className="p-3 text-sm text-slate-400 flex items-center gap-2">
-                       <WarningCircle size={16} /> No classes assigned for this subject.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+            ) : (
+              <p className="text-sm text-slate-400 italic p-3 bg-slate-50 rounded-xl">Quiz will be available to all students. To target specific sections, create faculty assignments first.</p>
+            )}
+          </div>
 
           {showSchedule && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6 p-4 bg-amber-50 rounded-2xl">
