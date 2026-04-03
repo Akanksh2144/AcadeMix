@@ -6,7 +6,7 @@ export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }) => {
   const [isDark, setIsDark] = useState(() => {
-    const saved = localStorage.getItem('academix_theme');
+    const saved = localStorage.getItem('acadmix_theme');
     if (saved) return saved === 'dark';
     return window.matchMedia?.('(prefers-color-scheme: dark)').matches || false;
   });
@@ -15,10 +15,10 @@ export const ThemeProvider = ({ children }) => {
     const root = document.documentElement;
     if (isDark) {
       root.classList.add('dark');
-      localStorage.setItem('academix_theme', 'dark');
+      localStorage.setItem('acadmix_theme', 'dark');
     } else {
       root.classList.remove('dark');
-      localStorage.setItem('academix_theme', 'light');
+      localStorage.setItem('acadmix_theme', 'light');
     }
   }, [isDark]);
 

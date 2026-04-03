@@ -35,10 +35,10 @@ const ROLE_DASHBOARD = {
 };
 
 function App() {
-  const [currentPage, setCurrentPage] = useState(() => sessionStorage.getItem('academix_page') || 'login');
+  const [currentPage, setCurrentPage] = useState(() => sessionStorage.getItem('acadmix_page') || 'login');
 
   useEffect(() => {
-    sessionStorage.setItem('academix_page', currentPage);
+    sessionStorage.setItem('acadmix_page', currentPage);
   }, [currentPage]);
   const [user, setUser] = useState(null);
   const [selectedData, setSelectedData] = useState(null);

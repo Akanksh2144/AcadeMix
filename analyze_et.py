@@ -1,7 +1,7 @@
 import pandas as pd
 import json
 
-df = pd.read_excel('c:/AcadeMix/sample_data/ET department(1).xlsx')
+df = pd.read_excel('c:/AcadMix/sample_data/ET department(1).xlsx')
 
 print("Columns:", df.columns.tolist())
 

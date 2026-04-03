@@ -76,7 +76,7 @@ const LoginPage = ({ onLogin }) => {
             >
               <GraduationCap size={36} weight="duotone" className="text-white" />
             </motion.div>
-            <h1 className="text-5xl font-extrabold tracking-tight mb-4">Welcome to<br/>AcadeMix</h1>
+            <h1 className="text-5xl font-extrabold tracking-tight mb-4">Welcome to<br/>AcadMix</h1>
             <p className="text-lg font-medium leading-relaxed text-white/80">Your complete college quiz and results management system</p>
           </div>
           <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">

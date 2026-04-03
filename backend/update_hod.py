@@ -7,7 +7,7 @@ load_dotenv()
 
 async def migrate():
     MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-    DB_NAME = os.getenv("DB_NAME", "academix")
+    DB_NAME = os.getenv("DB_NAME", "acadmix")
     
     client = AsyncIOMotorClient(MONGO_URL)
     db = client[DB_NAME]

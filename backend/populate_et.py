@@ -27,7 +27,7 @@ async def main():
     print(f"Deleted {result.deleted_count} records.")
     
     print("Reading ET department Excel file...")
-    df = pd.read_excel('c:/AcadeMix/sample_data/ET department(1).xlsx')
+    df = pd.read_excel('c:/AcadMix/sample_data/ET department(1).xlsx')
     
     # Drop duplicates to prevent BulkWriteError on _id (HT No)
     df = df.drop_duplicates(subset=['H.T.NO.'])

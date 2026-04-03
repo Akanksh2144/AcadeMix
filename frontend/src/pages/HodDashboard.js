@@ -49,7 +49,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   const [newAssignment, setNewAssignment] = useState({ teacher_id: '', subject_code: '', subject_name: '', department: user?.department || 'ET', batch: '2026', section: 'DS', semester: 3 });
   
   const [showNotifications, setShowNotifications] = useState(false);
-  const notifKey = `academix_notif_read_${user?.id || 'default'}`;
+  const notifKey = `acadmix_notif_read_${user?.id || 'default'}`;
   const [notifRead, setNotifReadState] = useState(() => localStorage.getItem(notifKey) === 'true');
   const setNotifRead = (val) => { setNotifReadState(val); localStorage.setItem(notifKey, String(val)); };
   
@@ -283,7 +283,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
               <PresentationChart size={22} weight="duotone" className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadeMix</h1>
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadMix</h1>
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Head of Department</p>
             </div>
           </div>

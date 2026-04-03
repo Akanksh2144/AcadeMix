@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 load_dotenv('backend/.env')
 
 # PDF extraction
-results_dir = r'c:\AcadeMix\results'
+results_dir = r'c:\AcadMix\results'
 # Map: filename -> semester number
 file_sem_map = {
     'OverallMarks-Details 1-1.pdf': 1,

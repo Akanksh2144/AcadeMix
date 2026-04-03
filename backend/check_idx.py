@@ -1,7 +1,7 @@
 from pymongo import MongoClient
 
 client = MongoClient('mongodb://127.0.0.1:27017')
-db = client['academix']
+db = client['acadmix']
 print("Users indexes:")
 for idx in db.users.list_indexes():
     print(idx)

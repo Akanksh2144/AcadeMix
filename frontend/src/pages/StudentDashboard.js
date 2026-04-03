@@ -71,7 +71,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const { isDark, toggle: toggleTheme } = useTheme();
 
-  const notifKey = `academix_last_notif_${user?.id || 'default'}`;
+  const notifKey = `acadmix_last_notif_${user?.id || 'default'}`;
   const [lastReadTime, setLastReadTime] = useState(() => localStorage.getItem(notifKey) || '1970-01-01T00:00:00.000Z');
   
   const handleBellClick = () => {
@@ -167,7 +167,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
               <BookOpen size={22} weight="duotone" className="text-white" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadeMix</h1>
+              <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadMix</h1>
               <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">Student</p>
             </div>
           </div>
