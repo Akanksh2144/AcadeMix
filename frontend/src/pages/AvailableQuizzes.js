@@ -66,7 +66,7 @@ const AvailableQuizzes = ({ navigate, user }) => {
               {inProgress.map((attempt) => (
                 <div key={attempt.id} className="soft-card p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-l-4 border-amber-400">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center">
+                    <div className="w-10 h-10 bg-amber-50 dark:bg-amber-500/15 rounded-xl flex items-center justify-center">
                       <Play size={20} weight="fill" className="text-amber-500" />
                     </div>
                     <div>
@@ -99,7 +99,7 @@ const AvailableQuizzes = ({ navigate, user }) => {
               <div key={quiz.id} className="soft-card-hover p-5 sm:p-6" style={{animation: `fadeInUp ${0.3 + i * 0.06}s ease`}}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1 min-w-0">
-                    <h4 className="font-bold text-lg text-slate-900 mb-1 truncate">{quiz.title}</h4>
+                    <h4 className="font-bold text-lg text-slate-900 dark:text-white mb-1 truncate">{quiz.title}</h4>
                     <p className="text-sm font-medium text-slate-400">{quiz.subject}</p>
                   </div>
                   <div className="flex items-center gap-2 ml-2 flex-shrink-0">
@@ -109,7 +109,7 @@ const AvailableQuizzes = ({ navigate, user }) => {
                         {deadline.text}
                       </span>
                     )}
-                    <span className="soft-badge bg-amber-50 text-amber-600 whitespace-nowrap">{quiz.total_marks} marks</span>
+                    <span className="soft-badge bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 whitespace-nowrap">{quiz.total_marks} marks</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 mb-4 text-sm font-medium text-slate-500 dark:text-slate-400">

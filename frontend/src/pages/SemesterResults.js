@@ -57,7 +57,7 @@ const SemesterResults = ({ navigate, user }) => {
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
                   <button key={sem} data-testid={`semester-${sem}-button`} onClick={() => allSemNumbers.includes(sem) && setSelectedSem(sem)}
                     disabled={!allSemNumbers.includes(sem)}
-                    className={`pill-tab ${selectedSem === sem ? 'pill-tab-active' : allSemNumbers.includes(sem) ? 'pill-tab-inactive' : 'text-slate-300 cursor-not-allowed'}`}>
+                    className={`pill-tab ${selectedSem === sem ? 'pill-tab-active' : allSemNumbers.includes(sem) ? 'pill-tab-inactive' : 'text-slate-300 dark:text-slate-600 cursor-not-allowed opacity-40'}`}>
                     Sem {sem}
                   </button>
                 ))}

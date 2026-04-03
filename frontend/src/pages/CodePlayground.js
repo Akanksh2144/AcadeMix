@@ -490,7 +490,7 @@ const CodePlayground = ({ navigate, user }) => {
       {showChallengesModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-[2px] animate-fade-in" onClick={() => setShowChallengesModal(false)}>
           <div className="w-full max-w-4xl max-h-[85vh] bg-white rounded-3xl dark:bg-[#1A202C] shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50/80">
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/80">
               <div className="flex items-center gap-3">
                  <div className="w-10 h-10 bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 rounded-xl flex items-center justify-center">
                    <Lightning size={20} weight="fill" />
@@ -551,7 +551,7 @@ const CodePlayground = ({ navigate, user }) => {
       {showInsightsModal && stats && (
          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-[2px] animate-fade-in" onClick={() => setShowInsightsModal(false)}>
            <div className="w-full max-w-3xl bg-white rounded-3xl dark:bg-[#1A202C] shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
-             <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50/80">
+             <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/80">
                <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
                  <ChartBar className="text-indigo-500 text-2xl" weight="duotone" />
                  My Insights
