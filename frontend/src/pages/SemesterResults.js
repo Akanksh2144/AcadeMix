@@ -75,10 +75,10 @@ const SemesterResults = ({ navigate, user }) => {
             {currentSem && (
               <>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                  <div className="soft-card p-5" data-testid="sgpa-card"><span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">SGPA</span><p className="text-3xl font-extrabold text-slate-900 dark:text-white">{currentSem.sgpa}</p></div>
+                  <div className="soft-card p-5" data-testid="sgpa-card"><span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">SGPA</span><p className="text-3xl font-extrabold text-slate-900 dark:text-white">{Number(currentSem.sgpa || 0).toFixed(2)}</p></div>
                   <div className="soft-card p-5" data-testid="cgpa-card">
                     <span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">CGPA</span>
-                    <div className="flex items-center gap-2"><p className="text-3xl font-extrabold text-slate-900 dark:text-white">{currentSem.cgpa}</p></div>
+                    <div className="flex items-center gap-2"><p className="text-3xl font-extrabold text-slate-900 dark:text-white">{Number(currentSem.cgpa || 0).toFixed(2)}</p></div>
                   </div>
                   <div className="soft-card p-5" data-testid="subjects-count-card"><span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">Subjects</span><p className="text-3xl font-extrabold text-slate-900 dark:text-white">{currentSem.subjects?.length || 0}</p></div>
                   <div className="soft-card p-5" data-testid="status-card"><span className="text-xs font-bold uppercase tracking-widest text-slate-400 block mb-1">Status</span><span className="soft-badge bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-base mt-1">
@@ -119,7 +119,7 @@ const SemesterResults = ({ navigate, user }) => {
                           <div key={s.semester} className="flex items-center justify-between" data-testid={`cgpa-history-sem-${s.semester}`}>
                             <span className="font-bold text-slate-700 dark:text-slate-300">Semester {s.semester}</span>
                             <div className="flex items-center gap-2">
-                              <span className="text-xl font-extrabold text-slate-900 dark:text-white min-w-[56px] text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>{s.cgpa}</span>
+                              <span className="text-xl font-extrabold text-slate-900 dark:text-white min-w-[56px] text-right" style={{ fontVariantNumeric: 'tabular-nums' }}>{Number(s.cgpa || 0).toFixed(2)}</span>
                               <span className="w-5 flex items-center justify-center">
                                 {i > 0 && s.cgpa > semesters[i - 1].cgpa && <TrendUp size={16} weight="duotone" className="text-emerald-500" />}
                                 {i > 0 && s.cgpa < semesters[i - 1].cgpa && <TrendDown size={16} weight="duotone" className="text-red-500" />}
