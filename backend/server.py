@@ -21,8 +21,33 @@ import certifi
 import io
 import csv
 
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+
 # ─── App & DB ───────────────────────────────────────────────────────────────
 app = FastAPI(title="QuizPortal API")
+
+sentry_dsn = os.environ.get("SENTRY_DSN", "")
+
+def _scrub_pii(event, hint):
+    """Aggressively strip PII from the event before it's sent to Sentry"""
+    if 'request' in event and 'data' in event['request']:
+        data = event['request']['data']
+        if isinstance(data, dict):
+            for pii_key in ['email', 'password', 'name', 'college_id']:
+                if pii_key in data:
+                    data[pii_key] = '[FILTERED]'
+    return event
+
+if sentry_dsn:
+    sentry_sdk.init(
+        dsn=sentry_dsn,
+        enable_tracing=True,
+        traces_sample_rate=1.0,
+        send_default_pii=False,
+        before_send=_scrub_pii,
+        integrations=[FastApiIntegration()],
+    )
 
 MONGO_URL = os.environ["MONGO_URL"]
 DB_NAME = os.environ["DB_NAME"]
@@ -33,6 +58,7 @@ client = AsyncIOMotorClient(MONGO_URL, tlsCAFile=certifi.where())
 db = client[DB_NAME]
 
 frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+code_runner_url = os.environ.get("CODE_RUNNER_URL", "http://localhost:8080")
 cors_origins = os.environ.get("CORS_ORIGINS", "*")
 if cors_origins == "*":
     origins = ["*"]
@@ -615,21 +641,24 @@ async def submit_attempt(attempt_id: str, user: dict = Depends(get_current_user)
                 expected = q.get("expected_output", "").strip()
                 if expected:
                     try:
-                        with tempfile.TemporaryDirectory() as tmpdir:
-                            lang = q.get("language", "python")
-                            if lang == "python":
-                                fp = os.path.join(tmpdir, "solution.py")
-                                with open(fp, "w") as f:
-                                    f.write(str(student_answer))
-                                r = subprocess.run(["python3", fp], input=q.get("test_input", ""), capture_output=True, text=True, timeout=10, cwd=tmpdir)
-                                actual = r.stdout.strip()
+                        lang = q.get("language", "python")
+                        async with httpx.AsyncClient() as client:
+                            req_data = {
+                                "language": lang,
+                                "code": str(student_answer),
+                                "test_input": q.get("test_input", "")
+                            }
+                            resp = await client.post(f"{code_runner_url}/run", json=req_data, timeout=15.0)
+                            if resp.status_code == 200:
+                                result = resp.json()
+                                actual = result.get("output", "").strip()
                                 if actual == expected:
                                     is_correct = True
                                     marks_awarded = q.get("marks", 0)
                                 elif actual:
                                     marks_awarded = round(q.get("marks", 0) * 0.3)
                             else:
-                                marks_awarded = round(q.get("marks", 0) * 0.5)
+                                marks_awarded = round(q.get("marks", 0) * 0.2)
                     except Exception:
                         marks_awarded = round(q.get("marks", 0) * 0.2)
                 else:
@@ -1746,112 +1775,23 @@ async def _run_process(cmd, stdin_data="", timeout=5, cwd=None):
     with concurrent.futures.ThreadPoolExecutor() as pool:
         return await loop.run_in_executor(pool, _exec)
 
-# Detect available runtimes
-def _find_runtime(names):
-    import shutil as _shutil
-    for name in names:
-        path = _shutil.which(name)
-        if path and 'WindowsApps' not in path:  # Skip Windows Store stubs
-            return path
-    return None
-
-import sys as _sys
-_RUNTIMES = {
-    "python": _find_runtime(["python", "python3"]) or _sys.executable,  # fallback to current interpreter
-    "javascript": _find_runtime(["node"]),
-    "java": _find_runtime(["java"]),
-    "javac": _find_runtime(["javac"]),
-    "c": _find_runtime(["gcc"]),
-    "cpp": _find_runtime(["g++"]),
-}
-
 @app.post("/api/code/execute")
 async def execute_code(req: CodeExecuteRequest, user: dict = Depends(get_current_user)):
     if len(req.code) > 10000:
         raise HTTPException(status_code=400, detail="Code too long (max 10000 chars)")
 
-    language = req.language.lower()
-    allowed = {"python", "javascript", "java", "c", "cpp"}
-    if language not in allowed:
-        raise HTTPException(status_code=400, detail=f"Unsupported language. Supported: {', '.join(sorted(allowed))}")
-
-    # Validate code for dangerous patterns
-    _validate_code(req.code, language)
-
     try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            if language == "python":
-                rt = _RUNTIMES.get("python")
-                if not rt:
-                    raise HTTPException(status_code=500, detail="Python runtime not available on server")
-                filepath = os.path.join(tmpdir, "solution.py")
-                with open(filepath, "w") as f:
-                    f.write(req.code)
-                stdout, stderr, code = await _run_process([rt, filepath], req.test_input, timeout=5, cwd=tmpdir)
-
-            elif language == "javascript":
-                rt = _RUNTIMES.get("javascript")
-                if not rt:
-                    raise HTTPException(status_code=500, detail="Node.js runtime not available on server")
-                filepath = os.path.join(tmpdir, "solution.js")
-                with open(filepath, "w") as f:
-                    f.write(req.code)
-                stdout, stderr, code = await _run_process([rt, filepath], req.test_input, timeout=5, cwd=tmpdir)
-
-            elif language == "java":
-                javac = _RUNTIMES.get("javac")
-                java = _RUNTIMES.get("java")
-                if not javac or not java:
-                    raise HTTPException(status_code=500, detail="Java runtime not available on server")
-                filepath = os.path.join(tmpdir, "Solution.java")
-                with open(filepath, "w") as f:
-                    f.write(req.code)
-                # Compile
-                cout, cerr, ccode = await _run_process([javac, filepath], timeout=10, cwd=tmpdir)
-                if ccode != 0:
-                    return {"output": "", "error": cerr[:2000], "exit_code": ccode}
-                # Run
-                stdout, stderr, code = await _run_process([java, "-cp", tmpdir, "Solution"], req.test_input, timeout=5, cwd=tmpdir)
-
-            elif language == "c":
-                gcc = _RUNTIMES.get("c")
-                if not gcc:
-                    raise HTTPException(status_code=500, detail="GCC (C compiler) not available on server. Install MinGW or GCC.")
-                src = os.path.join(tmpdir, "solution.c")
-                out = os.path.join(tmpdir, "solution.exe" if os.name == "nt" else "solution")
-                with open(src, "w") as f:
-                    f.write(req.code)
-                # Compile
-                cout, cerr, ccode = await _run_process([gcc, src, "-o", out, "-lm"], timeout=10, cwd=tmpdir)
-                if ccode != 0:
-                    return {"output": "", "error": cerr[:2000], "exit_code": ccode}
-                # Run
-                stdout, stderr, code = await _run_process([out], req.test_input, timeout=5, cwd=tmpdir)
-
-            elif language == "cpp":
-                gpp = _RUNTIMES.get("cpp")
-                if not gpp:
-                    raise HTTPException(status_code=500, detail="G++ (C++ compiler) not available on server. Install MinGW or G++.")
-                src = os.path.join(tmpdir, "solution.cpp")
-                out = os.path.join(tmpdir, "solution.exe" if os.name == "nt" else "solution")
-                with open(src, "w") as f:
-                    f.write(req.code)
-                # Compile
-                cout, cerr, ccode = await _run_process([gpp, src, "-o", out, "-lm"], timeout=10, cwd=tmpdir)
-                if ccode != 0:
-                    return {"output": "", "error": cerr[:2000], "exit_code": ccode}
-                # Run
-                stdout, stderr, code = await _run_process([out], req.test_input, timeout=5, cwd=tmpdir)
-
-            if code != 0 and not stdout:
-                stdout = stderr
-                stderr = ""
-
-            return {
-                "output": stdout[:3000],
-                "error": stderr[:2000],
-                "exit_code": code
-            }
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{code_runner_url}/run",
+                json={"language": req.language, "code": req.code, "test_input": req.test_input},
+                timeout=15.0
+            )
+            if resp.status_code == 400:
+                raise HTTPException(status_code=400, detail=resp.json().get("detail", "Error"))
+            if resp.status_code != 200:
+                return {"output": "", "error": "Code runner service unavailable", "exit_code": -1}
+            return resp.json()
     except HTTPException:
         raise
     except Exception as e:
@@ -1861,6 +1801,12 @@ async def execute_code(req: CodeExecuteRequest, user: dict = Depends(get_current
 @app.get("/api/health")
 async def health():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+@app.get("/api/test-sentry")
+async def test_sentry():
+    """Intentional crash to verify Sentry connection and PII scrubbing."""
+    division_by_zero = 1 / 0
+    return {"message": "If you see this, Sentry didn't catch the intentional crash!"}
 
 # ─── Seed Data ──────────────────────────────────────────────────────────────
 async def seed_data():
@@ -2191,52 +2137,51 @@ async def submit_challenge(req: ChallengeSubmit, user: dict = Depends(get_curren
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
         
-    # Security Note: We run a simple quick local sandbox just like general execution
-    import tempfile
-    import subprocess
     import time
     
-    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-        # Wrap the user's code. If it passes execution without crashing on basic test cases, we consider it solved for this demo.
-        f.write(req.code)
-        # We append a simple test case runner if possible, but for MVP we just run it and assume solved if exit code is 0
-        filepath = f.name
-        
     start_time = time.time()
     try:
-        proc = subprocess.run(["python", filepath], capture_output=True, text=True, timeout=5.0)
-        end_time = time.time()
-        
-        output = proc.stdout
-        error = proc.stderr
-        exit_code = proc.returncode
-        
-        if exit_code == 0:
-            # Mark solved!
-            await db.student_progress.update_one(
-                {"student_id": user["id"], "challenge_id": req.challenge_id},
-                {"$set": {
-                    "status": "Solved",
-                    "language": req.language,
-                    "difficulty": challenge.get("difficulty"),
-                    "topics": challenge.get("topics", []),
-                    "execution_time_ms": int((end_time - start_time) * 1000)
-                }},
-                upsert=True
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{code_runner_url}/run",
+                json={"language": req.language, "code": req.code, "test_input": ""},
+                timeout=12.0
             )
             
-        return {
-            "output": output,
-            "error": error,
-            "exit_code": exit_code,
-            "success": exit_code == 0
-        }
-    except subprocess.TimeoutExpired:
+        end_time = time.time()
+        
+        if resp.status_code == 200:
+            result = resp.json()
+            exit_code = result.get("exit_code", -1)
+            output = result.get("output", "")
+            error = result.get("error", "")
+            
+            if exit_code == 0:
+                await db.student_progress.update_one(
+                    {"student_id": user["id"], "challenge_id": req.challenge_id},
+                    {"$set": {
+                        "status": "Solved",
+                        "language": req.language,
+                        "difficulty": challenge.get("difficulty"),
+                        "topics": challenge.get("topics", []),
+                        "execution_time_ms": int((end_time - start_time) * 1000)
+                    }},
+                    upsert=True
+                )
+            
+            return {
+                "output": output,
+                "error": error,
+                "exit_code": exit_code,
+                "success": exit_code == 0
+            }
+        else:
+            return {"error": "Code runner service error", "exit_code": -1, "success": False}
+            
+    except httpx.TimeoutException:
         return {"error": "Execution timed out", "exit_code": 1, "success": False}
-    finally:
-        import os
-        if os.path.exists(filepath):
-            os.remove(filepath)
+    except Exception as e:
+        return {"error": str(e), "exit_code": -1, "success": False}
 
 @app.on_event("startup")
 async def startup():
