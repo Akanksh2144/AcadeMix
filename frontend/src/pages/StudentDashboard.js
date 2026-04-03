@@ -425,10 +425,9 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{item.title}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        {item.subtitle && <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{item.subtitle}</span>}
-                        <span className="text-xs text-slate-400 dark:text-slate-500">•</span>
-                        <span className="text-xs font-medium text-slate-500 dark:text-slate-400">{timeAgo(item.timestamp)}</span>
+                      <div className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5 pr-2">
+                        {item.subtitle && <span>{item.subtitle} <span className="mx-1 text-slate-400 dark:text-slate-500">•</span></span>}
+                        <span className="whitespace-nowrap">{timeAgo(item.timestamp)}</span>
                       </div>
                     </div>
                     {item.score !== undefined && (
