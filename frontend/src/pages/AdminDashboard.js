@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Users, ChartBar, GraduationCap, SignOut, Database, Sun, Moon } from '@phosphor-icons/react';
+import { BookOpen, Users, ChartBar, GraduationCap, SignOut, Database, Sun, Moon, Bell, Info } from '@phosphor-icons/react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { StudentResultsSearch } from '../components/StudentResultsSearch';
 import { analyticsAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import DashboardSkeleton from '../components/DashboardSkeleton';
+import { Toaster, toast } from 'sonner';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -40,6 +41,13 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { isDark, toggle: toggleTheme } = useTheme();
+  
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifRead, setNotifRead] = useState(false);
+  const notifications = [
+    { title: 'System Security Updated', desc: 'New schemas applied for isolated partitions.', time: 'Just now' },
+    { title: 'New Registration Settings', desc: 'Sections schema applied via alembic.', time: '2 hours ago' }
+  ];
 
   useEffect(() => {
     const fetchDashboard = async () => {
@@ -60,7 +68,6 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
   const stats = [
     { label: 'Total Students', value: totalStudents.toLocaleString(), icon: Users, color: 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500' },
     { label: 'Total Teachers', value: totalTeachers.toLocaleString(), icon: GraduationCap, color: 'bg-emerald-50 text-emerald-500' },
-    { label: 'Active Quizzes', value: activeQuizzes.toLocaleString(), icon: ChartBar, color: 'bg-amber-50 text-amber-500' },
     { label: 'Departments', value: deptCount.toLocaleString(), icon: Database, color: 'bg-sky-50 text-sky-500' },
   ];
   const departmentPerformance = (dashboardData?.departments || []).map(d => ({
@@ -76,6 +83,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
+      <Toaster position="top-right" richColors />
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
@@ -84,6 +92,55 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
               <div><h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadMix</h1><p className="text-xs font-bold uppercase tracking-widest text-slate-400">Admin</p></div>
             </div>
             <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setShowNotifications(!showNotifications)} 
+                className="relative p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
+                aria-label="Notifications"
+                data-testid="notification-bell"
+              >
+                <Bell size={20} weight={showNotifications ? "fill" : "duotone"} />
+                {!notifRead && (
+                  <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                    {notifications.length}
+                  </div>
+                )}
+              </button>
+              <AnimatePresence>
+                {showNotifications && (
+                  <>
+                    <motion.div
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-[60]"
+                      onClick={() => setShowNotifications(false)}
+                    ></motion.div>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+                      className="absolute top-20 right-4 sm:right-8 z-[61] w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 dark:bg-[#1A202C] dark:border-white/[0.06] overflow-hidden"
+                    >
+                      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex flex-col items-start gap-2">
+                        <div className="flex w-full items-center justify-between">
+                          <h4 className="font-extrabold text-slate-800 dark:text-slate-100">System Notifications</h4>
+                          <button onClick={() => { setNotifRead(true); setShowNotifications(false); }} className="text-xs font-bold text-amber-500 hover:text-amber-600 transition-colors">Mark all as read</button>
+                        </div>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800">
+                        {notifications.map((item, i) => (
+                          <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:bg-slate-800/50 transition-colors cursor-pointer text-left">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-amber-50">
+                              <Info size={14} weight="duotone" className="text-amber-500" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title}</p>
+                              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{item.desc}</p>
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-2 block">{item.time}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
@@ -111,23 +168,33 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
         </motion.div>
 
         {/* Tabs */}
-        <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit mb-8 overflow-x-auto" data-testid="admin-tabs">
-          {[
-            { id: 'overview', label: 'Overview' }, 
-            { id: 'college-metrics', label: 'College Metrics' },
-            { id: 'department-metrics', label: 'Department Metrics' },
-            { id: 'section-metrics', label: 'Section Metrics' },
-            { id: 'student-profiles', label: 'Student Profiles' },
-            { id: 'results', label: 'Student Results' }
-          ].map(tab => (
-            <button key={tab.id} data-testid={`tab-${tab.id}`} onClick={() => setActiveTab(tab.id)}
-              className={`pill-tab ${activeTab === tab.id ? 'pill-tab-active' : 'pill-tab-inactive'} whitespace-nowrap`}>{tab.label}</button>
-          ))}
+        <div className="flex bg-white dark:bg-[#1A202C] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40" data-testid="admin-tabs">
+          <div className="max-w-7xl mx-auto px-6 w-full flex items-center gap-6 overflow-x-auto">
+            {[
+              { id: 'overview', label: 'Overview' }, 
+              { id: 'metrics', label: 'Metrics' },
+              { id: 'student-profiles', label: 'Student Profiles' },
+              { id: 'results', label: 'Student Results' }
+            ].map(tab => (
+              <button 
+                key={tab.id} 
+                data-testid={`tab-${tab.id}`} 
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-shrink-0 py-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.id 
+                    ? 'border-indigo-600 text-indigo-600' 
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {activeTab === 'overview' && (
           <motion.div data-testid="overview-content" variants={containerVariants} initial="hidden" animate="show">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {stats.map((stat, i) => {
                 const Icon = stat.icon;
                 return (
@@ -142,14 +209,10 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
               })}
             </div>
 
-            <motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
+            <motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
               <motion.button variants={itemVariants} whileHover={cardHover} data-testid="user-management-button" onClick={() => navigate('user-management')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
                 <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/15 rounded-xl flex items-center justify-center group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/30 transition-colors"><Users size={24} weight="duotone" className="text-indigo-500" /></div>
-                <div><p className="font-extrabold text-slate-900 dark:text-white">User Management</p><p className="text-sm font-medium text-slate-400">Add/edit users</p></div>
-              </motion.button>
-              <motion.button variants={itemVariants} whileHover={cardHover} data-testid="view-all-results-button" onClick={() => navigate('quiz-results')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
-                <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/15 rounded-xl flex items-center justify-center group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/30 transition-colors"><ChartBar size={24} weight="duotone" className="text-emerald-500" /></div>
-                <div><p className="font-extrabold text-slate-900 dark:text-white">Quiz Results</p><p className="text-sm font-medium text-slate-400">College-wide data</p></div>
+                <div><p className="font-extrabold text-slate-900 dark:text-white">Manage</p><p className="text-sm font-medium text-slate-400">Students, Faculty & Depts</p></div>
               </motion.button>
               <motion.button variants={itemVariants} whileHover={cardHover} data-testid="student-results-button" onClick={() => setActiveTab('results')} className="soft-card-hover p-6 text-left flex items-center gap-4 group">
                 <div className="w-12 h-12 bg-violet-50 dark:bg-violet-500/15 rounded-xl flex items-center justify-center group-hover:bg-violet-100 dark:group-hover:bg-violet-500/30 transition-colors"><GraduationCap size={24} weight="duotone" className="text-violet-500" /></div>
@@ -222,56 +285,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
           </motion.div>
         )}
 
-        {activeTab === 'college-metrics' && (
-          <motion.div data-testid="college-metrics-content" variants={containerVariants} initial="hidden" animate="show">
-            <motion.h3 variants={itemVariants} className="text-2xl font-bold text-slate-900 dark:text-white mb-6">College-wise Performance Metrics</motion.h3>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-              {['GNITC', 'GNITR', 'GNITS'].map((college, idx) => (
-                <motion.div variants={itemVariants} whileHover={cardHover} key={college} className="soft-card p-6">
-                  <h4 className="text-xl font-bold text-slate-900 dark:text-white mb-4">{college}</h4>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-500/15 rounded-xl">
-                      <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Total Students</span>
-                      <span className="text-2xl font-extrabold text-indigo-600">{idx === 0 ? '420' : idx === 1 ? '385' : '443'}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl">
-                      <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Avg Score</span>
-                      <span className="text-2xl font-extrabold text-emerald-600">{idx === 0 ? '82.5' : idx === 1 ? '79.3' : '84.1'}%</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl">
-                      <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Pass Rate</span>
-                      <span className="text-2xl font-extrabold text-amber-600">{idx === 0 ? '88' : idx === 1 ? '85' : '90'}%</span>
-                    </div>
-                    <div className="flex items-center justify-between p-3 bg-purple-50 rounded-xl">
-                      <span className="text-sm font-bold text-slate-600 dark:text-slate-400">Departments</span>
-                      <span className="text-2xl font-extrabold text-purple-600">{idx === 0 ? '5' : idx === 1 ? '4' : '6'}</span>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-            
-            <motion.div variants={itemVariants} className="soft-card p-6">
-              <h4 className="text-lg font-bold text-slate-900 dark:text-white mb-4">College Comparison</h4>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={[
-                  { name: 'GNITC', students: 420, avgScore: 82.5, passRate: 88 },
-                  { name: 'GNITR', students: 385, avgScore: 79.3, passRate: 85 },
-                  { name: 'GNITS', students: 443, avgScore: 84.1, passRate: 90 }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="name" stroke="#64748b" style={{ fontSize: '14px', fontWeight: '600' }} />
-                  <YAxis stroke="#64748b" style={{ fontSize: '12px', fontWeight: '600' }} />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: '14px', fontWeight: '600' }} />
-                  <Bar dataKey="avgScore" fill="#6366f1" name="Avg Score (%)" radius={[8, 8, 0, 0]} />
-                  <Bar dataKey="passRate" fill="#10b981" name="Pass Rate (%)" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </motion.div>
-          </motion.div>
-        )}
+
 
         {activeTab === 'department-metrics' && (
           <motion.div data-testid="department-metrics-content" variants={containerVariants} initial="hidden" animate="show">

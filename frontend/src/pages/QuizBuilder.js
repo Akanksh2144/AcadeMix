@@ -509,10 +509,10 @@ const QuizBuilder = ({ navigate, user }) => {
               </div>
               <div className="space-y-2">
                 {[
-                  { type: 'mcq-single', label: 'MCQ (Single)', color: 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 hover:bg-indigo-100' },
-                  { type: 'mcq-multiple', label: 'MCQ (Multiple)', color: 'bg-purple-50 text-purple-600 hover:bg-purple-100' },
-                  { type: 'short', label: 'Short Answer', color: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
-                  { type: 'coding', label: 'Coding', color: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' }
+                  { type: 'mcq-single', label: 'MCQ (Single)', color: 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-500/25' },
+                  { type: 'mcq-multiple', label: 'MCQ (Multiple)', color: 'bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400 hover:bg-purple-100 dark:hover:bg-purple-500/25' },
+                  { type: 'short', label: 'Short Answer', color: 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-500/25' },
+                  { type: 'coding', label: 'Coding', color: 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/25' }
                 ].map(b => (
                   <button key={b.type} onClick={() => addQuestion(b.type)}
                     className={`w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${b.color}`}>
@@ -525,7 +525,7 @@ const QuizBuilder = ({ navigate, user }) => {
                 <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">Bulk Import</p>
                 <button
                   onClick={handleDownloadQuizTemplate}
-                  className="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                  className="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/25"
                 >
                   <DownloadSimple size={15} weight="bold" /> Template (.xlsx)
                 </button>
@@ -557,9 +557,9 @@ const QuizBuilder = ({ navigate, user }) => {
                 <p className="text-slate-400 mb-8 max-w-sm mx-auto">Start building your quiz by adding a question type below.</p>
                 <div className="flex flex-wrap justify-center gap-3">
                   <button onClick={() => addQuestion('mcq-single')} className="btn-primary text-sm flex items-center gap-1"><Plus size={14}/> MCQ (Single)</button>
-                  <button onClick={() => addQuestion('mcq-multiple')} className="btn-secondary text-sm flex items-center gap-1 text-purple-600 border-purple-200 hover:bg-purple-50"><Plus size={14}/> MCQ (Multiple)</button>
-                  <button onClick={() => addQuestion('short')} className="btn-secondary text-sm flex items-center gap-1 text-amber-600 border-amber-200 hover:bg-amber-50"><Plus size={14}/> Short Answer</button>
-                  <button onClick={() => addQuestion('coding')} className="btn-secondary text-sm flex items-center gap-1 text-emerald-600 border-emerald-200 hover:bg-emerald-50"><Plus size={14}/> Coding</button>
+                  <button onClick={() => addQuestion('mcq-multiple')} className="btn-secondary text-sm flex items-center gap-1 !text-purple-600 dark:!text-purple-400 border border-purple-200 dark:border-purple-500/20 hover:bg-purple-50 dark:hover:bg-purple-500/10 !bg-transparent dark:!bg-transparent"><Plus size={14}/> MCQ (Multiple)</button>
+                  <button onClick={() => addQuestion('short')} className="btn-secondary text-sm flex items-center gap-1 !text-amber-600 dark:!text-amber-400 border border-amber-200 dark:border-amber-500/20 hover:bg-amber-50 dark:hover:bg-amber-500/10 !bg-transparent dark:!bg-transparent"><Plus size={14}/> Short Answer</button>
+                  <button onClick={() => addQuestion('coding')} className="btn-secondary text-sm flex items-center gap-1 !text-emerald-600 dark:!text-emerald-400 border border-emerald-200 dark:border-emerald-500/20 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 !bg-transparent dark:!bg-transparent"><Plus size={14}/> Coding</button>
                 </div>
               </div>
             ) : (

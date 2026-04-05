@@ -982,9 +982,6 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                     className={`stat-card relative overflow-hidden group text-left ${stat.onClick ? "cursor-pointer" : ""}`}
                     data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}
                   >
-                    <div
-                      className={`absolute top-0 left-0 w-full h-1 bg-gradient-to-r ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity`}
-                    ></div>
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
                       <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-slate-400">
                         {stat.label}

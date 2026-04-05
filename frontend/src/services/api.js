@@ -45,12 +45,36 @@ export const authAPI = {
   logout: () => api.post('/api/auth/logout'),
 };
 
-// Users
 export const usersAPI = {
   list: (role) => api.get('/api/users', { params: role ? { role } : {} }),
   get: (id) => api.get(`/api/users/${id}`),
   create: (data) => api.post('/api/users', data),
+  update: (id, data) => api.put(`/api/users/${id}`, data),
   delete: (id) => api.delete(`/api/users/${id}`),
+};
+
+// Departments
+export const departmentsAPI = {
+  list: () => api.get('/api/departments'),
+  create: (data) => api.post('/api/departments', data),
+  update: (id, data) => api.put(`/api/departments/${id}`, data),
+  delete: (id) => api.delete(`/api/departments/${id}`),
+};
+
+// Sections
+export const sectionsAPI = {
+  list: () => api.get('/api/sections'),
+  create: (data) => api.post('/api/sections', data),
+  update: (id, data) => api.put(`/api/sections/${id}`, data),
+  delete: (id) => api.delete(`/api/sections/${id}`),
+};
+
+// Roles
+export const rolesAPI = {
+  list: () => api.get('/api/roles'),
+  create: (data) => api.post('/api/roles', data),
+  update: (id, data) => api.put(`/api/roles/${id}`, data),
+  delete: (id) => api.delete(`/api/roles/${id}`),
 };
 
 // Quizzes
