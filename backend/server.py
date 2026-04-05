@@ -98,8 +98,9 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
-def create_access_token(user_id: str, role: str, tenant_id: str = "") -> str:
-    return jwt.encode({"sub": user_id, "role": role, "tenant_id": tenant_id, "exp": datetime.now(timezone.utc) + timedelta(hours=24), "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+def create_access_token(user_id: str, role: str, tenant_id: str = "", permissions: dict = None) -> str:
+    perms = permissions or {}
+    return jwt.encode({"sub": user_id, "role": role, "tenant_id": tenant_id, "permissions": perms, "exp": datetime.now(timezone.utc) + timedelta(hours=24), "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def create_refresh_token(user_id: str) -> str:
     return jwt.encode({"sub": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -144,6 +145,7 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
             "name": user.name,
             "tenant_id": user.college_id,
             "college_id": user.college_id,
+            "permissions": payload.get("permissions", {})
         }
         if user.profile_data:
             user_dict.update(user.profile_data)
@@ -162,6 +164,19 @@ def require_role(*roles):
         user = await get_current_user(request, session)
         if user["role"] not in roles:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
+        return user
+    return check
+
+def require_permission(module: str, action: str):
+    async def check(request: Request, session: AsyncSession = Depends(get_db)):
+        user = await get_current_user(request, session)
+        if user["role"] in ["super_admin", "admin"]:
+            return user
+        
+        perms = user.get("permissions", {})
+        module_perms = perms.get(module, [])
+        if action not in module_perms:
+            raise HTTPException(status_code=403, detail=f"Insufficient permissions: requires {module}.{action}")
         return user
     return check
 
@@ -341,8 +356,15 @@ async def login(req: LoginRequest, response: Response, request: Request, session
     if redis_client:
         redis_client.delete(key)
 
+    perms = {}
+    if user.role not in ["student", "super_admin", "admin"]:
+        role_result = await session.execute(select(models.Role).where(models.Role.name == user.role, models.Role.college_id == user.college_id))
+        r = role_result.scalars().first()
+        if r:
+            perms = r.permissions
+
     tid = user.college_id or ""
-    access = create_access_token(user.id, user.role, tid)
+    access = create_access_token(user.id, user.role, tid, perms)
     refresh = create_refresh_token(user.id)
     response.set_cookie("access_token", access, httponly=True, secure=False, samesite="lax", max_age=86400)
     response.set_cookie("refresh_token", refresh, httponly=True, secure=False, samesite="lax", max_age=604800)
