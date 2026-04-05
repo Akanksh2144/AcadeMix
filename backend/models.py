@@ -92,7 +92,7 @@ class Quiz(Base):
 class Question(Base):
     __tablename__ = "questions"
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
-    quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False)
+    quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="CASCADE"), nullable=False, index=True)
     type = Column(String, nullable=False)
     marks = Column(Float, nullable=False)
     points = Column(Integer, nullable=False, default=1)
@@ -108,8 +108,8 @@ class Option(Base):
 class QuizAttempt(Base):
     __tablename__ = "quiz_attempts"
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
-    quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="RESTRICT"), nullable=False)
-    student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="RESTRICT"), nullable=False, index=True)
+    student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     status = Column(String, nullable=False)
     start_time = Column(DateTime(timezone=True), nullable=True)
     end_time = Column(DateTime(timezone=True), nullable=True)
@@ -118,7 +118,7 @@ class QuizAttempt(Base):
 class QuizAnswer(Base):
     __tablename__ = "quiz_answers"
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
-    attempt_id = Column(String, ForeignKey("quiz_attempts.id", ondelete="CASCADE"), nullable=False)
+    attempt_id = Column(String, ForeignKey("quiz_attempts.id", ondelete="CASCADE"), nullable=False, index=True)
     question_id = Column(String, ForeignKey("questions.id", ondelete="RESTRICT"), nullable=False)
     selected_option_id = Column(String, ForeignKey("options.id", ondelete="RESTRICT"), nullable=True)
     code_submitted = Column(String, nullable=True)
@@ -155,7 +155,7 @@ class Appeal(Base):
 class MarkEntry(Base):
     __tablename__ = "mark_entries"
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
-    student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
     course_id = Column(String, nullable=False)  # subject_code, not FK (avoids missing-course errors)
     faculty_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     exam_type = Column(String, nullable=False)
@@ -205,3 +205,33 @@ class Placement(Base):
     package = Column(String, nullable=True)
     date = Column(String, nullable=False)
     details = Column(JSONB, nullable=True)
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    resource = Column(String, nullable=False)
+    action = Column(String, nullable=False)
+    details = Column(JSONB, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class CodingChallenge(Base):
+    __tablename__ = "coding_challenges"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=False)
+    difficulty = Column(String, nullable=False) # easy, medium, hard
+    topics = Column(JSONB, nullable=False) # list of str
+    language_support = Column(JSONB, nullable=False) # list of str ["python", "sql"]
+    init_code = Column(JSONB, nullable=True) # mapping language -> startup script
+    expected_output = Column(JSONB, nullable=True) # mapping language -> expected result
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class ChallengeProgress(Base):
+    __tablename__ = "challenge_progress"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    student_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    challenge_id = Column(String, ForeignKey("coding_challenges.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False) # "completed"
+    language_used = Column(String, nullable=False)
+    timestamp = Column(DateTime(timezone=True), server_default=func.now())

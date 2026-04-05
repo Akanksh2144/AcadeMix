@@ -15,7 +15,7 @@ from typing import Optional, List
 # bson removed — MongoDB is archived
 from fastapi import FastAPI, HTTPException, Request, Response, Depends, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 # certifi removed — was for MongoDB TLS
 import io
 import csv
@@ -144,6 +144,10 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
         # tenant_id is always set from college_id via the SQLAlchemy user row — fallback to empty string
         if "tenant_id" not in user_dict:
             user_dict["tenant_id"] = user_dict.get("college_id", "")
+        
+        import database
+        database.tenant_context.set(user.college_id)
+            
         return user_dict
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -167,6 +171,10 @@ def require_permission(module: str, action: str):
         perms = user.get("permissions", {})
         module_perms = perms.get(module, [])
         if action not in module_perms:
+            role = user.get("role")
+            if module == "quizzes" and role in ["teacher"]: return user
+            if module == "marks" and role in ["teacher", "exam_cell", "hod"]: return user
+            if module == "placements" and role in ["hod", "admin"]: return user
             raise HTTPException(status_code=403, detail=f"Insufficient permissions: requires {module}.{action}")
         return user
     return check
@@ -177,15 +185,15 @@ class LoginRequest(BaseModel):
     password: str
 
 class RegisterRequest(BaseModel):
-    name: str
-    college_id: str
-    email: str
-    password: str
-    role: str = "student"
-    college: str = "GNITC"  # GNITC, GNIT, or GNU
-    department: str = ""
-    batch: str = ""
-    section: str = ""
+    name: str = Field(..., max_length=150)
+    college_id: str = Field(..., max_length=50)
+    email: str = Field(..., max_length=255)
+    password: str = Field(..., min_length=6, max_length=100)
+    role: str = Field("student", max_length=30)
+    college: str = Field("GNITC", max_length=50)
+    department: str = Field("", max_length=100)
+    batch: str = Field("", max_length=20)
+    section: str = Field("", max_length=20)
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
@@ -198,35 +206,35 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
 
 class DepartmentCreate(BaseModel):
-    name: str
-    code: str
+    name: str = Field(..., max_length=150)
+    code: str = Field(..., max_length=20)
 
 class DepartmentUpdate(BaseModel):
-    name: Optional[str] = None
-    code: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=150)
+    code: Optional[str] = Field(None, max_length=20)
 
 class SectionCreate(BaseModel):
     department_id: str
-    name: str
+    name: str = Field(..., max_length=50)
 
 class SectionUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=50)
     department_id: Optional[str] = None
 
 class RoleCreate(BaseModel):
-    name: str
+    name: str = Field(..., max_length=50)
     permissions: dict = {}
 
 class RoleUpdate(BaseModel):
-    name: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=50)
     permissions: Optional[dict] = None
 
 class QuizCreate(BaseModel):
-    title: str
-    subject: str
-    description: str = ""
-    total_marks: int = 0
-    duration_mins: int = 60
+    title: str = Field(..., min_length=3, max_length=200)
+    subject: str = Field(..., min_length=2, max_length=200)
+    description: str = Field("", max_length=2000)
+    total_marks: float = Field(0.0, ge=0.0, le=1000.0)
+    duration_mins: int = Field(60, ge=1, le=480)
     negative_marking: bool = False
     timed: bool = True
     randomize_questions: bool = False
@@ -234,7 +242,7 @@ class QuizCreate(BaseModel):
     show_answers_after: bool = True
     allow_reattempt: bool = False
     assigned_classes: list = []
-    negative_marks: float = 0.0
+    negative_marks: float = Field(0.0, ge=0.0, le=10.0)
     questions: list = []
 
 class AnswerSubmit(BaseModel):
@@ -249,9 +257,9 @@ class SemesterResultCreate(BaseModel):
     cgpa: float
 
 class CodeExecuteRequest(BaseModel):
-    code: str
-    language: str = "python"
-    test_input: str = ""
+    code: str = Field(..., max_length=15000)
+    language: str = Field("python", max_length=50)
+    test_input: str = Field("", max_length=5000)
 
 class FacultyAssignment(BaseModel):
     teacher_id: str
@@ -272,8 +280,8 @@ class MarkEntrySave(BaseModel):
     assignment_id: str
     exam_type: str  # mid1 or mid2
     semester: int
-    max_marks: float = 30
-    entries: List[MarkEntryItem]
+    max_marks: float = Field(30, gt=0, le=200)
+    entries: List[MarkEntryItem] = Field(..., max_items=5000)
     revision_reason: Optional[str] = None
 
 class MarkReview(BaseModel):
@@ -307,11 +315,21 @@ class AnnouncementCreate(BaseModel):
     visibility: str = "all"  # all, faculty, students
 
 class ChallengeSubmit(BaseModel):
+    challenge_id: str
     code: str
     language: str = "python"
 
 class ViolationReport(BaseModel):
     violation_type: str = "tab_switch"  # tab_switch, fullscreen_exit, window_blur
+
+async def log_audit(session: AsyncSession, user_id: str, resource: str, action: str, details: dict = None):
+    log_entry = models.AuditLog(
+        user_id=user_id,
+        resource=resource,
+        action=action,
+        details=details or {}
+    )
+    session.add(log_entry)
 
 # ─── Auth Routes ────────────────────────────────────────────────────────────
 @app.post("/api/auth/login")
@@ -633,7 +651,7 @@ async def list_quizzes(status: Optional[str] = None, user: dict = Depends(get_cu
     return out
 
 @app.post("/api/quizzes")
-async def create_quiz(req: QuizCreate, user: dict = Depends(require_role("teacher", "admin")), session: AsyncSession = Depends(get_db)):
+async def create_quiz(req: QuizCreate, user: dict = Depends(require_permission("quizzes", "create")), session: AsyncSession = Depends(get_db)):
     new_quiz = models.Quiz(
         college_id=user["college_id"],
         faculty_id=user["id"],
@@ -654,6 +672,7 @@ async def create_quiz(req: QuizCreate, user: dict = Depends(require_role("teache
         )
         session.add(question)
 
+    await log_audit(session, user["id"], "quiz", "create", {"title": req.title})
     await session.commit()
     await session.refresh(new_quiz)
     return {"id": new_quiz.id, "title": new_quiz.title, "subject": new_quiz.type, "duration_mins": new_quiz.duration_minutes}
@@ -742,22 +761,24 @@ async def update_quiz(quiz_id: str, updates: dict, user: dict = Depends(require_
     return {"id": q.id, "title": q.title, "status": q.status, "subject": q.type}
 
 @app.delete("/api/quizzes/{quiz_id}")
-async def delete_quiz(quiz_id: str, user: dict = Depends(require_role("teacher", "admin")), session: AsyncSession = Depends(get_db)):
+async def delete_quiz(quiz_id: str, user: dict = Depends(require_permission("quizzes", "delete")), session: AsyncSession = Depends(get_db)):
     result_r = await session.execute(select(models.Quiz).where(models.Quiz.id == quiz_id))
     quiz = result_r.scalars().first()
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
+    await log_audit(session, user["id"], "quiz", "delete", {"quiz_id": quiz.id, "title": quiz.title})
     await session.delete(quiz)
     await session.commit()
     return {"message": "Quiz deleted"}
 
 @app.post("/api/quizzes/{quiz_id}/publish")
-async def publish_quiz(quiz_id: str, user: dict = Depends(require_role("teacher", "admin")), session: AsyncSession = Depends(get_db)):
+async def publish_quiz(quiz_id: str, user: dict = Depends(require_permission("quizzes", "publish")), session: AsyncSession = Depends(get_db)):
     result_r = await session.execute(select(models.Quiz).where(models.Quiz.id == quiz_id))
     quiz = result_r.scalars().first()
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
     quiz.status = "active"
+    await log_audit(session, user["id"], "quiz", "publish", {"quiz_id": quiz.id, "title": quiz.title})
     await session.commit()
     return {"message": "Quiz published"}
 
@@ -843,7 +864,7 @@ async def start_attempt(quiz_id: str, request: Request, user: dict = Depends(get
             "status": attempt.status, "start_time": attempt.start_time.isoformat()}
 
 @app.post("/api/attempts/{attempt_id}/answer")
-@limiter.limit("120/minute")
+@limiter.limit("60/minute")
 async def submit_answer(attempt_id: str, req: AnswerSubmit, request: Request, user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
     result = await session.execute(
         select(models.QuizAttempt).where(
@@ -1487,7 +1508,7 @@ async def get_mark_entry(assignment_id: str, exam_type: str, user: dict = Depend
             "entries": (entry.extra_data or {}).get("entries", [])}
 
 @app.post("/api/marks/entry")
-async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
+async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_permission("marks", "edit")), session: AsyncSession = Depends(get_db)):
     entries_data = [e.dict() for e in req.entries]
     assign_r = await session.execute(
         select(models.FacultyAssignment).where(
@@ -1515,6 +1536,7 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role(
         existing.extra_data = {**(existing.extra_data or {}), "entries": entries_data,
                           "status": "draft", "max_marks": req.max_marks}
         existing.max_marks = req.max_marks
+        await log_audit(session, user["id"], "mark_entry", "update", {"entry_id": existing.id, "course_id": existing.course_id})
         await session.commit()
         return {"id": existing.id, "status": "draft", "entries": entries_data}
     row = models.MarkEntry(
@@ -1532,6 +1554,7 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role(
         }
     )
     session.add(row)
+    await log_audit(session, user["id"], "mark_entry", "create", {"exam_type": req.exam_type, "course_id": assignment.subject_code})
     await session.commit()
     await session.refresh(row)
     return {"id": row.id, "status": "draft", "entries": entries_data}
@@ -1980,23 +2003,45 @@ async def _run_process(cmd, stdin_data="", timeout=5, cwd=None):
     with concurrent.futures.ThreadPoolExecutor() as pool:
         return await loop.run_in_executor(pool, _exec)
 
-@app.post("/api/code/execute")
-async def execute_code(req: CodeExecuteRequest, user: dict = Depends(get_current_user)):
-    if len(req.code) > 10000:
-        raise HTTPException(status_code=400, detail="Code too long (max 10000 chars)")
+import tenacity
 
-    try:
+TIMEOUT_CONFIG = {
+    "python": 15.0,
+    "javascript": 15.0,
+    "c": 65.0,
+    "cpp": 65.0,
+    "java": 50.0,
+    "sql": 15.0,
+}
+
+@app.post("/api/code/execute")
+@limiter.limit("30/minute")
+async def execute_code(request: Request, req: CodeExecuteRequest, user: dict = Depends(get_current_user)):
+    lang_timeout = TIMEOUT_CONFIG.get(req.language.lower(), 65.0)
+
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(3),
+        wait=tenacity.wait_exponential(multiplier=1, min=1, max=10),
+        retry=tenacity.retry_if_exception_type((httpx.RequestError, httpx.TimeoutException)),
+        reraise=True
+    )
+    async def _do_request():
         async with httpx.AsyncClient() as client:
             resp = await client.post(
                 f"{code_runner_url}/run",
                 json={"language": req.language, "code": req.code, "test_input": req.test_input},
-                timeout=15.0
+                timeout=lang_timeout
             )
             if resp.status_code == 400:
                 raise HTTPException(status_code=400, detail=resp.json().get("detail", "Error"))
+            if resp.status_code in [502, 503, 504]:
+                raise httpx.RequestError("Code runner gateway timeout")
             if resp.status_code != 200:
                 return {"output": "", "error": "Code runner service unavailable", "exit_code": -1}
             return resp.json()
+
+    try:
+        return await _do_request()
     except HTTPException:
         raise
     except Exception as e:
@@ -2065,75 +2110,100 @@ async def list_placements(user: dict = Depends(require_role("admin", "hod", "tea
     return [{"id": p.id, "company": p.company, "role": p.role, "package": p.package, "date": p.date, **(p.details or {})} for p in rows]
 
 # ─── Coding Challenges ─────────────────────────────────────────────────────────
-# NOTE: Coding challenges are stored in-memory. A PostgreSQL table can be added later.
-_challenges_store: list = []
-_student_progress_store: list = []
-
 @app.get("/api/challenges")
-async def get_challenges(page: int = 1, limit: int = 20, difficulty: str = "", topic: str = ""):
-    filtered = _challenges_store
+async def get_challenges(page: int = 1, limit: int = 20, difficulty: str = "", topic: str = "", session: AsyncSession = Depends(get_db)):
+    stmt = select(models.CodingChallenge)
     if difficulty:
-        filtered = [c for c in filtered if c.get("difficulty") == difficulty]
+        stmt = stmt.where(models.CodingChallenge.difficulty == difficulty)
+    
+    result = await session.execute(stmt)
+    all_challenges = result.scalars().all()
     if topic:
-        filtered = [c for c in filtered if topic in c.get("topics", [])]
+        all_challenges = [c for c in all_challenges if topic in (c.topics or [])]
+        
     start = (page - 1) * limit
+    page_data = all_challenges[start : start + limit]
+    
     return {
-        "data": filtered[start:start + limit],
-        "total": len(filtered),
+        "data": [{"id": c.id, "title": c.title, "description": c.description, "difficulty": c.difficulty, "topics": c.topics, "language_support": c.language_support} for c in page_data],
+        "total": len(all_challenges),
         "page": page,
         "limit": limit
     }
 
 @app.get("/api/challenges/stats")
-async def get_challenge_stats(user: dict = Depends(get_current_user)):
-    solved = [p for p in _student_progress_store if p.get("student_id") == user["id"] and p.get("status") == "Solved"]
-    topics_count: dict = {}
+async def get_challenge_stats(user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    r = await session.execute(select(models.ChallengeProgress).where(models.ChallengeProgress.student_id == user["id"], models.ChallengeProgress.status == "completed"))
+    solved = r.scalars().all()
+    
     easy = medium = hard = 0
-    for doc in solved:
-        d = doc.get("difficulty", "Easy")
-        if d == "Easy": easy += 1
-        elif d == "Medium": medium += 1
-        elif d == "Hard": hard += 1
-        for t in doc.get("topics", []):
-            topics_count[t] = topics_count.get(t, 0) + 1
+    topics_count = {}
+    
+    # Ideally joined query, but fast enough for stats dashboard caching
+    for prog in solved:
+        cr = await session.execute(select(models.CodingChallenge).where(models.CodingChallenge.id == prog.challenge_id))
+        c = cr.scalars().first()
+        if c:
+            d = getattr(c, "difficulty", "easy").lower()
+            if d == "easy": easy += 1
+            elif d == "medium": medium += 1
+            elif d == "hard": hard += 1
+            for t in (c.topics or []):
+                topics_count[t] = topics_count.get(t, 0) + 1
+                
     return {"total_solved": len(solved), "difficulty": {"Easy": easy, "Medium": medium, "Hard": hard}, "topics": topics_count}
 
 @app.post("/api/challenges/submit")
-async def submit_challenge(req: ChallengeSubmit, user: dict = Depends(get_current_user)):
-    challenge = next((c for c in _challenges_store if c.get("id") == getattr(req, "challenge_id", None)), None)
+@limiter.limit("30/minute")
+async def submit_challenge(request: Request, req: ChallengeSubmit, user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    cr = await session.execute(select(models.CodingChallenge).where(models.CodingChallenge.id == req.challenge_id))
+    challenge = cr.scalars().first()
     if not challenge:
         raise HTTPException(status_code=404, detail="Challenge not found")
-    import time
-    start_time = time.time()
-    try:
+        
+    init_sql_script = ""
+    # Inject the SQL datasets for DataLemur style tests
+    if req.language.lower() == "sql" and challenge.init_code:
+        init_sql_script = challenge.init_code.get("sql", "")
+        
+    lang_timeout = TIMEOUT_CONFIG.get(req.language.lower(), 60.0)
+
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(3),
+        wait=tenacity.wait_exponential(multiplier=1, min=1, max=10),
+        retry=tenacity.retry_if_exception_type((httpx.RequestError, httpx.TimeoutException)),
+        reraise=True
+    )
+    async def _do_request():
         async with httpx.AsyncClient() as client:
-            resp = await client.post(
+            return await client.post(
                 f"{code_runner_url}/run",
-                json={"language": req.language, "code": req.code, "test_input": ""},
-                timeout=12.0
+                json={"language": req.language, "code": req.code, "test_input": init_sql_script},
+                timeout=lang_timeout
             )
-        end_time = time.time()
+
+    try:
+        resp = await _do_request()
+        
         if resp.status_code == 200:
             result = resp.json()
             exit_code = result.get("exit_code", -1)
-            if exit_code == 0:
-                # Upsert progress in memory
-                prog = next((p for p in _student_progress_store if p.get("student_id") == user["id"] and p.get("challenge_id") == req.challenge_id), None)
-                if prog:
-                    prog["status"] = "Solved"
+            
+            is_success = (exit_code == 0)
+            
+            if is_success:
+                pr = await session.execute(select(models.ChallengeProgress).where(models.ChallengeProgress.student_id == user["id"], models.ChallengeProgress.challenge_id == req.challenge_id))
+                prog = pr.scalars().first()
+                if not prog:
+                    prog = models.ChallengeProgress(student_id=user["id"], challenge_id=req.challenge_id, status="completed", language_used=req.language)
+                    session.add(prog)
                 else:
-                    _student_progress_store.append({
-                        "student_id": user["id"], "challenge_id": req.challenge_id,
-                        "status": "Solved", "language": req.language,
-                        "difficulty": challenge.get("difficulty"),
-                        "topics": challenge.get("topics", []),
-                        "execution_time_ms": int((end_time - start_time) * 1000)
-                    })
+                    prog.status = "completed"
+                await session.commit()
+                
             return {"output": result.get("output", ""), "error": result.get("error", ""),
-                    "exit_code": exit_code, "success": exit_code == 0}
+                    "exit_code": exit_code, "success": is_success}
         return {"error": "Code runner service error", "exit_code": -1, "success": False}
-    except httpx.TimeoutException:
-        return {"error": "Execution timed out", "exit_code": 1, "success": False}
     except Exception as e:
         return {"error": str(e), "exit_code": -1, "success": False}
 

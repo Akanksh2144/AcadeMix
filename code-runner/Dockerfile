@@ -7,6 +7,7 @@ RUN apt-get update && apt-get install -y \
     nodejs \
     default-jdk \
     iptables \
+    sqlite3 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

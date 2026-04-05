@@ -19,15 +19,16 @@ if not DATABASE_URL:
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    pool_size=5,
-    max_overflow=10,
-    pool_timeout=30,
-    pool_recycle=300,
+    pool_size=20,
+    max_overflow=30,
+    pool_timeout=10,
+    pool_recycle=600,
     pool_pre_ping=True,
     connect_args={
         "statement_cache_size": 0,
-        "timeout": 20,           # asyncpg connection timeout (seconds)
+        "timeout": 10,           # asyncpg connection timeout (seconds)
         "command_timeout": 30,   # per-query timeout
+        "server_settings": {"jit": "off"} # disable Postgres JIT to avoid memory spikes and unpredictable latency
     }
 )
 
@@ -40,6 +41,27 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 Base = declarative_base()
+
+import contextvars
+from sqlalchemy import event
+from sqlalchemy.orm import Session
+
+tenant_context = contextvars.ContextVar("tenant_context", default=None)
+
+@event.listens_for(Session, "do_orm_execute")
+def receive_do_orm_execute(orm_execute_state):
+    college_id = tenant_context.get()
+    if not college_id or college_id == "super_admin":
+        return
+        
+    if orm_execute_state.is_select:
+        # Securely scope all matching mappers in the statement
+        for mapper in orm_execute_state.all_mappers:
+            # We skip 'User' table injection to allow cross-tenant login lookups, everything else is scoped.
+            if hasattr(mapper.class_, "college_id") and mapper.class_.__name__ not in ["User", "College"]:
+                orm_execute_state.statement = orm_execute_state.statement.where(
+                    mapper.class_.college_id == college_id
+                )
 
 async def get_db():
     async with AsyncSessionLocal() as session:
