@@ -12,11 +12,11 @@ import subprocess
 import tempfile
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List
-from bson import ObjectId
+# bson removed — MongoDB is archived
 from fastapi import FastAPI, HTTPException, Request, Response, Depends, Query, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import certifi
+# certifi removed — was for MongoDB TLS
 import io
 import csv
 
@@ -105,16 +105,7 @@ def create_access_token(user_id: str, role: str, tenant_id: str = "", permission
 def create_refresh_token(user_id: str) -> str:
     return jwt.encode({"sub": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-def serialize_doc(doc):
-    if doc is None:
-        return None
-    doc["id"] = str(doc.pop("_id"))
-    for k, v in doc.items():
-        if isinstance(v, ObjectId):
-            doc[k] = str(v)
-        elif isinstance(v, datetime):
-            doc[k] = v.isoformat()
-    return doc
+# serialize_doc removed — was MongoDB-specific dead code
 
 def grade_to_points(grade: str) -> float:
     mapping = {"O": 10, "A+": 9, "A": 8, "B+": 7, "B": 6, "C": 5, "D": 4, "F": 0}
@@ -740,15 +731,15 @@ async def update_quiz(quiz_id: str, updates: dict, user: dict = Depends(require_
     if not q:
         raise HTTPException(status_code=404, detail="Quiz not found")
     if "title" in updates: q.title = updates["title"]
-    if "subject" in updates: q.subject = updates["subject"]
+    if "subject" in updates: q.type = updates["subject"]
     if "status" in updates: q.status = updates["status"]
-    if "duration_mins" in updates: q.duration_mins = updates["duration_mins"]
+    if "duration_mins" in updates: q.duration_minutes = updates["duration_mins"]
     if "total_marks" in updates: q.total_marks = updates["total_marks"]
     if "questions" in updates:
         q.questions = updates["questions"]
         q.total_marks = sum(qu.get("marks", 0) for qu in updates["questions"])
     await session.commit()
-    return {"id": q.id, "title": q.title, "status": q.status, "subject": q.subject}
+    return {"id": q.id, "title": q.title, "status": q.status, "subject": q.type}
 
 @app.delete("/api/quizzes/{quiz_id}")
 async def delete_quiz(quiz_id: str, user: dict = Depends(require_role("teacher", "admin")), session: AsyncSession = Depends(get_db)):
@@ -779,9 +770,9 @@ async def extend_quiz_time(quiz_id: str, body: dict = {}, user: dict = Depends(r
     quiz = result_r.scalars().first()
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
-    quiz.duration_mins = (quiz.duration_mins or 60) + mins
+    quiz.duration_minutes = (quiz.duration_minutes or 60) + mins
     await session.commit()
-    return {"message": f"Extended by {mins} mins. New duration: {quiz.duration_mins} mins", "duration_mins": quiz.duration_mins}
+    return {"message": f"Extended by {mins} mins. New duration: {quiz.duration_minutes} mins", "duration_mins": quiz.duration_minutes}
 
 @app.post("/api/quizzes/{quiz_id}/end")
 async def end_quiz_now(quiz_id: str, user: dict = Depends(require_role("teacher", "admin", "hod")), session: AsyncSession = Depends(get_db)):
@@ -1069,8 +1060,7 @@ async def student_profile(student_id: str, user: dict = Depends(require_role("ho
     attempts = attempts_r.scalars().all()
     marks_r = await session.execute(
         select(models.MarkEntry).where(
-            models.MarkEntry.student_id == student_id,
-            models.MarkEntry.exam_type != "__assignment__"
+            models.MarkEntry.student_id == student_id
         )
     )
     marks_rows = marks_r.scalars().all()
@@ -1157,28 +1147,27 @@ async def student_analytics(student_id: str, user: dict = Depends(get_current_us
 
 @app.get("/api/analytics/teacher/class-results")
 async def class_results_analytics(user: dict = Depends(require_role("teacher", "hod", "exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
-    # Fetch assignment records (stored as MarkEntry with exam_type='__assignment__')
-    stmt = select(models.MarkEntry).where(models.MarkEntry.exam_type == "__assignment__")
+    # Fetch faculty assignments from the dedicated table
+    stmt = select(models.FacultyAssignment)
     if user["role"] == "teacher":
-        stmt = stmt.where(models.MarkEntry.faculty_id == user["id"])
+        stmt = stmt.where(models.FacultyAssignment.teacher_id == user["id"])
     result = await session.execute(stmt)
     assignments = result.scalars().all()
 
     assigned_classes = []
     class_details: dict = {}
     for a in assignments:
-        meta = a.marks or {}
-        class_key = f"{meta.get('subject_code', '')}_{meta.get('batch', '')}_{meta.get('section', '')}"
+        class_key = f"{a.subject_code}_{a.batch}_{a.section}"
         if any(c.get("class_key") == class_key for c in assigned_classes):
             continue
         assigned_classes.append({
             "id": a.id, "class_key": class_key,
-            "section": f"{meta.get('department','')} {meta.get('batch','')} {meta.get('section','')}",
-            "department": meta.get("department", ""), "subject": meta.get("subject_name", ""),
-            "batch": str(meta.get("batch", "")), "totalStudents": 0
+            "section": f"{a.department} {a.batch} {a.section}",
+            "department": a.department, "subject": a.subject_name,
+            "batch": str(a.batch), "totalStudents": 0
         })
-        class_details[class_key] = {"totalStudents": 0, "department": meta.get("department"),
-                                    "batch": str(meta.get("batch", "")), "section": str(meta.get("section", ""))}
+        class_details[class_key] = {"totalStudents": 0, "department": a.department,
+                                    "batch": str(a.batch), "section": str(a.section)}
 
     # Quiz results from QuizAttempt
     attempts_r = await session.execute(
@@ -1500,9 +1489,8 @@ async def get_mark_entry(assignment_id: str, exam_type: str, user: dict = Depend
 async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
     entries_data = [e.dict() for e in req.entries]
     assign_r = await session.execute(
-        select(models.MarkEntry).where(
-            models.MarkEntry.id == req.assignment_id,
-            models.MarkEntry.exam_type == "__assignment__"
+        select(models.FacultyAssignment).where(
+            models.FacultyAssignment.id == req.assignment_id
         )
     )
     assignment = assign_r.scalars().first()
@@ -1510,7 +1498,7 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role(
         raise HTTPException(status_code=404, detail="Assignment not found")
     existing_r = await session.execute(
         select(models.MarkEntry).where(
-            models.MarkEntry.course_id == assignment.course_id,
+            models.MarkEntry.course_id == assignment.subject_code,
             models.MarkEntry.exam_type == req.exam_type,
             models.MarkEntry.faculty_id == user["id"],
         )
@@ -1530,7 +1518,7 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role(
         return {"id": existing.id, "status": "draft", "entries": entries_data}
     row = models.MarkEntry(
         student_id=user["id"],
-        course_id=assignment.course_id,
+        course_id=assignment.subject_code,
         faculty_id=user["id"],
         exam_type=req.exam_type,
         marks_obtained=0,
@@ -1538,7 +1526,8 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_role(
         extra_data={
             "assignment_id": req.assignment_id, "entries": entries_data,
             "status": "draft", "semester": req.semester, "max_marks": req.max_marks,
-            **(assignment.extra_data or {})
+            "subject_name": assignment.subject_name, "department": assignment.department,
+            "batch": assignment.batch, "section": assignment.section
         }
     )
     session.add(row)
@@ -1567,7 +1556,7 @@ async def submit_marks(entry_id: str, user: dict = Depends(require_role("teacher
 
 @app.get("/api/marks/submissions")
 async def list_submissions(status: Optional[str] = None, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
-    stmt = select(models.MarkEntry).where(models.MarkEntry.exam_type != "__assignment__")
+    stmt = select(models.MarkEntry)
     result = await session.execute(stmt)
     all_rows = result.scalars().all()
     out = []
@@ -1599,7 +1588,7 @@ async def review_marks(entry_id: str, req: MarkReview, user: dict = Depends(requ
 # ─── Exam Cell Routes ──────────────────────────────────────────────────────
 @app.get("/api/examcell/approved-marks")
 async def get_approved_marks(user: dict = Depends(require_role("exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
-    result = await session.execute(select(models.MarkEntry).where(models.MarkEntry.exam_type != "__assignment__"))
+    result = await session.execute(select(models.MarkEntry))
     all_rows = result.scalars().all()
     return [{
         "id": r.id, "course_id": r.course_id, "exam_type": r.exam_type,
@@ -1867,11 +1856,11 @@ async def hod_dashboard(user: dict = Depends(require_role("hod", "admin")), sess
         )
     )
     assignments_r = await session.execute(
-        select(func.count(models.MarkEntry.id)).where(models.MarkEntry.exam_type == "__assignment__")
+        select(func.count(models.FacultyAssignment.id))
     )
     # Pending/approved from JSONB status field
     mark_entries_r = await session.execute(
-        select(models.MarkEntry).where(models.MarkEntry.exam_type != "__assignment__")
+        select(models.MarkEntry)
     )
     all_entries = mark_entries_r.scalars().all()
     pending = sum(1 for e in all_entries if (e.extra_data or {}).get("status") == "submitted")
@@ -1891,7 +1880,7 @@ async def hod_dashboard(user: dict = Depends(require_role("hod", "admin")), sess
 @app.get("/api/dashboard/exam_cell")
 async def exam_cell_dashboard(user: dict = Depends(require_role("exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
     mark_entries_r = await session.execute(
-        select(models.MarkEntry).where(models.MarkEntry.exam_type != "__assignment__")
+        select(models.MarkEntry)
     )
     all_entries = mark_entries_r.scalars().all()
     approved = sum(1 for e in all_entries if (e.extra_data or {}).get("status") == "approved")
