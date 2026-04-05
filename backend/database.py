@@ -51,17 +51,21 @@ tenant_context = contextvars.ContextVar("tenant_context", default=None)
 @event.listens_for(Session, "do_orm_execute")
 def receive_do_orm_execute(orm_execute_state):
     college_id = tenant_context.get()
-    if not college_id or college_id == "super_admin":
-        return
-        
+    
     if orm_execute_state.is_select:
-        # Securely scope all matching mappers in the statement
         for mapper in orm_execute_state.all_mappers:
-            # We skip 'User' table injection to allow cross-tenant login lookups, everything else is scoped.
-            if hasattr(mapper.class_, "college_id") and mapper.class_.__name__ not in ["User", "College"]:
+            # 1. Soft Delete Filtering (Applies to all)
+            if hasattr(mapper.class_, "is_deleted"):
                 orm_execute_state.statement = orm_execute_state.statement.where(
-                    mapper.class_.college_id == college_id
+                    mapper.class_.is_deleted == False
                 )
+                
+            # 2. Tenant Isolation
+            if college_id and college_id != "super_admin":
+                if hasattr(mapper.class_, "college_id") and mapper.class_.__name__ not in ["User", "College"]:
+                    orm_execute_state.statement = orm_execute_state.statement.where(
+                        mapper.class_.college_id == college_id
+                    )
 
 async def get_db():
     async with AsyncSessionLocal() as session:

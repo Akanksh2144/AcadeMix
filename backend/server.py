@@ -67,18 +67,27 @@ JWT_ALGORITHM = "HS256"
 
 frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 code_runner_url = os.environ.get("CODE_RUNNER_URL", "https://acadmix-code-runner.fly.dev")
-cors_origins = os.environ.get("CORS_ORIGINS", "*")
-if cors_origins == "*":
-    origins = ["*"]
-else:
-    origins = [o.strip() for o in cors_origins.split(",")]
+cors_origins_env = os.environ.get("CORS_ORIGINS", "")
+if not cors_origins_env:
+    raise ValueError("CORS_ORIGINS must be explicitly set (no wildcard allowed)")
+
+origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+
+if "*" in origins:
+    raise ValueError("CORS_ORIGINS cannot contain wildcard '*'. List origins explicitly.")
+
+if os.getenv("ENVIRONMENT") == "production":
+    for origin in origins:
+        if not origin.startswith("https://"):
+            raise ValueError(f"CORS origin '{origin}' must use HTTPS in production")
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
+    max_age=3600,
 )
 
 redis_url = os.environ.get("REDIS_URL", "")
@@ -98,12 +107,33 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
+import uuid
+
+class TokenBlacklistConfig:
+    USE_BLACKLIST = os.getenv("USE_TOKEN_BLACKLIST", "false").lower() == "true"
+    ACCESS_TOKEN_TTL_MINUTES = 15
+    REFRESH_TOKEN_TTL_DAYS = 7
+    BLACKLIST_CHECK_REDIS = True
+
 def create_access_token(user_id: str, role: str, tenant_id: str = "", permissions: dict = None) -> str:
     perms = permissions or {}
-    return jwt.encode({"sub": user_id, "role": role, "tenant_id": tenant_id, "permissions": perms, "exp": datetime.now(timezone.utc) + timedelta(hours=24), "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode({
+        "sub": user_id, 
+        "role": role, 
+        "tenant_id": tenant_id, 
+        "permissions": perms, 
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=TokenBlacklistConfig.ACCESS_TOKEN_TTL_MINUTES), 
+        "type": "access",
+        "jti": str(uuid.uuid4())
+    }, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 def create_refresh_token(user_id: str) -> str:
-    return jwt.encode({"sub": user_id, "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return jwt.encode({
+        "sub": user_id, 
+        "exp": datetime.now(timezone.utc) + timedelta(days=TokenBlacklistConfig.REFRESH_TOKEN_TTL_DAYS), 
+        "type": "refresh",
+        "jti": str(uuid.uuid4())
+    }, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 # serialize_doc removed — was MongoDB-specific dead code
 
@@ -123,6 +153,11 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         if payload.get("type") != "access":
             raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        if TokenBlacklistConfig.USE_BLACKLIST and redis_client:
+            jti = payload.get("jti")
+            if jti and redis_client.exists(f"revoked_access:{jti}"):
+                raise HTTPException(status_code=401, detail="Token revoked")
         
         result = await session.execute(select(models.User).where(models.User.id == payload["sub"]))
         user = result.scalars().first()
@@ -334,18 +369,18 @@ async def log_audit(session: AsyncSession, user_id: str, resource: str, action: 
 # ─── Auth Routes ────────────────────────────────────────────────────────────
 @app.post("/api/auth/login")
 async def login(req: LoginRequest, response: Response, request: Request, session: AsyncSession = Depends(get_db)):
-    key = f"login_failures:{req.college_id.upper()}"
+    college_id_normalized = req.college_id.strip().upper()
+    key = f"login_failures:{college_id_normalized}"
     if redis_client:
         failures = redis_client.get(key)
         if failures and int(failures) >= 5:
             raise HTTPException(status_code=429, detail="Too many failed attempts. Try again in 5 minutes.")
 
     # Find user by college_id stored in profile_data or by email
-    query_str = req.college_id.strip()
     result = await session.execute(
         select(models.User).where(
-            (models.User.profile_data["college_id"].astext == query_str.upper()) |
-            (models.User.email.ilike(query_str))
+            (models.User.profile_data["college_id"].astext == college_id_normalized) |
+            (models.User.email.ilike(college_id_normalized))
         )
     )
     user = result.scalars().first()
@@ -400,18 +435,66 @@ async def get_me(user: dict = Depends(get_current_user)):
     return user
 
 @app.post("/api/auth/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
+    refresh_token = request.cookies.get("refresh_token")
+    if refresh_token:
+        try:
+            payload = jwt.decode(refresh_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+            jti = payload.get("jti")
+            if redis_client and jti:
+                redis_client.setex(f"revoked_refresh:{jti}", 604800, "revoked")
+        except jwt.InvalidTokenError:
+            pass
+            
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return {"message": "Logged out"}
 
+@app.post("/api/auth/refresh")
+async def refresh_access_token(request: Request, response: Response):
+    from database import AsyncSessionLocal
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="No refresh token")
+        
+    try:
+        payload = jwt.decode(refresh_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        if payload.get("type") != "refresh":
+            raise HTTPException(status_code=401, detail="Invalid token type")
+            
+        jti = payload.get("jti")
+        if redis_client and redis_client.exists(f"revoked_refresh:{jti}"):
+            raise HTTPException(status_code=401, detail="Refresh token revoked")
+            
+        user_id = payload["sub"]
+        
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(models.User).where(models.User.id == user_id))
+            user = result.scalars().first()
+            if not user:
+                raise HTTPException(status_code=401, detail="User not found")
+                
+        new_access = create_access_token(user_id, user.role, user.college_id)
+        response.set_cookie("access_token", new_access, httponly=True, secure=False, samesite="lax", max_age=900)
+        
+        return {"access_token": new_access, "expires_in": 900}
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 # ─── User Routes ────────────────────────────────────────────────────────────
 @app.get("/api/users")
-async def list_users(role: Optional[str] = None, user: dict = Depends(require_role("admin", "teacher", "hod", "exam_cell")), session: AsyncSession = Depends(get_db)):
+async def list_users(
+    role: Optional[str] = None, 
+    limit: int = Query(50, ge=1, le=1000),
+    offset: int = Query(0, ge=0),
+    user: dict = Depends(require_role("admin", "teacher", "hod", "exam_cell")), 
+    session: AsyncSession = Depends(get_db)):
     stmt = select(models.User).where(models.User.college_id == user["college_id"])
     if role:
         stmt = stmt.where(models.User.role == role)
-    result = await session.execute(stmt)
+    result = await session.execute(stmt.offset(offset).limit(limit))
     users = result.scalars().all()
     return [{
         "id": u.id, "name": u.name, "email": u.email, "role": u.role,
@@ -683,7 +766,7 @@ async def get_quiz(quiz_id: str, user: dict = Depends(get_current_user), session
     q = result.scalars().first()
     if not q:
         raise HTTPException(status_code=404, detail="Quiz not found")
-    qr = await session.execute(select(models.Question).where(models.Question.quiz_id == q.id))
+    qr = await session.execute(select(models.Question).where(models.Question.quiz_id == q.id).order_by(models.Question.id))
     questions = qr.scalars().all()
     q_list = []
     for question in questions:
@@ -711,6 +794,18 @@ async def live_quiz_monitor(quiz_id: str, user: dict = Depends(require_role("tea
     )
     attempts = attempts_r.scalars().all()
     student_ids = [a.student_id for a in attempts]
+    
+    # Pre-fetch answers for efficiency
+    answers_by_attempt = {}
+    if attempts:
+        ans_r = await session.execute(select(models.QuizAnswer).where(models.QuizAnswer.attempt_id.in_([a.id for a in attempts])))
+        for ans in ans_r.scalars().all():
+            answers_by_attempt.setdefault(ans.attempt_id, []).append(ans)
+            
+    # Pre-fetch total questions
+    q_questions_r = await session.execute(select(models.Question).where(models.Question.quiz_id == quiz_id))
+    total_questions = len(q_questions_r.scalars().all())
+
     students_r = await session.execute(
         select(models.User).where(models.User.id.in_(student_ids))
     )
@@ -729,14 +824,16 @@ async def live_quiz_monitor(quiz_id: str, user: dict = Depends(require_role("tea
             td = end.replace(tzinfo=timezone.utc) - a.start_time.replace(tzinfo=timezone.utc)
             time_elapsed = int(td.total_seconds() / 60)
             submit_time_str = end.strftime("%I:%M %p")
-        answers = a.answers or []
-        progress = sum(1 for ans in answers if ans is not None)
+            
+        answers = answers_by_attempt.get(a.id, [])
+        progress = len(answers)
+        
         live_data.append({
             "id": a.id,
             "name": student.name if student else "Unknown",
             "rollNo": (student.profile_data or {}).get("college_id", a.student_id) if student else a.student_id,
             "status": "active" if a.status == "in_progress" else "submitted",
-            "progress": progress, "totalQuestions": len(answers),
+            "progress": progress, "totalQuestions": total_questions,
             "violations": 0, "timeElapsed": max(0, time_elapsed),
             "startTime": a.start_time.strftime("%I:%M %p"),
             "submitTime": submit_time_str
@@ -878,11 +975,22 @@ async def submit_answer(attempt_id: str, req: AnswerSubmit, request: Request, us
     if attempt.status != "in_progress":
         raise HTTPException(status_code=400, detail="Attempt already submitted")
 
+    # Map index to actual Question UUID
+    qr = await session.execute(
+        select(models.Question.id)
+        .where(models.Question.quiz_id == attempt.quiz_id)
+        .order_by(models.Question.id)
+    )
+    q_ids = qr.scalars().all()
+    if req.question_index < 0 or req.question_index >= len(q_ids):
+        raise HTTPException(status_code=400, detail="Invalid question index")
+    actual_question_id = q_ids[req.question_index]
+
     # Save answer as a QuizAnswer row
     existing_ans = await session.execute(
         select(models.QuizAnswer).where(
             models.QuizAnswer.attempt_id == attempt_id,
-            models.QuizAnswer.question_id == str(req.question_index)  # using index as key
+            models.QuizAnswer.question_id == actual_question_id
         )
     )
     ans_row = existing_ans.scalars().first()
@@ -891,7 +999,7 @@ async def submit_answer(attempt_id: str, req: AnswerSubmit, request: Request, us
     else:
         ans_row = models.QuizAnswer(
             attempt_id=attempt_id,
-            question_id=str(req.question_index),
+            question_id=actual_question_id,
             code_submitted=str(req.answer) if req.answer is not None else None,
         )
         session.add(ans_row)
@@ -913,6 +1021,7 @@ async def log_violation(attempt_id: str, req: ViolationReport = ViolationReport(
         suspicion_score=1.0,
     )
     session.add(violation)
+    await log_audit(session, user["id"], "proctoring_violation", "create", {"attempt_id": attempt_id, "type": req.violation_type})
     await session.commit()
     # Count total violations for this attempt
     count_r = await session.execute(
@@ -941,7 +1050,7 @@ async def submit_attempt(attempt_id: str, request: Request, user: dict = Depends
     if not quiz:
         raise HTTPException(status_code=404, detail="Quiz not found")
 
-    questions_r = await session.execute(select(models.Question).where(models.Question.quiz_id == quiz.id))
+    questions_r = await session.execute(select(models.Question).where(models.Question.quiz_id == quiz.id).order_by(models.Question.id))
     questions = questions_r.scalars().all()
 
     answers_r = await session.execute(select(models.QuizAnswer).where(models.QuizAnswer.attempt_id == attempt_id))
@@ -954,7 +1063,7 @@ async def submit_attempt(attempt_id: str, request: Request, user: dict = Depends
     for i, q in enumerate(questions):
         content = q.content or {}
         student_answer = None
-        ans_row = answers_map.get(str(i))
+        ans_row = answers_map.get(q.id)
         if ans_row:
             student_answer = ans_row.code_submitted
 
@@ -1046,16 +1155,23 @@ async def list_attempts(quiz_id: Optional[str] = None, user: dict = Depends(get_
 
 # ─── Student Search & Profile (HOD / Admin) ───────────────────────────────
 @app.get("/api/students/search")
-async def search_students(q: str = "", department: Optional[str] = None, college: Optional[str] = None, user: dict = Depends(require_role("hod", "admin", "exam_cell", "teacher")), session: AsyncSession = Depends(get_db)):
+async def search_students(
+    q: str = "", 
+    department: Optional[str] = None, 
+    college: Optional[str] = None, 
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: dict = Depends(require_role("hod", "admin", "exam_cell", "teacher")), 
+    session: AsyncSession = Depends(get_db)):
     stmt = select(models.User).where(models.User.role == "student")
     if q:
         stmt = stmt.where(
             models.User.name.ilike(f"%{q}%") |
             models.User.profile_data["college_id"].astext.ilike(f"%{q}%")
         )
-    result = await session.execute(stmt.order_by(models.User.name))
+    result = await session.execute(stmt.order_by(models.User.name).offset(offset).limit(limit))
     students = result.scalars().all()
-    return [{"id": s.id, "name": s.name, "email": s.email, "role": s.role, **(s.profile_data or {})} for s in students[:200]]
+    return [{"id": s.id, "name": s.name, "email": s.email, "role": s.role, **(s.profile_data or {})} for s in students]
 
 @app.get("/api/students/{student_id}/profile")
 async def student_profile(student_id: str, user: dict = Depends(require_role("hod", "admin", "exam_cell", "teacher")), session: AsyncSession = Depends(get_db)):
@@ -1251,29 +1367,40 @@ async def get_quiz_detailed_analytics(quiz_id: str, department: str = "", batch:
     return results
 
 @app.get("/api/leaderboard")
-async def get_leaderboard(user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
-    attempts_r = await session.execute(
-        select(models.QuizAttempt.student_id, models.QuizAttempt.final_score)
+async def get_leaderboard(
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    user: dict = Depends(get_current_user), 
+    session: AsyncSession = Depends(get_db)):
+    from sqlalchemy import func, desc
+    stmt = (
+        select(
+            models.QuizAttempt.student_id,
+            func.avg(models.QuizAttempt.final_score).label("avg_score"),
+            func.count(models.QuizAttempt.id).label("quizzes_taken"),
+            models.User.name,
+            models.User.profile_data
+        )
+        .join(models.User, models.User.id == models.QuizAttempt.student_id)
         .where(models.QuizAttempt.status == "submitted")
+        .group_by(models.QuizAttempt.student_id, models.User.id)
+        .order_by(desc("avg_score"))
+        .offset(offset)
+        .limit(limit)
     )
-    student_scores: dict = {}
-    for sid, score in attempts_r.all():
-        student_scores.setdefault(sid, []).append(score or 0)
-    ranked = sorted(
-        student_scores.items(),
-        key=lambda x: sum(x[1]) / len(x[1]) if x[1] else 0,
-        reverse=True
-    )[:50]
+    result = await session.execute(stmt)
+    rows = result.all()
+    
     leaderboard = []
-    for i, (sid, scores) in enumerate(ranked):
-        student_r = await session.execute(select(models.User).where(models.User.id == sid))
-        student = student_r.scalars().first()
-        avg = round(sum(scores) / len(scores), 1) if scores else 0
+    for i, row in enumerate(rows):
         leaderboard.append({
-            "rank": i + 1, "student_id": sid,
-            "name": student.name if student else "",
-            "college_id": (student.profile_data or {}).get("college_id", "") if student else "",
-            "avg_score": avg, "quizzes_taken": len(scores), "cgpa": 0,
+            "rank": offset + i + 1, 
+            "student_id": row.student_id,
+            "name": row.name,
+            "college_id": (row.profile_data or {}).get("college_id", ""),
+            "avg_score": round(row.avg_score, 1) if row.avg_score else 0, 
+            "quizzes_taken": row.quizzes_taken, 
+            "cgpa": 0,
         })
     return leaderboard
 
@@ -1371,17 +1498,27 @@ async def teacher_dashboard(user: dict = Depends(require_role("teacher", "admin"
     )
     my_quizzes = quizzes_r.scalars().all()
     quiz_list = []
-    for q in my_quizzes:
-        cnt_r = await session.execute(
-            select(models.QuizAttempt)
-            .where(models.QuizAttempt.quiz_id == q.id, models.QuizAttempt.status == "submitted")
+    
+    if my_quizzes:
+        quiz_ids = [q.id for q in my_quizzes]
+        from sqlalchemy import func
+        stats_r = await session.execute(
+            select(
+                models.QuizAttempt.quiz_id,
+                func.count(models.QuizAttempt.id).label("attempt_count"),
+                func.avg(models.QuizAttempt.final_score).label("avg_score")
+            )
+            .where(models.QuizAttempt.quiz_id.in_(quiz_ids), models.QuizAttempt.status == "submitted")
+            .group_by(models.QuizAttempt.quiz_id)
         )
-        attempts = cnt_r.scalars().all()
-        avg_score = round(sum(a.final_score or 0 for a in attempts) / len(attempts), 1) if attempts else 0
-        quiz_list.append({
-            "id": q.id, "title": q.title, "subject": q.type, "status": "active",
-            "attempt_count": len(attempts), "avg_score": avg_score
-        })
+        stats_map = {row.quiz_id: row for row in stats_r.all()}
+        for q in my_quizzes:
+            s = stats_map.get(q.id)
+            quiz_list.append({
+                "id": q.id, "title": q.title, "subject": q.type, "status": "active",
+                "attempt_count": s.attempt_count if s else 0,
+                "avg_score": round(s.avg_score, 1) if s and s.avg_score else 0
+            })
     students_r = await session.execute(select(models.User).where(models.User.role == "student"))
     total_students = len(students_r.scalars().all())
     recent_r = await session.execute(
@@ -1565,7 +1702,7 @@ async def submit_marks(entry_id: str, user: dict = Depends(require_role("teacher
         select(models.MarkEntry).where(
             models.MarkEntry.id == entry_id,
             models.MarkEntry.faculty_id == user["id"]
-        )
+        ).with_for_update()
     )
     entry = result.scalars().first()
     if not entry:
@@ -1575,22 +1712,31 @@ async def submit_marks(entry_id: str, user: dict = Depends(require_role("teacher
         raise HTTPException(status_code=400, detail=f"Cannot submit - current status: {current_status}")
     entry.extra_data = {**(entry.extra_data or {}), "status": "submitted",
                    "submitted_at": datetime.now(timezone.utc).isoformat()}
+    await log_audit(session, user["id"], "mark_entry", "submit", {"entry_id": entry_id, "course_id": entry.course_id})
     await session.commit()
     return {"message": "Marks submitted for HOD approval"}
 
 @app.get("/api/marks/submissions")
 async def list_submissions(status: Optional[str] = None, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    from sqlalchemy import func
     stmt = select(models.MarkEntry)
+    
+    if status:
+        stmt = stmt.where(func.jsonb_extract_path_text(models.MarkEntry.extra_data, 'status') == status)
+    else:
+        stmt = stmt.where(func.jsonb_extract_path_text(models.MarkEntry.extra_data, 'status').in_(['submitted', 'approved', 'rejected']))
+        
     result = await session.execute(stmt)
-    all_rows = result.scalars().all()
-    out = []
-    for r in all_rows:
-        row_status = (r.extra_data or {}).get("status", "draft")
-        filter_statuses = [status] if status else ["submitted", "approved", "rejected"]
-        if row_status in filter_statuses:
-            out.append({"id": r.id, "course_id": r.course_id, "exam_type": r.exam_type,
-                        "status": row_status, "max_marks": r.max_marks, **(r.extra_data or {})})
-    return out
+    submissions = result.scalars().all()
+    
+    return [{
+        "id": r.id, 
+        "course_id": r.course_id, 
+        "exam_type": r.exam_type,
+        "max_marks": r.max_marks,
+        "status": (r.extra_data or {}).get("status", "draft"), 
+        **(r.extra_data or {})
+    } for r in submissions]
 
 @app.post("/api/marks/review/{entry_id}")
 async def review_marks(entry_id: str, req: MarkReview, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
@@ -1656,6 +1802,18 @@ async def list_endterm(user: dict = Depends(require_role("exam_cell", "admin")),
 
 @app.post("/api/examcell/upload")
 async def upload_marks_file(file: UploadFile = File(...), semester: int = Form(...), subject_code: str = Form(...), subject_name: str = Form(...), department: str = Form(...), batch: str = Form(...), section: str = Form(...), user: dict = Depends(require_role("exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
+    # 1. Check for duplicate batch submission
+    existing = await session.execute(
+        select(models.MarkEntry).where(
+            models.MarkEntry.course_id == subject_code,
+            models.MarkEntry.exam_type == "endterm_csv",
+            models.MarkEntry.extra_data["section"].astext == section,
+            models.MarkEntry.extra_data["batch"].astext == batch
+        )
+    )
+    if existing.scalars().first():
+        raise HTTPException(status_code=400, detail="CSV for this subject and section already uploaded")
+
     content = await file.read()
     entries = []
     filename = file.filename.lower()
@@ -1665,9 +1823,10 @@ async def upload_marks_file(file: UploadFile = File(...), semester: int = Form(.
             reader = csv.DictReader(io.StringIO(text))
             for row in reader:
                 cid = row.get('college_id', row.get('roll_no', row.get('College ID', ''))).strip().upper()
-                marks_val = float(row.get('marks', row.get('Marks', row.get('score', '0'))) or 0)
-                grade = row.get('grade', row.get('Grade', 'O'))
-                entries.append({"college_id": cid, "marks": marks_val, "grade": grade})
+                if cid:
+                    marks_val = float(row.get('marks', row.get('Marks', row.get('score', '0'))) or 0)
+                    grade = row.get('grade', row.get('Grade', 'O'))
+                    entries.append({"college_id": cid, "marks": marks_val, "grade": grade})
         elif filename.endswith('.xlsx') or filename.endswith('.xls'):
             import openpyxl
             wb = openpyxl.load_workbook(io.BytesIO(content))
@@ -1677,10 +1836,11 @@ async def upload_marks_file(file: UploadFile = File(...), semester: int = Form(.
             marks_col = next((i for i, h in enumerate(headers) if h in ['marks', 'score']), 1)
             grade_col = next((i for i, h in enumerate(headers) if h in ['grade']), -1)
             for row in ws.iter_rows(min_row=2, values_only=True):
-                if not row[cid_col]:
+                cid_val = str(row[cid_col] or '').strip().upper()
+                if not cid_val:
                     continue
                 entries.append({
-                    "college_id": str(row[cid_col]).strip().upper(),
+                    "college_id": cid_val,
                     "marks": float(row[marks_col] or 0),
                     "grade": str(row[grade_col] or 'O') if grade_col >= 0 else 'O'
                 })
@@ -1688,32 +1848,135 @@ async def upload_marks_file(file: UploadFile = File(...), semester: int = Form(.
         raise HTTPException(status_code=400, detail=f"Failed to parse file: {str(e)}")
     if not entries:
         raise HTTPException(status_code=400, detail="No valid entries found in file")
-    # Look up student IDs and create SemesterGrade rows
-    saved = 0
+        
+    # 2. Strict Validation against College Constraints
+    validated_entries = []
     for entry in entries:
         student_r = await session.execute(
-            select(models.User).where(
-                models.User.profile_data["college_id"].astext == entry["college_id"]
-            )
+            select(models.User).where(models.User.profile_data["college_id"].astext == entry["college_id"])
         )
         student = student_r.scalars().first()
-        if student:
-            row = models.SemesterGrade(
-                student_id=student.id,
-                course_id=subject_code,
-                semester=semester,
-                grade=entry["grade"],
-                credits_earned=3,
-            )
-            session.add(row)
-            saved += 1
+        if not student:
+            raise HTTPException(status_code=400, detail=f"Student ID {entry['college_id']} not found in database.")
+        if student.college_id != user["college_id"] and user["role"] != "super_admin":
+            raise HTTPException(status_code=403, detail=f"Student ID {entry['college_id']} belongs to a different college tenant.")
+            
+        validated_entries.append({
+            "student_id": student.id,
+            "college_id": entry["college_id"],
+            "marks": entry["marks"],
+            "grade": entry["grade"]
+        })
+
+    # 3. Queue for HOD Approval instead of Silent Mutation
+    mark_entry = models.MarkEntry(
+        student_id=user["id"], 
+        course_id=subject_code,
+        faculty_id=user["id"],
+        exam_type="endterm_csv",
+        marks_obtained=0,
+        max_marks=100,
+        extra_data={
+            "subject_name": subject_name,
+            "department": department,
+            "batch": batch,
+            "section": section,
+            "semester": semester,
+            "filename": filename,
+            "status": "pending_hod_approval",
+            "entries": validated_entries
+        }
+    )
+    session.add(mark_entry)
+    
+    await log_audit(session, user["id"], "exam_cell_csv_upload", "create", {"subject": subject_code, "entries": len(validated_entries)})
     await session.commit()
-    return {"message": f"Uploaded {saved} student marks", "count": saved}
+    
+    return {"message": f"Successfully uploaded {len(validated_entries)} entries. Pending HOD approval.", "entry_id": mark_entry.id}
 
 @app.post("/api/examcell/publish/{entry_id}")
 async def publish_results(entry_id: str, user: dict = Depends(require_role("exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
-    # In the new schema, SemesterGrade rows are the source of truth; publishing = confirmation
-    return {"message": "Results published successfully"}
+    result = await session.execute(
+        select(models.MarkEntry)
+        .where(models.MarkEntry.id == entry_id)
+        .with_for_update()
+    )
+    entry = result.scalars().first()
+    
+    if not entry:
+        raise HTTPException(status_code=404, detail="Entry not found")
+        
+    current_status = (entry.extra_data or {}).get("status", "draft")
+    if current_status != "approved":
+        raise HTTPException(status_code=400, detail=f"Only approved marks can be published (current: {current_status})")
+        
+    entries = (entry.extra_data or {}).get("entries", [])
+    if not entries:
+        raise HTTPException(status_code=400, detail="No student marks found in entry")
+        
+    metadata = entry.extra_data or {}
+    subject_code = entry.course_id
+    semester = int(metadata.get("semester", 1))
+    max_marks = float(metadata.get("max_marks", 100))
+    
+    semester_grades = []
+    for student_entry in entries:
+        student_id = student_entry.get("student_id")
+        marks = float(student_entry.get("marks", 0.0))
+        pct = (marks / max_marks) * 100 if max_marks > 0 else 0
+        
+        # Calculate grade from percentage dynamically
+        if pct >= 90: grade = "O"
+        elif pct >= 80: grade = "A+"
+        elif pct >= 70: grade = "A"
+        elif pct >= 60: grade = "B+"
+        elif pct >= 50: grade = "B"
+        elif pct >= 45: grade = "C"
+        elif pct >= 40: grade = "D"
+        else: grade = "F"
+        
+        if not student_id:
+            continue
+            
+        existing = await session.execute(
+            select(models.SemesterGrade).where(
+                models.SemesterGrade.student_id == student_id,
+                models.SemesterGrade.semester == semester,
+                models.SemesterGrade.course_id == subject_code
+            )
+        )
+        if existing.scalars().first():
+            continue
+            
+        semester_grades.append(models.SemesterGrade(
+            student_id=student_id,
+            semester=semester,
+            course_id=subject_code,
+            grade=grade,
+            credits_earned=3
+        ))
+        
+    if semester_grades:
+        session.add_all(semester_grades)
+
+    entry.extra_data = {
+        **(entry.extra_data or {}),
+        "status": "published",
+        "published_at": datetime.now(timezone.utc).isoformat(),
+        "published_by": user["id"]
+    }
+    
+    await log_audit(session, user["id"], "mark_entry", "publish", {
+        "entry_id": entry_id, "course_id": subject_code, 
+        "student_count": len(semester_grades)
+    })
+    await session.commit()
+    
+    return {
+        "message": f"Published {len(semester_grades)} student grades",
+        "entry_id": entry_id,
+        "published_count": len(semester_grades)
+    }
 
 # ─── Timetable Routes (HOD) ───────────────────────────────────────────────────────────
 @app.get("/api/timetable")
@@ -1733,6 +1996,18 @@ async def get_timetable(section: str, semester: int = 3, user: dict = Depends(re
 
 @app.post("/api/timetable")
 async def save_timetable_slot(req: TimetableSlot, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    # 1. Validate against FacultyAssignment (Explicit DB Link resolving point 5)
+    assignment_r = await session.execute(
+        select(models.FacultyAssignment).where(
+            models.FacultyAssignment.teacher_id == req.teacher_id,
+            models.FacultyAssignment.subject_code == req.subject_code,
+            models.FacultyAssignment.college_id == user["college_id"]
+        )
+    )
+    assignment = assignment_r.scalars().first()
+    if not assignment:
+        raise HTTPException(status_code=400, detail="Invalid timetable slot: Teacher is not assigned to this subject code.")
+
     existing_r = await session.execute(
         select(models.Timetable).where(
             models.Timetable.college_id == user["college_id"],
@@ -1748,9 +2023,10 @@ async def save_timetable_slot(req: TimetableSlot, user: dict = Depends(require_r
         existing.room = ""
         await session.commit()
         return {"id": existing.id, "day": existing.day, "time_slot": existing.time_slot, "course_id": existing.course_id}
+        
     slot = models.Timetable(
         college_id=user["college_id"],
-        department_id=req.section,  # Will be overwritten below with real UUID
+        department_id="", 
         course_id=req.subject_code,
         faculty_id=req.teacher_id,
         semester=req.semester,
@@ -1758,22 +2034,19 @@ async def save_timetable_slot(req: TimetableSlot, user: dict = Depends(require_r
         time_slot=str(req.period),
         room="",
     )
-    # Look up real department UUID by code or name
-    dept_code = user.get("department", "")
-    if dept_code:
-        dept_r = await session.execute(
-            select(models.Department).where(
-                models.Department.college_id == user["college_id"],
-                or_(models.Department.code == dept_code, models.Department.name == dept_code)
-            )
+    # Look up real department UUID based on the assignment, fundamentally decoupling it from User session state.
+    dept_r = await session.execute(
+        select(models.Department).where(
+            models.Department.college_id == user["college_id"],
+            or_(models.Department.code == assignment.department, models.Department.name == assignment.department)
         )
-        dept = dept_r.scalars().first()
-        if dept:
-            slot.department_id = dept.id
-        else:
-            raise HTTPException(status_code=400, detail=f"Department '{dept_code}' not found. Create it first.")
+    )
+    dept = dept_r.scalars().first()
+    if dept:
+        slot.department_id = dept.id
     else:
-        raise HTTPException(status_code=400, detail="User has no department set.")
+        raise HTTPException(status_code=400, detail=f"Department '{assignment.department}' not found. Create it first.")
+
     session.add(slot)
     await session.commit()
     await session.refresh(slot)
@@ -1850,7 +2123,12 @@ async def delete_announcement(announcement_id: str, user: dict = Depends(require
 
 # ─── At-Risk Students (HOD) ────────────────────────────────────────────────
 @app.get("/api/hod/at-risk-students")
-async def get_at_risk_students(threshold: float = 5.0, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+async def get_at_risk_students(
+    cgpa_threshold: float = 5.0, 
+    backlog_threshold: int = 2,
+    user: dict = Depends(require_role("hod", "admin")), 
+    session: AsyncSession = Depends(get_db)
+):
     students_r = await session.execute(
         select(models.User).where(
             models.User.college_id == user["college_id"],
@@ -1859,28 +2137,43 @@ async def get_at_risk_students(threshold: float = 5.0, user: dict = Depends(requ
     )
     students = students_r.scalars().all()
     at_risk = []
+    
     for student in students:
         grades_r = await session.execute(
             select(models.SemesterGrade).where(models.SemesterGrade.student_id == student.id)
         )
         grades = grades_r.scalars().all()
+        
         if not grades:
             continue
+            
         total_credits = sum(g.credits_earned for g in grades)
         total_points = sum(grade_to_points(g.grade) * g.credits_earned for g in grades)
         backlogs = sum(1 for g in grades if g.grade == "F")
         cgpa = round(total_points / total_credits, 2) if total_credits > 0 else 0
-        if cgpa < threshold or backlogs >= 2:
+        
+        if cgpa < cgpa_threshold or backlogs >= backlog_threshold:
+            if cgpa < (cgpa_threshold - 1.5) or backlogs >= (backlog_threshold + 2):
+                severity = "critical"
+            else:
+                severity = "warning"
+                
             at_risk.append({
-                "id": student.id, "name": student.name,
+                "id": student.id, 
+                "name": student.name,
                 "college_id": (student.profile_data or {}).get("college_id", ""),
                 "section": (student.profile_data or {}).get("section", ""),
                 "batch": (student.profile_data or {}).get("batch", ""),
-                "cgpa": cgpa, "backlogs": backlogs,
-                "severity": "critical" if cgpa < (threshold - 1.5) or backlogs >= 4 else "warning"
+                "cgpa": cgpa,
+                "cgpa_threshold": cgpa_threshold,
+                "backlogs": backlogs,
+                "backlog_threshold": backlog_threshold,
+                "severity": severity
             })
-    at_risk.sort(key=lambda x: x["cgpa"])
+            
+    at_risk.sort(key=lambda x: (x["severity"] != "critical", x["cgpa"]))
     return at_risk
+
 
 @app.get("/api/dashboard/hod")
 async def hod_dashboard(user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
@@ -1940,45 +2233,90 @@ import re as _re
 import shutil as _shutil
 
 # Dangerous patterns per language — block common attack vectors
+import ast as _ast
+
 _BLOCKED_PATTERNS = {
     "python": [
-        r"\bimport\s+os\b", r"\bimport\s+subprocess\b", r"\bimport\s+shutil\b",
-        r"\bimport\s+socket\b", r"\bimport\s+http\b", r"\bimport\s+urllib\b",
-        r"\bimport\s+requests\b", r"\bimport\s+pathlib\b",
-        r"\b__import__\s*\(", r"\bexec\s*\(", r"\beval\s*\(",
-        r"\bopen\s*\(", r"\bos\.", r"\bsubprocess\.",
+        # File system
+        r"\bimport\s+os\b", r"\bimport\s+subprocess\b", r"\bimport\s+shutil\b", r"\bimport\s+pathlib\b",
+        r"\bopen\s*\(", r"\bos\.", r"\bsubprocess\.", r"\bshutil\.", r"\bpathlib\.",
+        # Network
+        r"\bimport\s+socket\b", r"\bimport\s+http\b", r"\bimport\s+urllib\b", r"\bimport\s+requests\b",
+        r"\bsocket\.", r"\burllib\.", r"\brequests\.",
+        # Code execution
+        r"\b__import__\s*\(", r"\bexec\s*\(", r"\beval\s*\(", r"\bcompile\s*\(", 
+        # Introspection/reflection
+        r"\bglobals\s*\(", r"\blocals\s*\(", r"\bgetattr\s*\(", r"\bhasattr\s*\(",
+        r"\btype\s*\(", r"\bvars\s*\(", r"\bdir\s*\(", r"\binspect\.",
+        # Module introspection
+        r"\b__dict__\b", r"\b__code__\b", r"\b__class__\b", r"\b__bases__\b",
     ],
     "javascript": [
         r"require\s*\(\s*['\"]child_process", r"require\s*\(\s*['\"]fs",
         r"require\s*\(\s*['\"]net", r"require\s*\(\s*['\"]http",
         r"\bprocess\.exit", r"\bprocess\.env",
         r"\bexecSync\b", r"\bspawnSync\b",
+        r"\beval\s*\(", r"\bFunction\s*\(",
     ],
     "java": [
-        r"Runtime\.getRuntime", r"ProcessBuilder",
-        r"System\.exit", r"java\.io\.File",
-        r"java\.net\.", r"java\.nio\.file",
+        r"Runtime\.getRuntime", r"ProcessBuilder", r"System\.exit", 
+        r"java\.io\.File", r"java\.net\.", r"java\.nio\.file",
     ],
     "c": [
         r"#include\s*<unistd\.h>", r"#include\s*<sys/",
-        r"\bsystem\s*\(", r"\bexecl?[vpe]*\s*\(",
-        r"\bfork\s*\(", r"\bpopen\s*\(",
-        r"\bsocket\s*\(",
+        r"\bsystem\s*\(", r"\bexecl?[vpe]*\s*\(", r"\bfork\s*\(", 
+        r"\bpopen\s*\(", r"\bsocket\s*\(",
     ],
-    "cpp": [],  # inherits from c
 }
-_BLOCKED_PATTERNS["cpp"] = _BLOCKED_PATTERNS["c"]  # C++ inherits C restrictions
+_BLOCKED_PATTERNS["cpp"] = _BLOCKED_PATTERNS["c"]
+
+def _validate_code_ast(code: str, language: str):
+    if language.lower() != "python": return
+    try:
+        tree = _ast.parse(code)
+    except SyntaxError as e:
+        raise HTTPException(status_code=400, detail=f"Syntax error: {e}")
+        
+    BLOCKED_IMPORTS = {"os", "subprocess", "shutil", "socket", "http", "urllib", "requests", "pathlib", "inspect", "__builtin__"}
+    BLOCKED_CALLS = {"__import__", "exec", "eval", "compile", "globals", "locals", "getattr", "hasattr", "type", "vars", "dir", "open"}
+    
+    class CodeValidator(_ast.NodeVisitor):
+        def __init__(self):
+            self.violations = []
+        def visit_Import(self, node):
+            for alias in node.names:
+                if alias.name.split(".")[0] in BLOCKED_IMPORTS:
+                    self.violations.append(f"Blocked import: {alias.name}")
+            self.generic_visit(node)
+        def visit_ImportFrom(self, node):
+            if node.module and node.module.split(".")[0] in BLOCKED_IMPORTS:
+                self.violations.append(f"Blocked import: {node.module}")
+            self.generic_visit(node)
+        def visit_Call(self, node):
+            func_name = getattr(node.func, "id", getattr(node.func, "attr", None))
+            if func_name in BLOCKED_CALLS:
+                self.violations.append(f"Blocked call: {func_name}()")
+            self.generic_visit(node)
+        def visit_Attribute(self, node):
+            obj_name = getattr(node.value, "id", None)
+            if obj_name in BLOCKED_IMPORTS:
+                self.violations.append(f"Blocked access: {obj_name}.{node.attr}")
+            if node.attr.startswith("__") and node.attr.endswith("__"):
+                self.violations.append(f"Blocked dunder: {node.attr}")
+            self.generic_visit(node)
+            
+    validator = CodeValidator()
+    validator.visit(tree)
+    if validator.violations:
+        raise HTTPException(status_code=400, detail=f"Code blocked: {'; '.join(validator.violations[:3])}")
 
 def _validate_code(code: str, language: str):
-    """Check code for dangerous patterns."""
     patterns = _BLOCKED_PATTERNS.get(language, [])
     for pattern in patterns:
         match = _re.search(pattern, code)
         if match:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Blocked: '{match.group()}' is not allowed for security reasons."
-            )
+            raise HTTPException(status_code=400, detail=f"Blocked: '{match.group()}' is not allowed.")
+    _validate_code_ast(code, language)
 
 async def _run_process(cmd, stdin_data="", timeout=5, cwd=None):
     """Run a subprocess in a thread executor (Windows-compatible)."""
@@ -2133,25 +2471,28 @@ async def get_challenges(page: int = 1, limit: int = 20, difficulty: str = "", t
 
 @app.get("/api/challenges/stats")
 async def get_challenge_stats(user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
-    r = await session.execute(select(models.ChallengeProgress).where(models.ChallengeProgress.student_id == user["id"], models.ChallengeProgress.status == "completed"))
-    solved = r.scalars().all()
+    stmt = select(models.CodingChallenge).join(
+        models.ChallengeProgress,
+        models.CodingChallenge.id == models.ChallengeProgress.challenge_id
+    ).where(
+        models.ChallengeProgress.student_id == user["id"],
+        models.ChallengeProgress.status == "completed"
+    )
+    cr = await session.execute(stmt)
+    solved_challenges = cr.scalars().all()
     
     easy = medium = hard = 0
     topics_count = {}
     
-    # Ideally joined query, but fast enough for stats dashboard caching
-    for prog in solved:
-        cr = await session.execute(select(models.CodingChallenge).where(models.CodingChallenge.id == prog.challenge_id))
-        c = cr.scalars().first()
-        if c:
-            d = getattr(c, "difficulty", "easy").lower()
-            if d == "easy": easy += 1
-            elif d == "medium": medium += 1
-            elif d == "hard": hard += 1
-            for t in (c.topics or []):
-                topics_count[t] = topics_count.get(t, 0) + 1
-                
-    return {"total_solved": len(solved), "difficulty": {"Easy": easy, "Medium": medium, "Hard": hard}, "topics": topics_count}
+    for c in solved_challenges:
+        d = getattr(c, "difficulty", "easy").lower()
+        if d == "easy": easy += 1
+        elif d == "medium": medium += 1
+        elif d == "hard": hard += 1
+        for t in (c.topics or []):
+            topics_count[t] = topics_count.get(t, 0) + 1
+            
+    return {"total_solved": len(solved_challenges), "difficulty": {"Easy": easy, "Medium": medium, "Hard": hard}, "topics": topics_count}
 
 @app.post("/api/challenges/submit")
 @limiter.limit("30/minute")
