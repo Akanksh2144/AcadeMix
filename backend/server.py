@@ -66,7 +66,7 @@ JWT_SECRET = os.environ["JWT_SECRET"]
 JWT_ALGORITHM = "HS256"
 
 frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-code_runner_url = os.environ.get("CODE_RUNNER_URL", "http://localhost:8080")
+code_runner_url = os.environ.get("CODE_RUNNER_URL", "https://acadmix-code-runner.fly.dev")
 cors_origins = os.environ.get("CORS_ORIGINS", "*")
 if cors_origins == "*":
     origins = ["*"]
