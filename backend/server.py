@@ -26,7 +26,7 @@ from sqlalchemy import or_, and_, delete, update
 from sqlalchemy.orm import selectinload
 from database import get_db
 import models
-from tenant import derive_tenant_id, get_tenant_id, is_super_admin, tenant_query, inject_tenant, COLLEGE_TO_TENANT
+# tenant.py archived to backend/legacy/ — functions inlined or removed below
 
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -150,9 +150,9 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
         if user.profile_data:
             user_dict.update(user.profile_data)
             
-        # Ensure tenant_id is always present on the user dict
+        # tenant_id is always set from college_id via the SQLAlchemy user row — fallback to empty string
         if "tenant_id" not in user_dict:
-            user_dict["tenant_id"] = derive_tenant_id(user_dict.get("college", ""))
+            user_dict["tenant_id"] = user_dict.get("college_id", "")
         return user_dict
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -1419,12 +1419,12 @@ async def list_department_teachers(user: dict = Depends(require_role("hod", "adm
 
 @app.get("/api/faculty/assignments")
 async def list_assignments(user: dict = Depends(require_role("hod", "admin", "teacher")), session: AsyncSession = Depends(get_db)):
-    stmt = select(models.MarkEntry).where(models.MarkEntry.exam_type == "__assignment__")
+    stmt = select(models.FacultyAssignment)
     if user["role"] == "teacher":
-        stmt = stmt.where(models.MarkEntry.faculty_id == user["id"])
+        stmt = stmt.where(models.FacultyAssignment.teacher_id == user["id"])
     result = await session.execute(stmt)
     rows = result.scalars().all()
-    return [{"id": r.id, "course_id": r.course_id, **(r.profile_data or {})} for r in rows]
+    return [{"id": r.id, "course_id": r.subject_code, "teacher_id": r.teacher_id, "subject_code": r.subject_code, "subject_name": r.subject_name, "department": r.department, "batch": r.batch, "section": r.section, "semester": r.semester} for r in rows]
 
 @app.post("/api/faculty/assignments")
 async def create_assignment(req: FacultyAssignment, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
@@ -1432,21 +1432,15 @@ async def create_assignment(req: FacultyAssignment, user: dict = Depends(require
     teacher = teacher_r.scalars().first()
     if not teacher:
         raise HTTPException(status_code=404, detail="Teacher not found")
-    row = models.MarkEntry(
-        student_id=req.teacher_id,
-        course_id=req.subject_code,
-        faculty_id=user["id"],
-        exam_type="__assignment__",
-        marks_obtained=0,
-        max_marks=100,
+    row = models.FacultyAssignment(
+        teacher_id=req.teacher_id,
+        subject_code=req.subject_code,
+        subject_name=req.subject_name,
+        department=req.department,
+        batch=req.batch,
+        section=req.section,
+        semester=req.semester
     )
-    # Store assignment metadata in profile_data column (JSONB)
-    row.profile_data = {
-        "teacher_id": req.teacher_id, "teacher_name": teacher.name,
-        "subject_code": req.subject_code, "subject_name": req.subject_name,
-        "department": req.department, "batch": req.batch, "section": req.section,
-        "semester": req.semester, "assigned_by": user["id"],
-    }
     session.add(row)
     await session.commit()
     await session.refresh(row)
@@ -1455,7 +1449,7 @@ async def create_assignment(req: FacultyAssignment, user: dict = Depends(require
 
 @app.delete("/api/faculty/assignments/{assignment_id}")
 async def delete_assignment(assignment_id: str, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
-    result = await session.execute(select(models.MarkEntry).where(models.MarkEntry.id == assignment_id))
+    result = await session.execute(select(models.FacultyAssignment).where(models.FacultyAssignment.id == assignment_id))
     row = result.scalars().first()
     if not row:
         raise HTTPException(status_code=404, detail="Assignment not found")
@@ -1467,13 +1461,10 @@ async def delete_assignment(assignment_id: str, user: dict = Depends(require_rol
 @app.get("/api/marks/my-assignments")
 async def my_assignments(user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
     result = await session.execute(
-        select(models.MarkEntry).where(
-            models.MarkEntry.faculty_id == user["id"],
-            models.MarkEntry.exam_type == "__assignment__"
-        )
+        select(models.FacultyAssignment).where(models.FacultyAssignment.teacher_id == user["id"])
     )
     rows = result.scalars().all()
-    return [{"id": r.id, "course_id": r.course_id, **(r.extra_data or {})} for r in rows]
+    return [{"id": r.id, "course_id": r.subject_code, "subject_code": r.subject_code, "subject_name": r.subject_name, "department": r.department, "batch": r.batch, "section": r.section, "semester": r.semester} for r in rows]
 
 @app.get("/api/marks/students")
 async def get_students_for_marks(department: str, batch: str, section: str, user: dict = Depends(require_role("teacher", "hod", "admin", "exam_cell")), session: AsyncSession = Depends(get_db)):
@@ -1769,47 +1760,63 @@ async def delete_timetable_slot(slot_id: str, user: dict = Depends(require_role(
     await session.commit()
     return {"message": "Slot deleted"}
 
-# ─── Announcement Routes (HOD) ───────────────────────────────────────────────────────────
-# NOTE: Announcements are not yet in the relational schema. Using a simple in-memory
-# stub for now — will be migrated as an `announcements` table in Phase 2.
-_announcements_store: list = []
-
+# ─── Announcement Routes ─────────────────────────────────────────────────────
 @app.get("/api/announcements")
-async def list_announcements(user: dict = Depends(get_current_user)):
+async def list_announcements(user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
     dept = user.get("department", "")
     role = user["role"]
-    result = []
-    for a in reversed(_announcements_store):
-        if a.get("college_id") != user.get("college_id"):
+    stmt = select(models.Announcement).where(
+        models.Announcement.college_id == user["college_id"]
+    ).order_by(models.Announcement.created_at.desc()).limit(50)
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    out = []
+    for a in rows:
+        details = a.details or {}
+        vis = details.get("visibility", "all")
+        a_dept = details.get("department", "")
+        if a_dept and a_dept != dept:
             continue
-        if a.get("department") and a["department"] != dept:
-            continue
-        vis = a.get("visibility", "all")
         if role == "student" and vis not in ("all", "students"):
             continue
         if role == "teacher" and vis not in ("all", "faculty"):
             continue
-        result.append(a)
-    return result[:50]
+        out.append({
+            "id": a.id, "title": a.title, "message": a.message,
+            "priority": a.priority, "visibility": vis,
+            "department": a_dept,
+            "posted_by": details.get("posted_by", ""),
+            "created_at": a.created_at.isoformat() if a.created_at else ""
+        })
+    return out
 
 @app.post("/api/announcements")
-async def create_announcement(req: AnnouncementCreate, user: dict = Depends(require_role("hod", "admin"))):
-    doc = {
-        "id": str(len(_announcements_store) + 1),
-        "title": req.title, "message": req.message,
-        "priority": req.priority, "visibility": req.visibility,
-        "department": user.get("department", ""),
-        "college_id": user.get("college_id", ""),
-        "posted_by": user["name"], "posted_by_id": user["id"],
-        "created_at": datetime.now(timezone.utc).isoformat()
-    }
-    _announcements_store.append(doc)
-    return doc
+async def create_announcement(req: AnnouncementCreate, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    row = models.Announcement(
+        college_id=user["college_id"],
+        title=req.title,
+        message=req.message,
+        priority=req.priority,
+        details={
+            "visibility": req.visibility,
+            "department": user.get("department", ""),
+            "posted_by": user["name"],
+            "posted_by_id": user["id"]
+        }
+    )
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return {"id": row.id, "title": row.title, "message": row.message, "priority": row.priority}
 
 @app.delete("/api/announcements/{announcement_id}")
-async def delete_announcement(announcement_id: str, user: dict = Depends(require_role("hod", "admin"))):
-    global _announcements_store
-    _announcements_store = [a for a in _announcements_store if a["id"] != announcement_id]
+async def delete_announcement(announcement_id: str, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    result = await session.execute(select(models.Announcement).where(models.Announcement.id == announcement_id))
+    row = result.scalars().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Announcement not found")
+    await session.delete(row)
+    await session.commit()
     return {"message": "Announcement deleted"}
 
 # ─── At-Risk Students (HOD) ────────────────────────────────────────────────
@@ -2006,32 +2013,50 @@ async def seed_data():
     pass
 
 
-_placements_store: list = []
+_placements_store: list = []  # legacy compat — routes now use DB exclusively
 
 @app.get("/api/placements/student")
-async def student_placements(user: dict = Depends(get_current_user)):
-    college_id = (user.get("profile_data") or {}).get("college_id", "")
-    dept = (user.get("profile_data") or {}).get("department", "")
-    result = []
-    for p in _placements_store:
-        candidates = p.get("candidates", [])
-        is_shortlisted = any(c.get("college_id") == college_id or c.get("email") == user.get("email") for c in candidates)
-        is_open = p.get("open_to_all") and p.get("department", "ALL") in (dept, "ALL", "all", "")
+async def student_placements(user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    college_id = user.get("college_id", "")
+    dept = user.get("department", "")
+    email = user.get("email", "")
+    stmt = select(models.Placement).where(models.Placement.college_id == college_id)
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    out = []
+    for p in rows:
+        details = p.details or {}
+        candidates = details.get("candidates", [])
+        is_shortlisted = any(c.get("college_id") == college_id or c.get("email") == email for c in candidates)
+        open_dept = details.get("department", "ALL")
+        is_open = details.get("open_to_all") and open_dept in (dept, "ALL", "all", "")
         if is_shortlisted or is_open:
-            doc = {k: v for k, v in p.items() if k != "candidates"}
-            result.append(doc)
-    result.sort(key=lambda x: x.get("drive_date", ""))
-    return result
+            out.append({"id": p.id, "company": p.company, "role": p.role, "package": p.package, "date": p.date, **{k: v for k, v in details.items() if k != "candidates"}})
+    out.sort(key=lambda x: x.get("drive_date", ""))
+    return out
 
 @app.post("/api/placements")
-async def create_placement(req: dict, user: dict = Depends(require_role("admin", "hod"))):
-    doc = {"id": str(len(_placements_store) + 1), **req, "created_by": user["id"]}
-    _placements_store.append(doc)
-    return doc
+async def create_placement(req: dict, user: dict = Depends(require_role("admin", "hod")), session: AsyncSession = Depends(get_db)):
+    row = models.Placement(
+        college_id=user["college_id"],
+        company=req.get("company", ""),
+        role=req.get("role", ""),
+        package=req.get("package", ""),
+        date=req.get("date", ""),
+        details={k: v for k, v in req.items() if k not in ("company", "role", "package", "date")}
+    )
+    row.details = {**(row.details or {}), "created_by": user["id"]}
+    session.add(row)
+    await session.commit()
+    await session.refresh(row)
+    return {"id": row.id, "company": row.company, "role": row.role, "date": row.date}
 
 @app.get("/api/placements")
-async def list_placements(user: dict = Depends(require_role("admin", "hod", "teacher"))):
-    return _placements_store
+async def list_placements(user: dict = Depends(require_role("admin", "hod", "teacher")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.Placement).where(models.Placement.college_id == user["college_id"])
+    result = await session.execute(stmt)
+    rows = result.scalars().all()
+    return [{"id": p.id, "company": p.company, "role": p.role, "package": p.package, "date": p.date, **(p.details or {})} for p in rows]
 
 # ─── Coding Challenges ─────────────────────────────────────────────────────────
 # NOTE: Coding challenges are stored in-memory. A PostgreSQL table can be added later.

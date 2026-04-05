@@ -85,6 +85,8 @@ class Quiz(Base):
     title = Column(String, nullable=False)
     duration_minutes = Column(Integer, nullable=False)
     type = Column(String, nullable=False)
+    status = Column(String, default="draft")
+    total_marks = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Question(Base):
@@ -169,3 +171,33 @@ class SemesterGrade(Base):
     course_id = Column(String, ForeignKey("courses.id", ondelete="RESTRICT"), nullable=False)
     grade = Column(String, nullable=False)
     credits_earned = Column(Integer, nullable=False)
+
+class FacultyAssignment(Base):
+    __tablename__ = "faculty_assignments"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    teacher_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    subject_code = Column(String, nullable=False)
+    subject_name = Column(String, nullable=False)
+    department = Column(String, nullable=False)
+    batch = Column(String, nullable=False)
+    section = Column(String, nullable=False)
+    semester = Column(Integer, nullable=False, default=1)
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
+    title = Column(String, nullable=False)
+    message = Column(String, nullable=False)
+    priority = Column(String, nullable=False, default="info")
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+class Placement(Base):
+    __tablename__ = "placements"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
+    company = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    package = Column(String, nullable=True)
+    date = Column(String, nullable=False)
+    details = Column(JSONB, nullable=True)
