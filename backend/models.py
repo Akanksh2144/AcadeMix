@@ -168,13 +168,16 @@ class SemesterGrade(Base):
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
     student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     semester = Column(Integer, nullable=False)
-    course_id = Column(String, ForeignKey("courses.id", ondelete="RESTRICT"), nullable=False)
+    # NOTE: course_id is intentionally NOT a FK. The courses table is empty and not seeded.
+    # Using a plain string to store subject codes (e.g. "22PC0DS17"). Do not re-add FK.
+    course_id = Column(String, nullable=False)
     grade = Column(String, nullable=False)
     credits_earned = Column(Integer, nullable=False)
 
 class FacultyAssignment(Base):
     __tablename__ = "faculty_assignments"
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
     teacher_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subject_code = Column(String, nullable=False)
     subject_name = Column(String, nullable=False)
@@ -190,6 +193,7 @@ class Announcement(Base):
     title = Column(String, nullable=False)
     message = Column(String, nullable=False)
     priority = Column(String, nullable=False, default="info")
+    details = Column(JSONB, nullable=True)  # stores visibility, department, posted_by
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Placement(Base):

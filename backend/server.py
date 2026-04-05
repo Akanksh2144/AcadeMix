@@ -1408,7 +1408,7 @@ async def list_department_teachers(user: dict = Depends(require_role("hod", "adm
 
 @app.get("/api/faculty/assignments")
 async def list_assignments(user: dict = Depends(require_role("hod", "admin", "teacher")), session: AsyncSession = Depends(get_db)):
-    stmt = select(models.FacultyAssignment)
+    stmt = select(models.FacultyAssignment).where(models.FacultyAssignment.college_id == user["college_id"])
     if user["role"] == "teacher":
         stmt = stmt.where(models.FacultyAssignment.teacher_id == user["id"])
     result = await session.execute(stmt)
@@ -1422,6 +1422,7 @@ async def create_assignment(req: FacultyAssignment, user: dict = Depends(require
     if not teacher:
         raise HTTPException(status_code=404, detail="Teacher not found")
     row = models.FacultyAssignment(
+        college_id=user["college_id"],
         teacher_id=req.teacher_id,
         subject_code=req.subject_code,
         subject_name=req.subject_name,
@@ -1726,7 +1727,7 @@ async def save_timetable_slot(req: TimetableSlot, user: dict = Depends(require_r
         return {"id": existing.id, "day": existing.day, "time_slot": existing.time_slot, "course_id": existing.course_id}
     slot = models.Timetable(
         college_id=user["college_id"],
-        department_id=user.get("department", "ET"),
+        department_id=req.section,  # Will be overwritten below with real UUID
         course_id=req.subject_code,
         faculty_id=req.teacher_id,
         semester=req.semester,
@@ -1734,6 +1735,22 @@ async def save_timetable_slot(req: TimetableSlot, user: dict = Depends(require_r
         time_slot=str(req.period),
         room="",
     )
+    # Look up real department UUID by code or name
+    dept_code = user.get("department", "")
+    if dept_code:
+        dept_r = await session.execute(
+            select(models.Department).where(
+                models.Department.college_id == user["college_id"],
+                or_(models.Department.code == dept_code, models.Department.name == dept_code)
+            )
+        )
+        dept = dept_r.scalars().first()
+        if dept:
+            slot.department_id = dept.id
+        else:
+            raise HTTPException(status_code=400, detail=f"Department '{dept_code}' not found. Create it first.")
+    else:
+        raise HTTPException(status_code=400, detail="User has no department set.")
     session.add(slot)
     await session.commit()
     await session.refresh(slot)
@@ -2123,14 +2140,56 @@ async def submit_challenge(req: ChallengeSubmit, user: dict = Depends(get_curren
 @app.on_event("startup")
 async def startup():
     """PostgreSQL startup: schema is managed by Alembic migrations.
-    Seed an admin user if none exists."""
+    Seed order matters:
+      1. Upsert College (GNI) → get college.id UUID
+      2. Upsert default Departments linked to college.id
+      3. Upsert Admin user with college_id = college.id
+    """
     from database import AsyncSessionLocal
     async with AsyncSessionLocal() as session:
-        admin_college_id = os.environ.get("ADMIN_COLLEGE_ID", "A001")
+        admin_college_id_str = os.environ.get("ADMIN_COLLEGE_ID", "A001")
         admin_pwd = os.environ.get("ADMIN_PASSWORD", "admin123")
+        college_name = os.environ.get("COLLEGE_NAME", "Guru Nanak Institutions Technical Campus")
+
+        # 1. Upsert College
+        college_r = await session.execute(
+            select(models.College).where(models.College.name == college_name)
+        )
+        college = college_r.scalars().first()
+        if not college:
+            college = models.College(name=college_name, domain="gnitc.ac.in")
+            session.add(college)
+            await session.commit()
+            await session.refresh(college)
+            print(f"[startup] College '{college_name}' seeded with id={college.id}")
+        else:
+            print(f"[startup] College '{college_name}' already exists (id={college.id})")
+
+        # 2. Upsert default Departments
+        default_depts = [
+            {"name": "Electronics & Telematics", "code": "ET"},
+            {"name": "Computer Science & Engineering", "code": "CSE"},
+            {"name": "Electrical & Electronics Engineering", "code": "EEE"},
+            {"name": "Mechanical Engineering", "code": "ME"},
+            {"name": "Civil Engineering", "code": "CE"},
+            {"name": "Information Technology", "code": "IT"},
+        ]
+        for dept in default_depts:
+            dept_r = await session.execute(
+                select(models.Department).where(
+                    models.Department.college_id == college.id,
+                    models.Department.code == dept["code"]
+                )
+            )
+            if not dept_r.scalars().first():
+                session.add(models.Department(college_id=college.id, name=dept["name"], code=dept["code"]))
+        await session.commit()
+        print(f"[startup] Default departments ensured for {college_name}")
+
+        # 3. Upsert Admin user with real college FK
         result = await session.execute(
             select(models.User).where(
-                models.User.profile_data["college_id"].astext == admin_college_id
+                models.User.profile_data["college_id"].astext == admin_college_id_str
             )
         )
         existing = result.scalars().first()
@@ -2140,14 +2199,20 @@ async def startup():
                 email="admin@gni.edu",
                 password_hash=hash_password(admin_pwd),
                 role="admin",
-                college_id=None,
-                profile_data={"college_id": admin_college_id, "college": "ALL", "department": "Administration"},
+                college_id=college.id,
+                profile_data={"college_id": admin_college_id_str, "college": college_name, "department": "Administration"},
             )
             session.add(admin)
             await session.commit()
-            print(f"[startup] Admin user '{admin_college_id}' seeded.")
+            print(f"[startup] Admin user '{admin_college_id_str}' seeded with college_id={college.id}")
         else:
-            print(f"[startup] Admin '{admin_college_id}' already exists. Skipping seed.")
+            # Fix existing admin if college_id is None
+            if existing.college_id is None:
+                existing.college_id = college.id
+                await session.commit()
+                print(f"[startup] Fixed admin college_id: None → {college.id}")
+            else:
+                print(f"[startup] Admin '{admin_college_id_str}' already exists. Skipping seed.")
 
 
 
