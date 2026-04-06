@@ -183,4 +183,19 @@ export const hodToolsAPI = {
   atRiskStudents: (threshold = 5.0) => api.get('/api/hod/at-risk-students', { params: { threshold } }),
 };
 
+// Phase 1: Permissions & CIA
+export const adminPhase1API = {
+  getPermissionsSummary: () => api.get('/api/admin/permissions/summary'),
+  updateUserPermissions: (userId, flags) => api.put(`/api/admin/users/${userId}/permissions`, { flags }),
+  
+  getCiaTemplates: () => api.get('/api/admin/cia-templates'),
+  createCiaTemplate: (data) => api.post('/api/admin/cia-templates', data),
+  updateCiaTemplate: (id, data) => api.put(`/api/admin/cia-templates/${id}`, data),
+  deleteCiaTemplate: (id) => api.delete(`/api/admin/cia-templates/${id}`),
+  
+  getCiaConfigs: () => api.get('/api/admin/cia-config'),
+  createCiaConfig: (data) => api.post('/api/admin/cia-config', data),
+  toggleConsolidation: (id) => api.put(`/api/admin/cia-config/${id}/enable-consolidation`),
+};
+
 export default api;

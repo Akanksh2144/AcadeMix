@@ -8,6 +8,9 @@ import { useTheme } from '../contexts/ThemeContext';
 import DashboardSkeleton from '../components/DashboardSkeleton';
 import { Toaster, toast } from 'sonner';
 
+import UserPermissionsManager from '../components/admin/UserPermissionsManager';
+import CIATemplateBuilder from '../components/admin/CIATemplateBuilder';
+
 const containerVariants = {
   hidden: { opacity: 0 },
   show: { opacity: 1, transition: { staggerChildren: 0.08 } }
@@ -174,7 +177,9 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
               { id: 'overview', label: 'Overview' }, 
               { id: 'metrics', label: 'Metrics' },
               { id: 'student-profiles', label: 'Student Profiles' },
-              { id: 'results', label: 'Student Results' }
+              { id: 'results', label: 'Student Results' },
+              { id: 'permissions', label: 'Permission Matrix' },
+              { id: 'cia-builder', label: 'CIA Engine' }
             ].map(tab => (
               <button 
                 key={tab.id} 
@@ -469,6 +474,22 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
           <motion.div data-testid="results-content" variants={containerVariants} initial="hidden" animate="show">
             <motion.div variants={itemVariants}>
               <StudentResultsSearch user={user} departmentLocked={false} />
+            </motion.div>
+          </motion.div>
+        )}
+
+        {activeTab === 'permissions' && (
+          <motion.div data-testid="permissions-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <UserPermissionsManager />
+            </motion.div>
+          </motion.div>
+        )}
+
+        {activeTab === 'cia-builder' && (
+          <motion.div data-testid="cia-builder-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <CIATemplateBuilder />
             </motion.div>
           </motion.div>
         )}
