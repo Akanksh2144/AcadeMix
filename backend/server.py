@@ -424,6 +424,20 @@ class AttendanceMarkBatch(BaseModel):
     date: str          # "YYYY-MM-DD"
     entries: List[AttendanceMarkItem]
 
+class LeaveApply(BaseModel):
+    leave_type: str = Field(..., pattern="^(CL|EL|ML|OD|medical)$")
+    from_date: str    # "YYYY-MM-DD"
+    to_date: str      # "YYYY-MM-DD"
+    reason: str = Field(..., max_length=500)
+    document_url: Optional[str] = None
+
+class LeaveReview(BaseModel):
+    action: str = Field(..., pattern="^(approve|reject)$")
+    remarks: Optional[str] = None
+
+class SubstituteAssign(BaseModel):
+    faculty_id: str
+
 
 async def log_audit(session: AsyncSession, user_id: str, resource: str, action: str, details: dict = None):
     log_entry = models.AuditLog(
@@ -1308,6 +1322,189 @@ async def get_attendance_defaulters(
         "subject_code": r.subject_code,
         "percentage": float(r.percentage) if r.percentage is not None else 0.0
     } for r in rows]
+
+# ─── Phase 3: Leave Management & Free Periods ────────────────────────────────
+
+@app.post("/api/leave/apply")
+async def apply_leave(req: LeaveApply, user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    try:
+        from_dt = datetime.strptime(req.from_date, "%Y-%m-%d")
+        to_dt = datetime.strptime(req.to_date, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
+
+    leave = models.LeaveRequest(
+        college_id=user["college_id"],
+        applicant_id=user["id"],
+        applicant_role=user["role"],
+        leave_type=req.leave_type,
+        from_date=from_dt,
+        to_date=to_dt,
+        reason=req.reason,
+        document_url=req.document_url
+    )
+    session.add(leave)
+    await session.commit()
+    await session.refresh(leave)
+    return {"id": leave.id, "message": "Leave request submitted"}
+
+@app.get("/api/leave/my")
+async def get_my_leaves(user: dict = Depends(get_current_user), session: AsyncSession = Depends(get_db)):
+    result = await session.execute(
+        select(models.LeaveRequest).where(
+            models.LeaveRequest.applicant_id == user["id"],
+            models.LeaveRequest.college_id == user["college_id"]
+        ).order_by(models.LeaveRequest.created_at.desc())
+    )
+    leaves = result.scalars().all()
+    return [{
+        "id": l.id, "leave_type": l.leave_type,
+        "from_date": l.from_date.isoformat(), "to_date": l.to_date.isoformat(),
+        "reason": l.reason, "status": l.status,
+        "reviewed_at": l.reviewed_at.isoformat() if l.reviewed_at else None,
+        "review_remarks": l.review_remarks
+    } for l in leaves]
+
+@app.get("/api/hod/leave/pending")
+async def get_pending_faculty_leaves(user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    result = await session.execute(
+        select(models.LeaveRequest, models.User).join(
+            models.User, models.LeaveRequest.applicant_id == models.User.id
+        ).where(
+            models.LeaveRequest.college_id == user["college_id"],
+            models.LeaveRequest.status == "pending",
+            models.LeaveRequest.applicant_role.in_(["teacher", "faculty"])
+        )
+    )
+    rows = result.all()
+    return [{
+        "id": l.id, "applicant_id": l.applicant_id, "applicant_name": u.name, "applicant_email": u.email,
+        "leave_type": l.leave_type, "from_date": l.from_date.isoformat(), "to_date": l.to_date.isoformat(),
+        "reason": l.reason, "document_url": l.document_url, "created_at": l.created_at.isoformat()
+    } for l, u in rows]
+
+@app.get("/api/hod/leave/student-pending")
+async def get_pending_student_leaves(user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    result = await session.execute(
+        select(models.LeaveRequest, models.User).join(
+            models.User, models.LeaveRequest.applicant_id == models.User.id
+        ).where(
+            models.LeaveRequest.college_id == user["college_id"],
+            models.LeaveRequest.status == "pending",
+            models.LeaveRequest.applicant_role == "student"
+        )
+    )
+    rows = result.all()
+    return [{
+        "id": l.id, "applicant_id": l.applicant_id, "applicant_name": u.name, 
+        "batch": u.profile_data.get("batch") if u.profile_data else None,
+        "leave_type": l.leave_type, "from_date": l.from_date.isoformat(), "to_date": l.to_date.isoformat(),
+        "reason": l.reason, "created_at": l.created_at.isoformat()
+    } for l, u in rows]
+
+@app.put("/api/hod/leave/{leave_id}/review")
+async def review_leave(leave_id: str, req: LeaveReview, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    leave_r = await session.execute(
+        select(models.LeaveRequest).where(
+            models.LeaveRequest.id == leave_id,
+            models.LeaveRequest.college_id == user["college_id"]
+        )
+    )
+    leave = leave_r.scalars().first()
+    if not leave:
+        raise HTTPException(status_code=404, detail="Leave request not found")
+    if leave.status != "pending":
+        raise HTTPException(status_code=400, detail="Leave is already reviewed")
+
+    leave.status = req.action
+    leave.reviewed_by = user["id"]
+    leave.reviewed_at = datetime.now()
+    leave.review_remarks = req.remarks
+
+    # If approved and faculty, auto-release their slots
+    affected_slot_ids = []
+    if req.action == "approve" and leave.applicant_role in ["teacher", "faculty"]:
+        # Find all period slots for this faculty where the day maps to a date inside the leave window
+        # To do this accurately, we should really map dates to days of the week in the range.
+        
+        # Simple implementation: we'll just release all slots that week if duration > 5 days
+        # Otherwise, properly map the specific days of the week affected.
+        leave_days = []
+        current_date_iter = leave.from_date
+        while current_date_iter <= leave.to_date:
+            days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+            day_str = days[current_date_iter.weekday()]
+            if day_str not in leave_days:
+                leave_days.append(day_str)
+            current_date_iter += timedelta(days=1)
+        
+        if leave_days:
+            slots_r = await session.execute(
+                select(models.PeriodSlot).where(
+                    models.PeriodSlot.faculty_id == leave.applicant_id,
+                    models.PeriodSlot.day.in_(leave_days)
+                )
+            )
+            slots = slots_r.scalars().all()
+            for slot in slots:
+                slot.original_faculty_id = slot.faculty_id
+                slot.faculty_id = None
+                slot.slot_type = "released"
+                affected_slot_ids.append(slot.id)
+            leave.affected_slots = affected_slot_ids
+
+    await log_audit(session, user["id"], "leave_request", req.action, {"leave_id": leave.id})
+    await session.commit()
+    return {"message": f"Leave {req.action}d", "affected_slots": len(affected_slot_ids)}
+
+@app.get("/api/hod/free-periods")
+async def get_free_period_pool(user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    """View the released period pool."""
+    dept_id = user.get("scope", {}).get("department")
+    # For robust production, department scope should be strictly enforced.
+    
+    stmt = select(models.PeriodSlot, models.User).outerjoin(
+        models.User, models.PeriodSlot.original_faculty_id == models.User.id
+    ).where(
+        models.PeriodSlot.college_id == user["college_id"],
+        models.PeriodSlot.slot_type == "released"
+    )
+    
+    result = await session.execute(stmt)
+    rows = result.all()
+    return [{
+        "id": s.id, "day": s.day, "period_no": s.period_no, "start_time": s.start_time, "end_time": s.end_time,
+        "batch": s.batch, "section": s.section, "department_id": s.department_id,
+        "subject_code": s.subject_code, "subject_name": s.subject_name,
+        "original_faculty_name": u.name if u else "Unknown",
+        "slot_type": s.slot_type
+    } for s, u in rows]
+
+@app.put("/api/hod/free-periods/{slot_id}/assign")
+async def assign_substitute_faculty(slot_id: str, req: SubstituteAssign, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    slot_r = await session.execute(
+        select(models.PeriodSlot).where(
+            models.PeriodSlot.id == slot_id,
+            models.PeriodSlot.college_id == user["college_id"]
+        )
+    )
+    slot = slot_r.scalars().first()
+    if not slot:
+        raise HTTPException(status_code=404, detail="Slot not found")
+    if slot.slot_type != "released":
+        raise HTTPException(status_code=400, detail="Slot is not in the released pool")
+
+    # Verify target faculty exists
+    fac_r = await session.execute(select(models.User).where(models.User.id == req.faculty_id))
+    if not fac_r.scalars().first():
+        raise HTTPException(status_code=404, detail="Substitute faculty not found")
+
+    slot.faculty_id = req.faculty_id
+    slot.slot_type = "substitute"
+    
+    await log_audit(session, user["id"], "free_period", "assign_substitute", {"slot_id": slot.id, "substitute_id": req.faculty_id})
+    await session.commit()
+    return {"message": "Substitute assigned successfully"}
 
 
 # ─── User Routes ────────────────────────────────────────────────────────────

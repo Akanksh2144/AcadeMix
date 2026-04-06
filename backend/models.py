@@ -401,3 +401,28 @@ class AttendanceRecord(Base, SoftDeleteMixin):
         Index("ix_attendance_faculty_date", "faculty_id", "date"),
         UniqueConstraint("student_id", "period_slot_id", "date", name="uq_attendance_entry"),
     )
+
+# ─── Phase 3: Leave Management ───────────────────────────────────────────────
+
+class LeaveRequest(Base, SoftDeleteMixin):
+    __tablename__ = "leave_requests"
+    id              = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id      = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
+    applicant_id    = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    applicant_role  = Column(String, nullable=False)      # faculty, student
+    leave_type      = Column(String, nullable=False)      # CL, EL, ML, OD, medical
+    from_date       = Column(DateTime(timezone=True), nullable=False)
+    to_date         = Column(DateTime(timezone=True), nullable=False)
+    reason          = Column(String, nullable=False)
+    document_url    = Column(String, nullable=True)       # medical certificate, etc.
+    status          = Column(String, nullable=False, server_default="pending")   # pending, approved, rejected
+    reviewed_by     = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at     = Column(DateTime(timezone=True), nullable=True)
+    review_remarks  = Column(String, nullable=True)
+    affected_slots  = Column(JSONB, nullable=True)        # period_slot_ids auto-detected on approval
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_leave_applicant_status", "applicant_id", "status"),
+        Index("ix_leave_college_status", "college_id", "status"),
+    )
