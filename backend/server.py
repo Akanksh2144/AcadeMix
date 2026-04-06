@@ -1410,8 +1410,6 @@ async def save_teaching_plan(
         raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
 
     today = datetime.now(timezone.utc).date()
-    if target_date < today:
-        raise HTTPException(status_code=400, detail="Cannot create teaching plan for a past date.")
     if (target_date - today).days > 14:
         raise HTTPException(status_code=400, detail=f"Teaching plan can only be set up to 14 days in advance. Target date {req.date} is {(target_date - today).days} days away.")
 
@@ -2613,7 +2611,24 @@ async def get_exam_schedules(department_id: Optional[str] = None, batch: Optiona
         stmt = stmt.where(models.ExamSchedule.semester == semester)
         
     result = await session.execute(stmt.order_by(models.ExamSchedule.exam_date.desc()))
-    return result.scalars().all()
+    items = result.scalars().all()
+    out = []
+    for s in items:
+        out.append({
+            "id": s.id,
+            "department_id": s.department_id,
+            "batch": s.batch,
+            "semester": s.semester,
+            "academic_year": s.academic_year,
+            "subject_code": s.subject_code,
+            "subject_name": s.subject_name,
+            "exam_date": str(s.exam_date) if s.exam_date else None,
+            "session": s.session,
+            "exam_time": s.exam_time,
+            "document_url": s.document_url,
+            "is_published": s.is_published
+        })
+    return out
 
 @app.put("/api/examcell/schedule/{id}/publish")
 async def toggle_exam_schedule_publish(id: str, published: bool = Query(..., description="Set to true to publish, false to unpublish"), user: dict = Depends(require_role("exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
@@ -2633,15 +2648,17 @@ async def delete_exam_schedule(id: str, user: dict = Depends(require_role("exam_
     if not sched:
         raise HTTPException(status_code=404, detail="Exam schedule not found")
     
-    await session.delete(sched)
+    sched.is_deleted = True
+    sched.deleted_at = func.now()
+    await log_audit(session, user["id"], "examcell_schedule", "delete", {"schedule_id": id})
     await session.commit()
     return {"message": "Exam schedule deleted"}
 
 @app.get("/api/student/exam-schedule")
 async def get_student_exam_schedule(user: dict = Depends(require_role("student")), session: AsyncSession = Depends(get_db)):
     profile = user.get("profile_data") or {}
-    dept_str = profile.get("department", "")
-    batch_str = profile.get("batch", "")
+    dept_str = user.get("department") or profile.get("department", "")
+    batch_str = user.get("batch") or profile.get("batch", "")
     
     dept_r = await session.execute(
         select(models.Department).where(
@@ -2730,8 +2747,8 @@ async def get_hall_ticket(semester: int, academic_year: str, user: dict = Depend
         raise HTTPException(status_code=404, detail="No approved registrations found for this semester. Hall ticket unavailable.")
         
     profile = user.get("profile_data") or {}
-    dept_str = profile.get("department", "")
-    batch_str = profile.get("batch", "")
+    dept_str = user.get("department") or profile.get("department", "")
+    batch_str = user.get("batch") or profile.get("batch", "")
     
     dept_r = await session.execute(
         select(models.Department).where(
@@ -2757,6 +2774,8 @@ async def get_hall_ticket(semester: int, academic_year: str, user: dict = Depend
         scheds = sched_r.scalars().all()
     
     sched_map = { s.subject_code: s for s in scheds }
+    if not scheds:
+        raise HTTPException(status_code=400, detail="Exam schedules have not been published for your courses yet.")
     
     photo_url = profile.get("photo_url")
     if photo_url:
@@ -3011,6 +3030,9 @@ async def update_user(user_id: str, req: UserUpdate, user: dict = Depends(requir
         profile["section"] = req.section
         
     u.profile_data = profile
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(u, "profile_data")
+    
     await session.commit()
     await session.refresh(u)
     return {"id": u.id, "name": u.name, "email": u.email, "role": u.role, "college_id": u.college_id, **(u.profile_data or {})}
