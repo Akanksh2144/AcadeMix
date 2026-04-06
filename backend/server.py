@@ -242,6 +242,20 @@ class RegisterRequest(BaseModel):
     batch: str = Field("", max_length=20)
     section: str = Field("", max_length=20)
 
+class StudentProfileData(BaseModel):
+    batch: Optional[str] = None
+    section: Optional[str] = None
+    department: Optional[str] = None
+    first_graduate: Optional[bool] = None
+    community: Optional[str] = None
+    blood_group: Optional[str] = None
+    hostel_required: Optional[bool] = None
+    transport_required: Optional[bool] = None
+    aadhaar_number: Optional[str] = None
+    address: Optional[str] = None
+    phone: Optional[str] = None
+    languages_known: Optional[list] = None
+
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
@@ -251,6 +265,7 @@ class UserUpdate(BaseModel):
     batch: Optional[str] = None
     section: Optional[str] = None
     password: Optional[str] = None
+    profile_data: Optional[StudentProfileData] = None
 
 class DepartmentCreate(BaseModel):
     name: str = Field(..., max_length=150)
@@ -357,6 +372,7 @@ class MarkEntryItem(BaseModel):
 class MarkEntrySave(BaseModel):
     assignment_id: str
     exam_type: str  # mid1 or mid2
+    component_id: Optional[str] = None
     semester: int
     max_marks: float = Field(30, gt=0, le=200)
     entries: List[MarkEntryItem] = Field(..., max_items=5000)
@@ -392,8 +408,33 @@ class AnnouncementCreate(BaseModel):
     priority: str = "info"  # info, warning, urgent
     visibility: str = "all"  # all, faculty, students
 
+from pydantic import validator
+
 class CollegeSettingsUpdate(BaseModel):
     settings: dict
+
+    @validator("settings")
+    def validate_grade_scale(cls, v):
+        scale = v.get("grade_scale")
+        if scale is not None:
+            if not isinstance(scale, list) or len(scale) == 0:
+                raise ValueError("grade_scale must be a non-empty list of dictionaries")
+            
+            prev_pct = 101.0
+            has_zero = False
+            for item in scale:
+                pct = item.get("min_pct")
+                if pct is None:
+                    raise ValueError("Each grade scale item must have min_pct")
+                if float(pct) >= prev_pct:
+                    raise ValueError(f"grade_scale min_pct must be strictly monotonically decreasing. Violating element: {pct}")
+                if float(pct) <= 0:
+                    has_zero = True
+                prev_pct = float(pct)
+                
+            if not has_zero:
+                raise ValueError("grade_scale must end exactly at or below min_pct=0")
+        return v
 
 class ExamScheduleCreate(BaseModel):
     department_id: str
@@ -820,13 +861,21 @@ async def list_subject_allocations(
         stmt = stmt.where(models.FacultyAssignment.semester == semester)
     result = await session.execute(stmt)
     assigns = result.scalars().all()
-    return [
-        {"id": a.id, "teacher_id": a.teacher_id, "subject_code": a.subject_code,
-         "subject_name": a.subject_name, "department": a.department, "batch": a.batch,
-         "section": a.section, "semester": a.semester, "academic_year": a.academic_year,
-         "credits": a.credits, "hours_per_week": a.hours_per_week, "is_lab": a.is_lab}
-        for a in assigns
-    ]
+    matrix = {}
+    for a in assigns:
+        if a.subject_code not in matrix:
+            matrix[a.subject_code] = {
+                "subject_code": a.subject_code,
+                "subject_name": a.subject_name,
+                "credits": a.credits,
+                "assignments": []
+            }
+        matrix[a.subject_code]["assignments"].append({
+             "id": a.id, "teacher_id": a.teacher_id, "department": a.department, 
+             "batch": a.batch, "section": a.section, "semester": a.semester, 
+             "academic_year": a.academic_year, "hours_per_week": a.hours_per_week, "is_lab": a.is_lab
+        })
+    return list(matrix.values())
 
 @app.delete("/api/hod/subject-allocation/{assignment_id}")
 async def delete_subject_allocation(assignment_id: str, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
@@ -1923,6 +1972,73 @@ async def get_student_academic_calendar(
         "events": c.events or []
     } for c in calendars]
 
+@app.get("/api/student/attendance/calendar")
+async def get_student_attendance_calendar(
+    month: Optional[int] = None,
+    year: Optional[int] = None,
+    user: dict = Depends(require_role("student")),
+    session: AsyncSession = Depends(get_db)
+):
+    """Aggregated attendance calendar View. Groups records by date."""
+    from sqlalchemy import extract
+    stmt = select(models.AttendanceRecord).where(
+        models.AttendanceRecord.student_id == user["id"],
+        models.AttendanceRecord.is_deleted == False
+    )
+    if month and year:
+        stmt = stmt.where(extract("month", models.AttendanceRecord.date) == month)
+        stmt = stmt.where(extract("year", models.AttendanceRecord.date) == year)
+        
+    result = await session.execute(stmt)
+    records = result.scalars().all()
+    
+    calendar = {}
+    for r in records:
+        d = str(r.date)
+        if d not in calendar:
+            calendar[d] = {"present": 0, "absent": 0, "od": 0, "details": []}
+        
+        status = r.status.lower() if r.status else ""
+        if status in calendar[d]:
+            calendar[d][status] += 1
+            
+        calendar[d]["details"].append({
+            "subject_code": r.subject_code,
+            "period": r.period_no,
+            "status": status,
+            "is_late": r.is_late_entry
+        })
+    return calendar
+
+@app.get("/api/student/my-mentor")
+async def get_my_mentor(user: dict = Depends(require_role("student")), session: AsyncSession = Depends(get_db)):
+    """Resolves the student's active mentor from MentorAssignment."""
+    stmt = select(models.MentorAssignment).where(
+        models.MentorAssignment.student_id == user["id"],
+        models.MentorAssignment.is_active == True,
+        models.MentorAssignment.college_id == user["college_id"]
+    )
+    result = await session.execute(stmt)
+    mentor_assignment = result.scalars().first()
+    
+    if not mentor_assignment:
+        return {"mentor": None}
+        
+    faculty = await session.get(models.User, mentor_assignment.faculty_id)
+    if not faculty:
+        return {"mentor": None}
+        
+    return {
+        "mentor": {
+            "id": faculty.id,
+            "name": faculty.name,
+            "email": faculty.email,
+            "department": faculty.department
+        },
+        "assigned_at": str(mentor_assignment.created_at)
+    }
+
+
 @app.get("/api/student/subjects")
 async def get_student_subjects(
     user: dict = Depends(require_role("student")),
@@ -2113,7 +2229,7 @@ async def get_pending_faculty_leaves(user: dict = Depends(require_role("hod", "a
             models.User, models.LeaveRequest.applicant_id == models.User.id
         ).where(
             models.LeaveRequest.college_id == user["college_id"],
-            models.LeaveRequest.status == "pending",
+            models.LeaveRequest.status.in_(["pending", "cancellation_requested", "partially_cancelled"]),
             models.LeaveRequest.applicant_role.in_(["teacher", "faculty"])
         )
     )
@@ -2131,7 +2247,7 @@ async def get_pending_student_leaves(user: dict = Depends(require_role("hod", "a
             models.User, models.LeaveRequest.applicant_id == models.User.id
         ).where(
             models.LeaveRequest.college_id == user["college_id"],
-            models.LeaveRequest.status == "pending",
+            models.LeaveRequest.status.in_(["pending", "cancellation_requested", "partially_cancelled"]),
             models.LeaveRequest.applicant_role == "student"
         )
     )
@@ -2774,8 +2890,7 @@ async def get_hall_ticket(semester: int, academic_year: str, user: dict = Depend
         scheds = sched_r.scalars().all()
     
     sched_map = { s.subject_code: s for s in scheds }
-    if not scheds:
-        raise HTTPException(status_code=400, detail="Exam schedules have not been published for your courses yet.")
+    sched_map = { s.subject_code: s for s in scheds }
     
     photo_url = profile.get("photo_url")
     if photo_url:
@@ -2787,18 +2902,24 @@ async def get_hall_ticket(semester: int, academic_year: str, user: dict = Depend
     rows = ""
     for r in regs:
         s = sched_map.get(r.subject_code)
-        dt = s.exam_date.strftime("%d-%b-%Y") if s and s.exam_date else "TBA"
-        session_text = f"{s.session} ({s.exam_time})" if s else "TBA"
+        
+        status_text = "Pending" if not s else "Published"
+        dt = s.exam_date.strftime("%d-%b-%Y") if s and s.exam_date else "Pending Schedule"
+        session_text = f"{s.session} ({s.exam_time})" if s else "Pending Schedule"
         hall = s.document_url if s and s.document_url else "Check Notice Board"
+        
+        # Determine color for the status field
+        color = "red" if not s else "green"
         
         rows += f"""
         <tr>
             <td style="padding:8px; border:1px solid #ddd;">{r.subject_code}</td>
-            <td style="padding:8px; border:1px solid #ddd;">{s.subject_name if s else "Subject"}</td>
+            <td style="padding:8px; border:1px solid #ddd;">{s.subject_name if s else "Subject TBA"}</td>
             <td style="padding:8px; border:1px solid #ddd; text-align:center;">{"Arrear" if r.is_arrear else "Regular"}</td>
             <td style="padding:8px; border:1px solid #ddd; text-align:center;">{dt}</td>
             <td style="padding:8px; border:1px solid #ddd; text-align:center;">{session_text}</td>
             <td style="padding:8px; border:1px solid #ddd; text-align:center;">{hall}</td>
+            <td style="padding:8px; border:1px solid #ddd; text-align:center; color:{color}; font-weight:bold;">{status_text}</td>
         </tr>
         """
         
@@ -2858,6 +2979,7 @@ async def get_hall_ticket(semester: int, academic_year: str, user: dict = Depend
                     <th>Date</th>
                     <th>Session</th>
                     <th>Hall / Room Allocation</th>
+                    <th>Schedule Status</th>
                 </tr>
             </thead>
             <tbody>
@@ -4086,7 +4208,7 @@ async def get_students_for_marks(department: str, batch: str, section: str, user
     return [{"id": s.id, "name": s.name, "email": s.email, **(s.profile_data or {})} for s in students]
 
 @app.get("/api/marks/entry/{assignment_id}/{exam_type}")
-async def get_mark_entry(assignment_id: str, exam_type: str, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
+async def get_mark_entry(assignment_id: str, exam_type: str, component_id: Optional[str] = None, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
     result = await session.execute(
         select(models.MarkEntry).where(
             models.MarkEntry.assignment_id == assignment_id,
@@ -4094,7 +4216,16 @@ async def get_mark_entry(assignment_id: str, exam_type: str, user: dict = Depend
             models.MarkEntry.faculty_id == user["id"],
         )
     )
-    entry = result.scalars().first()
+    entries = result.scalars().all()
+    entry = None
+    if component_id:
+        for e in entries:
+            if (e.extra_data or {}).get("component_id") == component_id:
+                entry = e
+                break
+    else:
+        entry = entries[0] if entries else None
+        
     if not entry:
         return None
     return {"id": entry.id, "course_id": entry.course_id, "exam_type": entry.exam_type,
@@ -4119,7 +4250,12 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_permi
             models.MarkEntry.faculty_id == user["id"],
         )
     )
-    existing = existing_r.scalars().first()
+    entries = existing_r.scalars().all()
+    existing = None
+    for e in entries:
+        if (e.extra_data or {}).get("component_id") == req.component_id:
+            existing = e
+            break
     if existing:
         current_status = (existing.extra_data or {}).get("status", "draft")
         if current_status == "approved":
@@ -4128,7 +4264,7 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_permi
         if current_status == "submitted":
             raise HTTPException(status_code=400, detail="Cannot edit submitted marks. Wait for approval or rejection.")
         existing.extra_data = {**(existing.extra_data or {}), "entries": entries_data,
-                          "status": "draft", "max_marks": req.max_marks}
+                          "status": "draft", "max_marks": req.max_marks, "component_id": req.component_id}
         existing.max_marks = req.max_marks
         await log_audit(session, user["id"], "mark_entry", "update", {"entry_id": existing.id, "course_id": existing.course_id})
         await session.commit()
@@ -4144,7 +4280,8 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_permi
             "assignment_id": req.assignment_id, "entries": entries_data,
             "status": "draft", "semester": req.semester, "max_marks": req.max_marks,
             "subject_name": assignment.subject_name, "department": assignment.department,
-            "batch": assignment.batch, "section": assignment.section
+            "batch": assignment.batch, "section": assignment.section,
+            "component_id": req.component_id
         }
     )
     session.add(row)
@@ -4409,12 +4546,20 @@ async def publish_results(entry_id: str, user: dict = Depends(require_role("exam
         if existing.scalars().first():
             continue
             
+        credits_assigned = 3
+        assignment_id = metadata.get("assignment_id")
+        if assignment_id:
+            ass_r = await session.execute(select(models.FacultyAssignment).where(models.FacultyAssignment.id == assignment_id))
+            ass = ass_r.scalars().first()
+            if ass:
+                credits_assigned = ass.credits
+                
         semester_grades.append(models.SemesterGrade(
             student_id=student_id,
             semester=semester,
             course_id=subject_code,
             grade=grade,
-            credits_earned=3
+            credits_earned=credits_assigned
         ))
         
     if semester_grades:
@@ -5142,9 +5287,9 @@ async def get_student_progression(student_id: str, user: dict = Depends(get_curr
             c_r = await session.execute(select(models.ClassInCharge).where(
                 models.ClassInCharge.faculty_id == user["id"],
                 models.ClassInCharge.academic_year == academic_year,
-                models.ClassInCharge.department == stud.profile_data.get("department"),
-                models.ClassInCharge.batch == stud.profile_data.get("batch"),
-                models.ClassInCharge.section == stud.profile_data.get("section")
+                models.ClassInCharge.department == (stud.profile_data or {}).get("department", ""),
+                models.ClassInCharge.batch == (stud.profile_data or {}).get("batch", ""),
+                models.ClassInCharge.section == (stud.profile_data or {}).get("section", "")
             ))
             is_cic = c_r.scalars().first() is not None
             
@@ -5281,3 +5426,175 @@ async def _seed_db():
 
 
 
+
+class AttendanceOverride(BaseModel):
+    date: str
+    period_no: int
+    status: str
+    reason: str
+
+@app.put("/api/faculty/attendance/override/{subject_code}/{student_id}")
+async def override_student_attendance(
+    subject_code: str,
+    student_id: str,
+    req: AttendanceOverride,
+    user: dict = Depends(require_role("teacher", "hod")),
+    session: AsyncSession = Depends(get_db)
+):
+    """Selective attendance override for a single student."""
+    from sqlalchemy import cast, Date
+    stmt = select(models.AttendanceRecord).where(
+        models.AttendanceRecord.student_id == student_id,
+        models.AttendanceRecord.subject_code == subject_code,
+        models.AttendanceRecord.date == cast(req.date, Date),
+        models.AttendanceRecord.period_no == req.period_no,
+        models.AttendanceRecord.is_deleted == False
+    )
+    result = await session.execute(stmt)
+    record = result.scalars().first()
+    
+    if not record:
+        raise HTTPException(status_code=404, detail="Attendance slot not found")
+        
+    record.status = req.status
+    # We can track the override metadata in extra_data manually for an audit trail
+    record.is_late_entry = True # Force late entry flag for HOD review since it's an override 
+    await session.commit()
+    return {"message": "Override applied successfully."}
+
+class ActivityPermissionCreate(BaseModel):
+    activity_type: str
+    title: str
+    description: Optional[str] = None
+    date: str
+    venue: Optional[str] = None
+
+@app.post("/api/faculty/activities")
+async def request_activity_permission(req: ActivityPermissionCreate, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
+    """Faculty submits a request for extra-curricular activity."""
+    row = models.ActivityPermission(
+        college_id=user["college_id"],
+        faculty_id=user["id"],
+        activity_type=req.activity_type,
+        title=req.title,
+        description=req.description,
+        date=req.date,
+        venue=req.venue,
+        phase="pre_event",
+        status="pending"
+    )
+    session.add(row)
+    await session.commit()
+    return {"message": "Activity permission requested."}
+
+class OutOfCampusCreate(BaseModel):
+    destination: str
+    purpose: str
+    departure_time: str
+    return_time: str
+
+@app.post("/api/faculty/out-of-campus")
+async def request_out_of_campus(req: OutOfCampusCreate, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
+    row = models.OutOfCampusPermission(
+        college_id=user["college_id"],
+        faculty_id=user["id"],
+        destination=req.destination,
+        purpose=req.purpose,
+        departure_time=req.departure_time,
+        return_time=req.return_time,
+        status="pending"
+    )
+    session.add(row)
+    await session.commit()
+    return {"message": "Out of campus permission requested."}
+
+class FreePeriodRequestCreate(BaseModel):
+    period_slot_id: str
+    date: str
+    reason: str
+
+@app.post("/api/faculty/free-periods")
+async def request_free_period(req: FreePeriodRequestCreate, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
+    row = models.FreePeriodRequest(
+        college_id=user["college_id"],
+        faculty_id=user["id"],
+        period_slot_id=req.period_slot_id,
+        date=req.date,
+        reason=req.reason,
+        status="pending"
+    )
+    session.add(row)
+    await session.commit()
+    return {"message": "Free period requested."}
+
+
+class ActivityReview(BaseModel):
+    action: str  # approve or reject
+
+@app.put("/api/hod/activity-permissions/{permission_id}/review")
+async def review_activity_permission(permission_id: str, req: ActivityReview, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
+    result = await session.execute(
+        select(models.ActivityPermission).where(
+            models.ActivityPermission.id == permission_id,
+            models.ActivityPermission.college_id == user["college_id"]
+        )
+    )
+    perm = result.scalars().first()
+    if not perm:
+        raise HTTPException(status_code=404, detail="Activity permission request not found")
+        
+    perm.status = "approved" if req.action == "approve" else "rejected"
+    perm.hod_approved_by = user["id"]
+    await session.commit()
+    return {"message": f"Activity permission {perm.status}"}
+
+
+class ManualRegistrationCreate(BaseModel):
+    student_id: str
+    semester: int
+    academic_year: str
+    subject_code: str
+    is_arrear: bool = False
+
+@app.post("/api/examcell/registrations/manual-add")
+async def manual_add_registration(req: ManualRegistrationCreate, user: dict = Depends(require_role("exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
+    """Allow Exam Cell to explicitly inject a student registration"""
+    row = models.CourseRegistration(
+        student_id=req.student_id,
+        semester=req.semester,
+        academic_year=req.academic_year,
+        subject_code=req.subject_code,
+        is_arrear=req.is_arrear,
+        status="approved" # Automatically approved
+    )
+    session.add(row)
+    await log_audit(session, user["id"], "course_registration", "manual_add", {"student_id": req.student_id, "subject_code": req.subject_code})
+    await session.commit()
+    return {"message": "Registration added manually."}
+
+@app.get("/api/admin/reports/faculty-research")
+async def get_faculty_research_report(user: dict = Depends(require_role("admin", "principal")), session: AsyncSession = Depends(get_db)):
+    """NAAC Criterion 3.3 Research Aggregation"""
+    stmt = select(models.User).where(
+        models.User.college_id == user["college_id"],
+        models.User.role.in_(["teacher", "faculty"])
+    )
+    result = await session.execute(stmt)
+    faculty = result.scalars().all()
+    
+    report = []
+    for f in faculty:
+        profile = f.profile_data or {}
+        research = profile.get("research", [])
+        publications = profile.get("publications", [])
+        
+        report.append({
+            "faculty_id": f.id,
+            "name": f.name,
+            "department": profile.get("department", "N/A"),
+            "research_projects": research,
+            "publications": publications,
+            "total_publications": len(publications),
+            "total_research": len(research)
+        })
+    return report
