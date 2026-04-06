@@ -300,25 +300,28 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
           </p>
         </motion.div>
 
-        <div
-          className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit mb-8"
-          data-testid="examcell-tabs"
-        >
-          {[
-            { id: "overview", label: "Overview" },
-            { id: "midterm", label: "Approved Midterms" },
-            { id: "endterm", label: "End-term Marks" },
-            { id: "upload", label: "Upload Marks" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              data-testid={`tab-${tab.id}`}
-              onClick={() => setActiveTab(tab.id)}
-              className={`pill-tab ${activeTab === tab.id ? "pill-tab-active" : "pill-tab-inactive"}`}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="flex bg-white dark:bg-[#1A202C] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 mb-6 sm:mb-8" data-testid="examcell-tabs">
+          <div className="w-full flex items-center gap-6 overflow-x-auto">
+            {[
+              { id: "overview", label: "Overview" },
+              { id: "midterm", label: "Approved Midterms" },
+              { id: "endterm", label: "End-term Marks" },
+              { id: "upload", label: "Upload Marks" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                data-testid={`tab-${tab.id}`}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-shrink-0 py-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.id 
+                    ? 'border-indigo-600 text-indigo-600' 
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {activeTab === "overview" && (

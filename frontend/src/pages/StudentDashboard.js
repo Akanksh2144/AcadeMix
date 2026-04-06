@@ -66,6 +66,8 @@ const cardHover = {
 };
 
 const StudentDashboard = ({ navigate, user, onLogout }) => {
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('student_tab') || 'overview');
+  useEffect(() => { sessionStorage.setItem('student_tab', activeTab); }, [activeTab]);
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showNotifications, setShowNotifications] = useState(false);
@@ -245,6 +247,31 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
           </motion.div>
         </motion.div>
 
+        {/* Tabs */}
+        <div className="flex bg-white dark:bg-[#1A202C] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 mb-6 sm:mb-8" data-testid="student-tabs">
+          <div className="max-w-7xl mx-auto w-full flex items-center gap-6 overflow-x-auto">
+            {[
+              { id: 'overview', label: 'Overview' }, 
+              { id: 'timetable', label: 'My Timetable' },
+              { id: 'attendance', label: 'Attendance Record' }
+            ].map(tab => (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-shrink-0 py-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.id 
+                    ? 'border-indigo-600 text-indigo-600' 
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeTab === 'overview' && (
+          <motion.div data-testid="overview-content" variants={containerVariants} initial="hidden" animate="show">
         {/* ── Stat Cards (Spring Physics) ───────────────── */}
         <motion.div
           variants={containerVariants} initial="hidden" animate="show"
@@ -486,6 +513,29 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
             </button>
           </motion.div>
         </motion.div>
+        </motion.div>
+        )}
+
+        {activeTab === 'timetable' && (
+          <motion.div data-testid="timetable-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants} className="soft-card p-12 text-center text-slate-500">
+              <Calendar size={48} weight="duotone" className="mx-auto mb-4 opacity-50" />
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Student Timetable</h3>
+              <p>Your class schedule will appear here.</p>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {activeTab === 'attendance' && (
+          <motion.div data-testid="attendance-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants} className="soft-card p-12 text-center text-slate-500">
+              <Clock size={48} weight="duotone" className="mx-auto mb-4 opacity-50" />
+              <h3 className="text-xl font-bold text-slate-800 dark:text-white mb-2">Attendance Record</h3>
+              <p>Your daily attendance details will appear here.</p>
+            </motion.div>
+          </motion.div>
+        )}
+
       </div>
     </div>
   );
