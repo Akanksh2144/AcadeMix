@@ -111,6 +111,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   const [teachers, setTeachers] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const { isDark, toggle: toggleTheme } = useTheme();
   const [showAddForm, setShowAddForm] = useState(false);
   const [newAssignment, setNewAssignment] = useState({
@@ -490,6 +491,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
 
   const fetchData = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       if (activeTab === "overview") {
         const { data } = await examCellAPI.hodDashboard();
@@ -508,7 +510,8 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
         setSubmissions(data);
       }
     } catch (err) {
-      console.error(err);
+      console.error("HOD Dashboard fetch error:", err);
+      setFetchError(err?.response?.data?.detail || err?.message || "Failed to load dashboard data. Please check if the backend is running.");
     }
     setLoading(false);
   };
@@ -631,20 +634,19 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
       status: r.status,
     }));
 
-  const stats = dashboard
-    ? [
+  const stats = [
         {
           label: "Teachers",
-          value: String(dashboard.total_teachers),
+          value: dashboard ? String(dashboard.total_teachers) : "—",
           sub: "in department",
           icon: Users,
           color: "bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500",
           gradient: "from-indigo-500 to-blue-500",
-          onClick: () => setActiveTab("teachers"),
+          onClick: () => setActiveTab("faculty"),
         },
         {
           label: "Students",
-          value: String(dashboard.total_students),
+          value: dashboard ? String(dashboard.total_students) : "—",
           sub: "enrolled",
           icon: BookOpen,
           color: "bg-emerald-50 text-emerald-500",
@@ -662,7 +664,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
         },
         {
           label: "Pending Reviews",
-          value: String(dashboard.pending_reviews),
+          value: dashboard ? String(dashboard.pending_reviews) : "—",
           sub: "needs action",
           icon: Clock,
           color: "bg-rose-50 text-rose-500",
@@ -705,8 +707,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           gradient: "from-slate-500 to-slate-700",
           onClick: () => setActiveTab("activity-log"),
         },
-      ]
-    : [];
+      ];
 
   if (loading) return <DashboardSkeleton />;
 
@@ -974,6 +975,16 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
             animate="show"
             data-testid="overview-content"
           >
+            {fetchError && (
+              <motion.div variants={itemVariants} className="mb-6 p-4 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 flex items-center gap-3">
+                <WarningOctagon size={20} weight="duotone" className="text-rose-500 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">Failed to load dashboard data</p>
+                  <p className="text-xs text-rose-500 dark:text-rose-400 mt-0.5">{fetchError}</p>
+                </div>
+                <button onClick={() => fetchData()} className="text-xs font-bold text-rose-600 hover:text-rose-800 dark:text-rose-300 px-3 py-1.5 rounded-lg bg-rose-100 dark:bg-rose-500/20 hover:bg-rose-200 transition-colors">Retry</button>
+              </motion.div>
+            )}
             <motion.div
               variants={containerVariants}
               className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8"
