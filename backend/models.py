@@ -236,15 +236,44 @@ class Announcement(Base, SoftDeleteMixin):
     details = Column(JSONB, nullable=True)  # stores visibility, department, posted_by
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class Placement(Base, SoftDeleteMixin):
-    __tablename__ = "placements"
+class Company(Base, SoftDeleteMixin):
+    __tablename__ = "companies"
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
     college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
-    company = Column(String, nullable=False)
-    role = Column(String, nullable=False)
-    package = Column(String, nullable=True)
-    date = Column(String, nullable=False)
-    details = Column(JSONB, nullable=True)
+    name = Column(String, nullable=False)
+    sector = Column(String, nullable=True)
+    hr_contacts = Column(JSONB, nullable=True)
+    website = Column(String, nullable=True)
+    bond_typical = Column(String, nullable=True)
+
+class PlacementDrive(Base, SoftDeleteMixin):
+    __tablename__ = "placement_drives"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    company_id = Column(String, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="upcoming")
+    drive_type = Column(String, nullable=False)
+    type = Column(String, nullable=False, default="placement")
+    job_description = Column(String, nullable=True)
+    bond_period = Column(String, nullable=True)
+    work_location = Column(String, nullable=True)
+    stipend = Column(Float, nullable=True)
+    duration_weeks = Column(Integer, nullable=True)
+    is_mandatory = Column(Boolean, nullable=True)
+    eligibility_criteria = Column(JSONB, nullable=True)
+    linked_quiz_id = Column(String, ForeignKey("quizzes.id", ondelete="SET NULL"), nullable=True)
+    quiz_threshold = Column(Float, nullable=True)
+
+class PlacementApplication(Base, SoftDeleteMixin):
+    __tablename__ = "placement_applications"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    drive_id = Column(String, ForeignKey("placement_drives.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String, nullable=False, default="registered")
+    round_results = Column(JSONB, nullable=True)
+    offer_details = Column(JSONB, nullable=True)
+    registered_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class AuditLog(Base, SoftDeleteMixin):
     __tablename__ = "audit_logs"

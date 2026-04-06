@@ -28,6 +28,8 @@ const LoginPage = ({ onLogin }) => {
     { role: 'Teacher', collegeId: 'T001', password: 'teacher123', color: 'bg-indigo-500 hover:bg-indigo-600', icon: '👨‍🏫' },
     { role: 'HOD', collegeId: 'HOD001', password: 'hod123', color: 'bg-amber-500 hover:bg-amber-600', icon: '👔' },
     { role: 'Admin', collegeId: 'A001', password: 'admin123', color: 'bg-rose-500 hover:bg-rose-600', icon: '⚙️' },
+    { role: 'Nodal Officer', collegeId: 'N001', password: 'nodal123', color: 'bg-emerald-500 hover:bg-emerald-600', icon: '🏛️' },
+    { role: 'T&P Officer', collegeId: 'TPO001', password: 'tpo123', color: 'bg-blue-500 hover:bg-blue-600', icon: '💼' },
   ];
 
   const handleSubmit = async (e) => {

@@ -5121,6 +5121,286 @@ async def list_placements(user: dict = Depends(require_role("admin", "hod", "tea
     rows = result.scalars().all()
     return [{"id": p.id, "company": p.company, "role": p.role, "package": p.package, "date": p.date, **(p.details or {})} for p in rows]
 
+# ─── Phase 3: Student T&P Workflows ──────────────────────────────────────────
+
+@app.get("/api/student/drives")
+async def get_eligible_student_drives(user: dict = Depends(require_role("student")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementDrive).where(
+        models.PlacementDrive.college_id == user["college_id"],
+        models.PlacementDrive.status.in_(["upcoming", "ongoing"])
+    )
+    res = await session.execute(stmt)
+    drives = res.scalars().all()
+    
+    # Pre-fetch Student Profile Data to match CGPA and active Backlogs
+    pd = user.get("profile_data") or {}
+    student_cgpa = float(pd.get("cgpa", 0))
+    student_backlogs = int(pd.get("active_backlogs", 0))
+    student_dept = pd.get("department", "")
+    
+    eligible = []
+    for d in drives:
+        crit = d.eligibility_criteria or {}
+        if crit:
+            # Check conditions
+            if float(crit.get("min_cgpa", 0)) > student_cgpa:
+                continue
+            if "max_backlogs" in crit and int(crit.get("max_backlogs", 99)) < student_backlogs:
+                continue
+            if "allowed_departments" in crit and crit["allowed_departments"]:
+                if student_dept not in crit["allowed_departments"]:
+                    continue
+        eligible.append(d)
+        
+    return eligible
+
+@app.post("/api/student/drives/{drive_id}/apply")
+async def apply_for_placement_drive(drive_id: str, user: dict = Depends(require_role("student")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementDrive).where(models.PlacementDrive.id == drive_id, models.PlacementDrive.college_id == user["college_id"])
+    res = await session.execute(stmt)
+    drive = res.scalars().first()
+    
+    if not drive:
+        raise HTTPException(status_code=404, detail="Drive not found")
+        
+    if drive.status not in ["upcoming", "ongoing"]:
+        raise HTTPException(status_code=400, detail="Drive is not accepting applications")
+        
+    pd = user.get("profile_data") or {}
+    student_cgpa = float(pd.get("cgpa", 0))
+    student_backlogs = int(pd.get("active_backlogs", 0))
+    student_dept = pd.get("department", "")
+    
+    crit = drive.eligibility_criteria or {}
+    if crit:
+        if float(crit.get("min_cgpa", 0)) > student_cgpa:
+            raise HTTPException(status_code=403, detail="Ineligible: CGPA below requirement")
+        if "max_backlogs" in crit and int(crit.get("max_backlogs", 99)) < student_backlogs:
+            raise HTTPException(status_code=403, detail="Ineligible: Exceeds active backlog limits")
+        if "allowed_departments" in crit and crit["allowed_departments"] and student_dept not in crit["allowed_departments"]:
+            raise HTTPException(status_code=403, detail="Ineligible: Department not permitted")
+            
+    if drive.linked_quiz_id:
+        quiz_r = await session.execute(
+            select(models.QuizAttempt).where(
+                models.QuizAttempt.quiz_id == drive.linked_quiz_id,
+                models.QuizAttempt.student_id == user["id"],
+                models.QuizAttempt.status == "submitted"
+            )
+        )
+        attempt = quiz_r.scalars().first()
+        if not attempt:
+            raise HTTPException(status_code=403, detail="Pre-screening test not completed or not passed.")
+        if drive.quiz_threshold and float(attempt.final_score or 0) < drive.quiz_threshold:
+            raise HTTPException(status_code=403, detail="Pre-screening test not completed or not passed.")
+
+    dup_r = await session.execute(
+        select(models.PlacementApplication).where(
+            models.PlacementApplication.drive_id == drive_id,
+            models.PlacementApplication.student_id == user["id"]
+        )
+    )
+    if dup_r.scalars().first():
+        raise HTTPException(status_code=400, detail="Already applied")
+        
+    appl = models.PlacementApplication(
+        college_id=user["college_id"],
+        student_id=user["id"],
+        drive_id=drive_id,
+        status="registered"
+    )
+    session.add(appl)
+    await session.commit()
+    return {"message": "Successfully applied to drive", "application_id": appl.id}
+
+@app.delete("/api/student/drives/{drive_id}/withdraw")
+async def withdraw_application(drive_id: str, user: dict = Depends(require_role("student")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementApplication).where(
+        models.PlacementApplication.drive_id == drive_id,
+        models.PlacementApplication.student_id == user["id"]
+    )
+    res = await session.execute(stmt)
+    appl = res.scalars().first()
+    
+    if not appl:
+        raise HTTPException(status_code=404, detail="Application not found")
+        
+    if appl.status != "registered":
+        raise HTTPException(status_code=400, detail="Already shortlisted — contact T&P Officer")
+        
+    await session.delete(appl)
+    await session.commit()
+    return {"message": "Application withdrawn successfully"}
+
+@app.get("/api/student/applications")
+async def get_student_application_history(user: dict = Depends(require_role("student")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementApplication).where(models.PlacementApplication.student_id == user["id"])
+    res = await session.execute(stmt)
+    return res.scalars().all()
+
+# ─── Phase 4 & 5: TPO Workflows & Analytics ──────────────────────────────────────
+
+@app.get("/api/tpo/drives/{drive_id}/applicants")
+async def get_drive_applicants(drive_id: str, user: dict = Depends(require_role("tp_officer", "admin", "super_admin")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementApplication).where(
+        models.PlacementApplication.drive_id == drive_id,
+        models.PlacementApplication.college_id == user["college_id"]
+    )
+    res = await session.execute(stmt)
+    return res.scalars().all()
+
+class ShortlistRequest(BaseModel):
+    student_ids: List[str]
+
+@app.put("/api/tpo/drives/{drive_id}/shortlist")
+async def bulk_shortlist(drive_id: str, req: ShortlistRequest, user: dict = Depends(require_role("tp_officer", "admin", "super_admin")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementApplication).where(
+        models.PlacementApplication.drive_id == drive_id,
+        models.PlacementApplication.college_id == user["college_id"],
+        models.PlacementApplication.student_id.in_(req.student_ids)
+    )
+    res = await session.execute(stmt)
+    apps = res.scalars().all()
+    for app in apps:
+        if app.status == "registered":
+            app.status = "shortlisted"
+            
+    await session.commit()
+    return {"message": f"Successfully shortlisted {len(apps)} candidates"}
+
+class ResultRequest(BaseModel):
+    student_id: str
+    round_name: str
+    result: str # pass or fail
+    remarks: Optional[str] = ""
+
+@app.put("/api/tpo/drives/{drive_id}/results")
+async def append_round_result(drive_id: str, req: ResultRequest, user: dict = Depends(require_role("tp_officer", "admin", "super_admin")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementApplication).where(
+        models.PlacementApplication.drive_id == drive_id,
+        models.PlacementApplication.student_id == req.student_id,
+        models.PlacementApplication.college_id == user["college_id"]
+    )
+    res = await session.execute(stmt)
+    app = res.scalars().first()
+    
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+        
+    res_list = app.round_results or []
+    from datetime import datetime
+    res_list.append({
+        "round": req.round_name,
+        "result": req.result,
+        "remarks": req.remarks,
+        "evaluated_at": datetime.utcnow().isoformat()
+    })
+    app.round_results = res_list
+    
+    if req.result == "fail":
+        app.status = "rejected"
+        
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(app, "round_results")
+    await session.commit()
+    return {"message": "Result appended"}
+
+class SelectRequest(BaseModel):
+    student_id: str
+    ctc: float
+    role: str
+    joining_date: Optional[str] = None
+    location: Optional[str] = None
+    offer_url: Optional[str] = None
+
+@app.put("/api/tpo/drives/{drive_id}/select")
+async def select_candidate(drive_id: str, req: SelectRequest, user: dict = Depends(require_role("tp_officer", "admin", "super_admin")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementApplication).where(
+        models.PlacementApplication.drive_id == drive_id,
+        models.PlacementApplication.student_id == req.student_id,
+        models.PlacementApplication.college_id == user["college_id"]
+    )
+    res = await session.execute(stmt)
+    app = res.scalars().first()
+    
+    if not app:
+        raise HTTPException(status_code=404, detail="Application not found")
+        
+    app.status = "selected"
+    app.offer_details = {
+        "ctc": req.ctc,
+        "role": req.role,
+        "joining_date": req.joining_date,
+        "location": req.location,
+        "offer_url": req.offer_url,
+        "is_accepted": False
+    }
+    await session.commit()
+    return {"message": "Candidate selected and generated offer metadata"}
+
+@app.get("/api/tpo/statistics")
+async def get_tpo_statistics(user: dict = Depends(require_role("tp_officer", "admin", "super_admin")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementApplication).where(
+        models.PlacementApplication.college_id == user["college_id"],
+        models.PlacementApplication.status == "selected"
+    )
+    res = await session.execute(stmt)
+    selected = res.scalars().all()
+    
+    total_ctc = 0
+    highest = 0
+    for s in selected:
+        if s.offer_details:
+            ctc = float(s.offer_details.get("ctc") or 0)
+            total_ctc += ctc
+            if ctc > highest:
+                highest = ctc
+                
+    avg = total_ctc / len(selected) if selected else 0
+    return {
+        "total_selected": len(selected),
+        "highest_package": highest,
+        "average_package": avg
+    }
+
+from fastapi.responses import StreamingResponse
+import io
+import openpyxl
+
+@app.get("/api/tpo/statistics/export")
+async def export_tpo_statistics(user: dict = Depends(require_role("tp_officer", "admin", "super_admin")), session: AsyncSession = Depends(get_db)):
+    stmt = select(models.PlacementApplication).where(
+        models.PlacementApplication.college_id == user["college_id"],
+        models.PlacementApplication.status == "selected"
+    )
+    res = await session.execute(stmt)
+    selected = res.scalars().all()
+    
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Placement Record"
+    ws.append(["Student ID", "Drive ID", "Role", "CTC (LPA)", "Location"])
+    
+    for s in selected:
+        details = s.offer_details or {}
+        ws.append([
+            s.student_id,
+            s.drive_id,
+            details.get("role", ""),
+            details.get("ctc", ""),
+            details.get("location", "")
+        ])
+        
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return StreamingResponse(
+        iter([output.getvalue()]), 
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+        headers={"Content-Disposition": "attachment; filename=placement_statistics.xlsx"}
+    )
+
 # ─── Coding Challenges ─────────────────────────────────────────────────────────
 @app.get("/api/challenges")
 async def get_challenges(page: int = 1, limit: int = 20, difficulty: str = "", topic: str = "", session: AsyncSession = Depends(get_db)):
