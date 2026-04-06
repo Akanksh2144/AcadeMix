@@ -4,6 +4,7 @@ import { BookOpen, NotePencil, ChartLine, Users, Eye, SignOut, Clipboard, Calend
 import { analyticsAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import DashboardSkeleton from '../components/DashboardSkeleton';
+import AttendanceMarker from '../components/faculty/AttendanceMarker';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -32,13 +33,12 @@ const timeAgo = (ts) => {
   const diff = Date.now() - new Date(ts).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
   return `${Math.floor(hrs / 24)}d ago`;
 };
 
 const TeacherDashboard = ({ navigate, user, onLogout }) => {
+  const [activeTab, setActiveTab] = useState(() => sessionStorage.getItem('teacher_tab') || 'overview');
+  useEffect(() => { sessionStorage.setItem('teacher_tab', activeTab); }, [activeTab]);
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const { isDark, toggle: toggleTheme } = useTheme();
@@ -184,8 +184,32 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
           </p>
         </motion.div>
 
-        {/* ── Stat Cards ──────────────────────────── */}
-        <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 sm:mb-8">
+        {/* Tabs */}
+        <div className="flex bg-white dark:bg-[#1A202C] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 mb-6 sm:mb-8" data-testid="teacher-tabs">
+          <div className="max-w-7xl mx-auto w-full flex items-center gap-6 overflow-x-auto">
+            {[
+              { id: 'overview', label: 'Overview' }, 
+              { id: 'attendance', label: 'Daily Attendance' }
+            ].map(tab => (
+              <button 
+                key={tab.id} 
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex-shrink-0 py-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${
+                  activeTab === tab.id 
+                    ? 'border-indigo-600 text-indigo-600' 
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {activeTab === 'overview' && (
+          <motion.div data-testid="overview-content" variants={containerVariants} initial="hidden" animate="show">
+            {/* ── Stat Cards ──────────────────────────── */}
+            <div className="grid grid-cols-2 gap-3 sm:gap-6 mb-6 sm:mb-8">
           {stats.map((stat, i) => {
             const Icon = stat.icon;
             const Wrapper = stat.onClick ? motion.button : motion.div;
@@ -203,16 +227,17 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
               </Wrapper>
             );
           })}
-        </motion.div>
+            </div>
 
         {/* ── Quick Actions ────────────────────────── */}
         <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-5 mb-6 sm:mb-8">
           {[
+            { id: 'attendance-marker', icon: Clipboard, label: 'Attendance', sub: 'Mark daily roster', colorBg: 'bg-emerald-50 dark:bg-emerald-500/15 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/25', colorText: 'text-emerald-500 dark:text-emerald-400', testId: 'attendance-marker-button' },
             { id: 'quiz-builder', icon: NotePencil, label: 'Create Quiz', sub: 'Build from scratch', colorBg: 'bg-indigo-50 dark:bg-indigo-500/15 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-500/25', colorText: 'text-indigo-500 dark:text-indigo-400', testId: 'create-quiz-button' },
             { id: 'marks-entry', icon: PencilLine, label: 'Marks Entry', sub: 'Mid-term marks', colorBg: 'bg-violet-50 dark:bg-violet-500/15 group-hover:bg-violet-100 dark:group-hover:bg-violet-500/25', colorText: 'text-violet-500 dark:text-violet-400', testId: 'marks-entry-button' },
-            { id: 'class-results', icon: ChartLine, label: 'View Results', sub: 'Class-wise analytics', colorBg: 'bg-emerald-50 dark:bg-emerald-500/15 group-hover:bg-emerald-100 dark:group-hover:bg-emerald-500/25', colorText: 'text-emerald-500 dark:text-emerald-400', testId: 'view-all-results-button' },
+            { id: 'class-results', icon: ChartLine, label: 'View Results', sub: 'Class-wise analytics', colorBg: 'bg-sky-50 dark:bg-sky-500/15 group-hover:bg-sky-100 dark:group-hover:bg-sky-500/25', colorText: 'text-sky-500 dark:text-sky-400', testId: 'view-all-results-button' },
             { id: 'student-management', icon: Users, label: 'Students', sub: 'Manage enrollment', colorBg: 'bg-amber-50 dark:bg-amber-500/15 group-hover:bg-amber-100 dark:group-hover:bg-amber-500/25', colorText: 'text-amber-500 dark:text-amber-400', testId: 'manage-students-button' },
-            { id: 'quiz-calendar', icon: CalendarDots, label: 'Calendar', sub: 'Quiz schedule', colorBg: 'bg-sky-50 dark:bg-sky-500/15 group-hover:bg-sky-100 dark:group-hover:bg-sky-500/25', colorText: 'text-sky-500 dark:text-sky-400', testId: 'quiz-calendar-button' },
+            { id: 'quiz-calendar', icon: CalendarDots, label: 'Calendar', sub: 'Quiz schedule', colorBg: 'bg-rose-50 dark:bg-rose-500/15 group-hover:bg-rose-100 dark:group-hover:bg-rose-500/25', colorText: 'text-rose-500 dark:text-rose-400', testId: 'quiz-calendar-button' },
           ].map((item, i) => {
             const Icon = item.icon;
             return (
@@ -305,6 +330,16 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
             </div>
           </motion.div>
         </motion.div>
+          </motion.div>
+        )}
+
+        {activeTab === 'attendance' && (
+          <motion.div data-testid="attendance-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <AttendanceMarker user={user} />
+            </motion.div>
+          </motion.div>
+        )}
 
       </div>
     </div>

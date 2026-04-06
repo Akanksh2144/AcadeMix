@@ -164,12 +164,21 @@ export const placementsAPI = {
   studentPlacements: () => api.get('/api/placements/student'),
 };
 
-// Timetable (HOD)
+// Timetable (HOD & Faculty)
 export const timetableAPI = {
-  get: (section, semester = 3) => api.get('/api/timetable', { params: { section, semester } }),
-  save: (data) => api.post('/api/timetable', data),
+  getHod: (departmentId, batch, semester) => api.get('/api/hod/timetable', { params: { department_id: departmentId, batch, semester } }),
+  saveHod: (slots) => api.put('/api/hod/timetable/slots', slots),
   delete: (slotId) => api.delete(`/api/timetable/${slotId}`),
+  getFacultyToday: () => api.get('/api/faculty/timetable/today'),
+  getStudentTimetable: () => api.get('/api/student/timetable'),
 };
+
+export const attendanceAPI = {
+  mark: (data) => api.post('/api/faculty/attendance/mark', data),
+  getStudentConsolidated: () => api.get('/api/student/attendance'),
+  getHodDefaulters: (departmentId, threshold) => api.get('/api/hod/attendance/defaulters', { params: { department_id: departmentId, threshold } }),
+};
+
 
 // Announcements (HOD)
 export const announcementsAPI = {

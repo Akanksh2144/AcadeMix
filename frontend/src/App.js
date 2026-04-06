@@ -26,6 +26,7 @@ import Placements from './pages/Placements';
 import TeacherQuizzes from './pages/TeacherQuizzes';
 import QuizCalendar from './pages/QuizCalendar';
 import QuizSummary from './pages/QuizSummary';
+import AttendanceMarker from './components/faculty/AttendanceMarker';
 
 const ROLE_DASHBOARD = {
   student: 'student-dashboard',
@@ -125,6 +126,14 @@ function App() {
       case 'teacher-quizzes': return <TeacherQuizzes navigate={navigate} user={user} />;
       case 'quiz-calendar': return <QuizCalendar navigate={navigate} user={user} />;
       case 'quiz-summary': return <QuizSummary navigate={navigate} user={user} attemptData={selectedData} />;
+      case 'attendance-marker': return (
+        <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] py-8">
+          <div className="max-w-7xl mx-auto px-4">
+            <button onClick={() => navigate('teacher-dashboard')} className="mb-4 text-indigo-500 font-bold hover:underline">← Back to Dashboard</button>
+            <AttendanceMarker user={user} />
+          </div>
+        </div>
+      );
       default: return <LoginPage onLogin={handleLogin} />;
     }
   };
