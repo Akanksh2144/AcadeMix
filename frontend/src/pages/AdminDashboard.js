@@ -171,8 +171,8 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
         </motion.div>
 
         {/* Tabs */}
-        <div className="flex bg-white dark:bg-[#1A202C] border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40" data-testid="admin-tabs">
-          <div className="max-w-7xl mx-auto px-6 w-full flex items-center gap-6 overflow-x-auto">
+        <div className="mb-8 overflow-x-auto" data-testid="admin-tabs">
+          <div className="flex items-center gap-1.5 bg-white dark:bg-[#1A202C]/60 backdrop-blur-md border border-slate-200 dark:border-slate-700/80 rounded-2xl p-1.5 shadow-sm w-fit min-w-full sm:min-w-0">
             {[
               { id: 'overview', label: 'Overview' }, 
               { id: 'metrics', label: 'Metrics' },
@@ -185,10 +185,10 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                 key={tab.id} 
                 data-testid={`tab-${tab.id}`} 
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-shrink-0 py-4 text-sm font-bold border-b-2 transition-colors whitespace-nowrap ${
+                className={`px-3.5 py-2 rounded-[14px] text-xs font-semibold transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
                   activeTab === tab.id 
-                    ? 'border-indigo-600 text-indigo-600' 
-                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                    ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-md" 
+                    : "text-slate-500 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800/50"
                 }`}
               >
                 {tab.label}
