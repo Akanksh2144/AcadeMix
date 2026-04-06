@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import api, { hodPhase2API, facultyAPI, studentsAPI } from '../../services/api';
 import AssignmentCardGrid from './AssignmentCardGrid';
@@ -14,11 +14,7 @@ const HODMentorTab = ({ departmentId }) => {
   // Wait, the items in the grid for Mentor mapping is Students! So the target is 1 Mentor per Student.
   // The completion strip measures count (1) vs target (1)
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       // Fetch all students (or fetch by department to save payload sz)
@@ -43,7 +39,11 @@ const HODMentorTab = ({ departmentId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [departmentId]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const handleAssign = async (studentItem, facultyId) => {
     try {

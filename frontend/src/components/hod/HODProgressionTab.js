@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { hodPhase2API, studentsAPI } from '../../services/api';
 import { Plus, Trash, FileText } from '@phosphor-icons/react';
@@ -28,18 +28,18 @@ const HODProgressionTab = ({ departmentId }) => {
   const [activeType, setActiveType] = useState('employment');
   const [formData, setFormData] = useState({});
 
-  useEffect(() => {
-    fetchStudents();
-  }, [departmentId]);
-
-  const fetchStudents = async () => {
+  const fetchStudents = useCallback(async () => {
     try {
       const res = await studentsAPI.search('', departmentId);
       setStudents(res.data);
     } catch (err) {
       toast.error("Failed to load students");
     }
-  };
+  }, [departmentId]);
+
+  useEffect(() => {
+    fetchStudents();
+  }, [fetchStudents]);
 
   const loadProgression = async (studentId) => {
     setLoading(true);
