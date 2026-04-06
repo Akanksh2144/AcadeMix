@@ -2550,6 +2550,21 @@ async def submit_challenge(request: Request, req: ChallengeSubmit, user: dict = 
 
 @app.on_event("startup")
 async def startup():
+    import asyncio
+    max_retries = 5
+    for attempt in range(1, max_retries + 1):
+        try:
+            await _seed_db()
+            return
+        except Exception as e:
+            if attempt == max_retries:
+                print(f"[startup] FATAL: Could not connect to database after {max_retries} attempts: {e}")
+                raise
+            wait = 2 ** attempt  # 2s, 4s, 8s, 16s
+            print(f"[startup] DB connection failed (attempt {attempt}/{max_retries}), retrying in {wait}s... ({e})")
+            await asyncio.sleep(wait)
+
+async def _seed_db():
     """PostgreSQL startup: schema is managed by Alembic migrations.
     Seed order matters:
       1. Upsert College (GNI) → get college.id UUID
