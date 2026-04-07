@@ -189,8 +189,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
         </motion.div>
 
         {/* Tabs */}
-        <div className="mb-8 overflow-x-auto" data-testid="teacher-tabs">
-          <div className="flex items-center gap-1.5 bg-white dark:bg-[#1A202C]/60 backdrop-blur-md border border-slate-200 dark:border-slate-700/80 rounded-2xl p-1.5 shadow-sm w-fit min-w-full sm:min-w-0">
+        <div className="flex overflow-x-auto gap-2 p-1.5 bg-slate-100 dark:bg-white/5 rounded-2xl mb-8 hide-scrollbar">
             {[
               { id: 'overview', label: 'Overview' }, 
               { id: 'attendance', label: 'Attendance' },
@@ -202,17 +201,16 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
               <button 
                 key={tab.id} 
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3.5 py-2 rounded-[14px] text-xs font-semibold transition-all duration-200 whitespace-nowrap flex-shrink-0 ${
+                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
                   activeTab === tab.id 
-                    ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-md" 
-                    : "text-slate-500 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:bg-slate-800/50"
+                    ? 'bg-white dark:bg-[#1A202C] text-blue-600 dark:text-blue-400 shadow-sm' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
                 }`}
               >
                 {tab.label}
               </button>
             ))}
           </div>
-        </div>
 
         {activeTab === 'overview' && (
           <motion.div data-testid="overview-content" variants={containerVariants} initial="hidden" animate="show">
@@ -363,13 +361,13 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
               <div className="flex items-center gap-1.5 bg-white dark:bg-[#1A202C]/60 backdrop-blur-md border border-slate-200 dark:border-slate-700/80 rounded-2xl p-1.5 shadow-sm w-fit">
                 <button onClick={() => setTeachingMode('plan')}
                   className={`px-3.5 py-2 rounded-[14px] text-xs font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-1.5 ${
-                    teachingMode === 'plan' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    teachingMode === 'plan' ? 'bg-white dark:bg-[#1A202C] text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
                   }`}>
                   <Notebook size={14} weight="duotone" /> Teaching Plan
                 </button>
                 <button onClick={() => setTeachingMode('record')}
                   className={`px-3.5 py-2 rounded-[14px] text-xs font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-1.5 ${
-                    teachingMode === 'record' ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-md' : 'text-slate-500 hover:text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800/50'
+                    teachingMode === 'record' ? 'bg-white dark:bg-[#1A202C] text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
                   }`}>
                   <PencilLine size={14} weight="duotone" /> Class Record
                 </button>
