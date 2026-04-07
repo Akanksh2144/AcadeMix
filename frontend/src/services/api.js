@@ -315,4 +315,36 @@ export const tpoAPI = {
   getStats: () => api.get('/api/tpo/statistics'),
 };
 
+export const alumniAPI = {
+  // Alumni Self-Service
+  getProfile: () => api.get('/api/alumni/profile'),
+  updateProfile: (data) => api.put('/api/alumni/profile', data),
+  getDirectory: () => api.get('/api/alumni/directory'),
+  getJobPostings: () => api.get('/api/alumni/job-postings'),
+  postJobReferral: (data) => api.post('/api/alumni/job-postings', data),
+  respondMentorship: (id, status) => api.post(`/api/alumni/mentorship/${id}/respond`, { status }),
+  addMentorshipNote: (id, note) => api.post(`/api/alumni/mentorship/${id}/session-note`, { note }),
+  getEvents: () => api.get('/api/alumni/events'),
+  rsvpEvent: (id, status) => api.post(`/api/alumni/events/${id}/register`, { rsvp_status: status }),
+  submitAchievement: (data) => api.post('/api/alumni/achievements', data),
+  submitFeedback: (data) => api.post('/api/alumni/feedback', data),
+  updateHigherStudies: (data) => api.put('/api/alumni/progression/higher-studies', data),
+
+  // Student Endpoints
+  getStudentJobs: () => api.get('/api/student/alumni-jobs'),
+  getAvailableMentors: () => api.get('/api/student/alumni-mentors'),
+  requestMentorship: (data) => api.post('/api/student/alumni-mentorship/request', data),
+
+  // Admin Endpoints
+  batchGraduate: (batch, dept, dryRun) => api.post(`/api/admin/alumni/batch-graduate?batch=${batch}&department=${dept || ''}&dry_run=${dryRun}`),
+  getPending: () => api.get('/api/admin/alumni/pending'),
+  verifyProfile: (id, action) => api.put(`/api/admin/alumni/${id}/verify`, { action }),
+  addContribution: (data) => api.post('/api/admin/alumni/contributions', data),
+  getOutcomesReport: () => api.get('/api/admin/reports/alumni-outcomes'),
+  createEvent: (data) => api.post('/api/admin/alumni-events', data),
+  updateEvent: (id, data) => api.put(`/api/admin/alumni-events/${id}`, data),
+  markAttendance: (id, ids) => api.put(`/api/admin/alumni-events/${id}/attendance`, { attended_alumni_ids: ids }),
+  verifyAchievement: (id, verified, featured) => api.put(`/api/admin/alumni/achievements/${id}/verify`, { is_verified: verified, is_featured: featured }),
+};
+
 export default api;

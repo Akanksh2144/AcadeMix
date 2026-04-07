@@ -745,3 +745,119 @@ class TimetableApproval(Base, SoftDeleteMixin):
     is_approved = Column(Boolean, nullable=False, default=False)
     approved_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     approved_at = Column(DateTime(timezone=True), nullable=True)
+
+# ─── Alumni Module ──────────────────────────────────────────────
+
+class AlumniJobPosting(Base, SoftDeleteMixin):
+    """Job/internship referrals posted by alumni, moderated by TPO."""
+    __tablename__ = "alumni_job_postings"
+    id              = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id      = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    alumni_id       = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    company         = Column(String, nullable=False)
+    role            = Column(String, nullable=False)
+    ctc_range       = Column(String, nullable=True)      # e.g. "6-10 LPA"
+    location        = Column(String, nullable=True)
+    eligibility     = Column(String, nullable=True)
+    deadline        = Column(Date, nullable=True)
+    contact_email   = Column(String, nullable=True)
+    referral_note   = Column(String, nullable=True)
+    status          = Column(String, nullable=False, server_default='pending_approval')  # pending_approval/active/expired/rejected
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+class AlumniMentorship(Base, SoftDeleteMixin):
+    """Alumni-to-student career/industry mentorship (separate from faculty mentors)."""
+    __tablename__ = "alumni_mentorships"
+    id              = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id      = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    alumni_id       = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id      = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status          = Column(String, nullable=False, server_default='requested')  # requested/active/completed/declined
+    focus_area      = Column(String, nullable=True)      # career/technical/higher_studies
+    session_notes   = Column(JSONB, nullable=True, server_default='[]')
+    requested_at    = Column(DateTime(timezone=True), server_default=func.now())
+
+class AlumniEvent(Base, SoftDeleteMixin):
+    """Alumni events: reunions, meetups, workshops, networking."""
+    __tablename__ = "alumni_events"
+    id                    = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id            = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_by            = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    title                 = Column(String, nullable=False)
+    description           = Column(String, nullable=True)
+    event_type            = Column(String, nullable=False)  # reunion/meetup/workshop/networking/fundraiser
+    date                  = Column(DateTime(timezone=True), nullable=False)
+    venue                 = Column(String, nullable=True)
+    max_capacity          = Column(Integer, nullable=True)
+    registration_deadline = Column(Date, nullable=True)
+    status                = Column(String, nullable=False, server_default='published')  # draft/published/closed/completed
+    created_at            = Column(DateTime(timezone=True), server_default=func.now())
+
+class AlumniEventRegistration(Base, SoftDeleteMixin):
+    """RSVP and attendance tracking for alumni events."""
+    __tablename__ = "alumni_event_registrations"
+    id            = Column(String, primary_key=True, index=True, default=generate_uuid)
+    event_id      = Column(String, ForeignKey("alumni_events.id", ondelete="CASCADE"), nullable=False, index=True)
+    alumni_id     = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    rsvp_status   = Column(String, nullable=False, server_default='attending')  # attending/maybe/not_attending
+    attended      = Column(Boolean, nullable=False, server_default='false')
+    registered_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("event_id", "alumni_id", name="uq_event_alumni"),
+    )
+
+class AlumniGuestLecture(Base, SoftDeleteMixin):
+    """Guest lecture by alumni — tracked separately for department queries."""
+    __tablename__ = "alumni_guest_lectures"
+    id              = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id      = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    alumni_id       = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    department_id   = Column(String, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False, index=True)
+    date            = Column(Date, nullable=False)
+    topic           = Column(String, nullable=False)
+    status          = Column(String, nullable=False, server_default='invited')  # invited/confirmed/completed/cancelled
+    created_at      = Column(DateTime(timezone=True), server_default=func.now())
+
+class AlumniContribution(Base, SoftDeleteMixin):
+    """Alumni donations and contributions — required for NAAC metrics."""
+    __tablename__ = "alumni_contributions"
+    id                = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id        = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    alumni_id         = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    contribution_type = Column(String, nullable=False)  # scholarship/infrastructure/equipment/other
+    amount            = Column(Float, nullable=False)
+    purpose           = Column(String, nullable=True)
+    date              = Column(Date, nullable=False)
+    receipt_number    = Column(String, nullable=True)
+    is_anonymous      = Column(Boolean, nullable=False, server_default='false')
+    acknowledgment_url = Column(String, nullable=True)
+    created_at        = Column(DateTime(timezone=True), server_default=func.now())
+
+class AlumniAchievement(Base, SoftDeleteMixin):
+    """Career milestones, awards, patents. is_featured=True for Distinguished Alumni."""
+    __tablename__ = "alumni_achievements"
+    id          = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id  = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    alumni_id   = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type        = Column(String, nullable=False)  # promotion/award/publication/patent/startup/distinguished_alumni
+    title       = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    date        = Column(Date, nullable=True)
+    proof_url   = Column(String, nullable=True)
+    is_featured = Column(Boolean, nullable=False, server_default='false')
+    is_verified = Column(Boolean, nullable=False, server_default='false')
+    created_at  = Column(DateTime(timezone=True), server_default=func.now())
+
+class AlumniFeedback(Base, SoftDeleteMixin):
+    """College feedback from alumni — separate from outgoing Announcements."""
+    __tablename__ = "alumni_feedback"
+    id            = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id    = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    alumni_id     = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)  # nullable for anonymous
+    category      = Column(String, nullable=False)  # academics/faculty/facilities/placement/infrastructure/alumni_services/other
+    rating        = Column(Integer, nullable=True)   # 1-5
+    feedback_text = Column(String, nullable=False)
+    is_anonymous  = Column(Boolean, nullable=False, server_default='false')
+    status        = Column(String, nullable=False, server_default='new')  # new/acknowledged/resolved
+    created_at    = Column(DateTime(timezone=True), server_default=func.now())

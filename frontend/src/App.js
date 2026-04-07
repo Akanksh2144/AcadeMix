@@ -28,6 +28,7 @@ import QuizCalendar from './pages/QuizCalendar';
 import QuizSummary from './pages/QuizSummary';
 import AttendanceMarker from './components/faculty/AttendanceMarker';
 import TPODashboard from './pages/TPODashboard';
+import AlumniDashboard from './pages/AlumniDashboard';
 
 const ROLE_DASHBOARD = {
   student: 'student-dashboard',
@@ -37,6 +38,7 @@ const ROLE_DASHBOARD = {
   exam_cell: 'examcell-dashboard',
   nodal_officer: 'admin-dashboard',
   tp_officer: 'tpo-dashboard',
+  alumni: 'alumni-dashboard',
 };
 
 function App() {
@@ -147,6 +149,7 @@ function App() {
         </div>
       );
       case 'tpo-dashboard': return <TPODashboard navigate={navigate} user={user} onLogout={handleLogout} />;
+      case 'alumni-dashboard': return <AlumniDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       default: return <LoginPage onLogin={handleLogin} />;
     }
   };
