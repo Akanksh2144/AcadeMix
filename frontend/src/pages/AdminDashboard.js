@@ -7,6 +7,7 @@ import { StudentResultsSearch } from '../components/StudentResultsSearch';
 import { analyticsAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import DashboardSkeleton from '../components/DashboardSkeleton';
+import AdminExpertManagement from '../components/admin/AdminExpertManagement';
 import { Toaster, toast } from 'sonner';
 
 import UserPermissionsManager from '../components/admin/UserPermissionsManager';
@@ -110,7 +111,14 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                   </div>
                 )}
               </button>
-              <AnimatePresence>
+                      {activeTab === 'experts' && (
+          <motion.div data-testid="experts-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <AdminExpertManagement />
+            </motion.div>
+          </motion.div>
+        )}
+        <AnimatePresence>
                 {showNotifications && (
                   <>
                     <motion.div
@@ -189,6 +197,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
               { id: 'results', label: 'Student Results' },
               { id: 'permissions', label: 'Permission Matrix' },
               { id: 'cia-builder', label: 'CIA Engine' }
+              ,{ id: 'experts', label: 'Expert Management' }
             ].map(tab => (
               <button 
                 key={tab.id} 

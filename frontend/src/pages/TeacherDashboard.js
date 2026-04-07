@@ -5,6 +5,7 @@ import { BookOpen, NotePencil, ChartLine, Users, Eye, SignOut, Clipboard, Calend
 import { analyticsAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import DashboardSkeleton from '../components/DashboardSkeleton';
+import FacultyExpertSubmissions from '../components/faculty/FacultyExpertSubmissions';
 import AttendanceMarker from '../components/faculty/AttendanceMarker';
 import FacultyTimetableGrid from '../components/faculty/FacultyTimetableGrid';
 import FacultyProfile from '../components/faculty/FacultyProfile';
@@ -201,6 +202,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
               { id: 'teaching', label: 'Teaching Work' },
               { id: 'cia', label: 'CIA Marks' },
               { id: 'profile', label: 'My Profile' },
+              { id: 'expert', label: 'Expert Module' },
             ].map(tab => (
               <button 
                 key={tab.id} 
