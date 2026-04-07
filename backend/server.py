@@ -23,7 +23,7 @@ import csv
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import or_, and_, delete, update, func, text, desc
+from sqlalchemy import or_, and_, delete, update, func, text, desc, Integer
 from sqlalchemy.orm import selectinload
 from database import get_db
 import models
@@ -5816,7 +5816,7 @@ async def override_student_attendance(
         models.AttendanceRecord.student_id == student_id,
         models.AttendanceRecord.subject_code == subject_code,
         models.AttendanceRecord.date == cast(req.date, Date),
-        models.AttendanceRecord.period_no == req.period_no,
+        models.AttendanceRecord.period_slot_id == str(req.period_no),
         models.AttendanceRecord.is_deleted == False
     )
     result = await session.execute(stmt)
@@ -5929,6 +5929,7 @@ class ManualRegistrationCreate(BaseModel):
 async def manual_add_registration(req: ManualRegistrationCreate, user: dict = Depends(require_role("exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
     """Allow Exam Cell to explicitly inject a student registration"""
     row = models.CourseRegistration(
+        college_id=user["college_id"],
         student_id=req.student_id,
         semester=req.semester,
         academic_year=req.academic_year,
@@ -7867,14 +7868,17 @@ async def add_principal_calendar_event(
     user: dict = Depends(require_role("principal", "admin")),
     session: AsyncSession = Depends(get_db)
 ):
-    """Add high-level institutional events to the active academic calendar."""
+    """Add high-level institutional events to the most recent academic calendar."""
     college_id = user["college_id"]
     
-    # Find active calendar
-    cal_r = await session.execute(select(models.AcademicCalendar).where(
-        models.AcademicCalendar.college_id == college_id,
-        models.AcademicCalendar.is_active == True
-    ))
+    # Find most recent calendar (no is_active column exists; use end_date >= today or latest)
+    from datetime import date as date_type
+    cal_r = await session.execute(
+        select(models.AcademicCalendar).where(
+            models.AcademicCalendar.college_id == college_id,
+            models.AcademicCalendar.end_date >= date_type.today()
+        ).order_by(models.AcademicCalendar.start_date.desc()).limit(1)
+    )
     calendar = cal_r.scalars().first()
     if not calendar:
         raise HTTPException(status_code=404, detail="No active academic calendar found")
@@ -7896,23 +7900,32 @@ async def add_principal_calendar_event(
 @app.get("/api/principal/reports/academic-performance")
 async def get_academic_performance(
     semester: int,
-    academic_year: str,
+    academic_year: Optional[str] = None,
     user: dict = Depends(require_role("principal", "admin")),
     session: AsyncSession = Depends(get_db)
 ):
-    """Aggregates pass/fail statistics grouped by department and subject."""
+    """Aggregates pass/fail statistics grouped by department and subject.
+    SemesterGrade has: student_id, semester, course_id, grade (string), credits_earned.
+    No grade_points, no academic_year, no college_id on this model. Scope via User.college_id join.
+    Pass = grade != 'F' and grade != 'AB' (absent).
+    """
     stmt = select(
         models.SemesterGrade.course_id,
         models.User.profile_data['department'].astext.label('department_id'),
         func.count(models.SemesterGrade.id).label("total_students"),
-        func.sum(func.cast(models.SemesterGrade.grade_points >= 4, models.Integer)).label("passed_students"), # Assuming >=4 is pass
-        func.avg(models.SemesterGrade.grade_points).label("average_grade_point")
+        func.sum(
+            func.cast(
+                and_(
+                    models.SemesterGrade.grade != 'F',
+                    models.SemesterGrade.grade != 'AB'
+                ), Integer
+            )
+        ).label("passed_students")
     ).join(
         models.User, models.User.id == models.SemesterGrade.student_id
     ).where(
-        models.SemesterGrade.college_id == user["college_id"],
-        models.SemesterGrade.semester == semester,
-        models.SemesterGrade.academic_year == academic_year
+        models.User.college_id == user["college_id"],
+        models.SemesterGrade.semester == semester
     ).group_by(
         models.SemesterGrade.course_id,
         models.User.profile_data['department'].astext
@@ -7931,8 +7944,7 @@ async def get_academic_performance(
             "total_students": total,
             "passed_students": passed,
             "failed_students": total - passed,
-            "pass_percentage": round((passed / total * 100) if total > 0 else 0, 2),
-            "average_grade_point": round(row.average_grade_point or 0, 2)
+            "pass_percentage": round((passed / total * 100) if total > 0 else 0, 2)
         })
     return data
 
@@ -7972,15 +7984,16 @@ async def get_attendance_compliance(
         }
         
     # Query 2: Unmarked periods grouped by department
+    # PeriodSlot has: department_id, period_slot_id is FK'd by AttendanceRecord.period_slot_id
+    # No timetable_id on PeriodSlot. PeriodSlot has academic_year directly.
     unmarked_stmt = text('''
         SELECT 
-            tt.department_id as department,
+            ps.department_id as department,
             COUNT(ps.id) as unmarked_slots
         FROM period_slots ps
-        JOIN timetables tt ON tt.id = ps.timetable_id
-        LEFT JOIN attendance_records ar ON ar.timetable_id = tt.id AND ar.date = ps.date AND ar.period_number = ps.period_number AND ar.is_deleted = false
-        WHERE ps.college_id = :college_id AND tt.academic_year = :academic_year AND ps.date <= CURRENT_DATE AND ar.id IS NULL AND ps.is_deleted = false
-        GROUP BY tt.department_id
+        LEFT JOIN attendance_records ar ON ar.period_slot_id = ps.id AND ar.is_deleted = false
+        WHERE ps.college_id = :college_id AND ps.academic_year = :academic_year AND ar.id IS NULL AND ps.is_deleted = false
+        GROUP BY ps.department_id
     ''')
     unmarked_r = await session.execute(unmarked_stmt, {"college_id": college_id, "academic_year": academic_year})
     unmarked_slots = {}
@@ -8005,24 +8018,25 @@ async def get_cia_status(
     user: dict = Depends(require_role("principal", "admin")),
     session: AsyncSession = Depends(get_db)
 ):
-    """Tracks submission pipeline (draft, submitted, HOD approved) of CIA marks."""
-    # We join FacultyAssignment with MarkEntry to see the status per assignment
+    """Tracks submission pipeline (draft, submitted, HOD approved) of CIA marks.
+    FacultyAssignment has: department (string, not department_id), subject_code, college_id, academic_year.
+    MarkEntry has: course_id (= subject_code), faculty_id, extra_data JSONB. No college_id.
+    Join via faculty_id + subject_code matching."""
     stmt = select(
-        models.FacultyAssignment.department_id,
+        models.FacultyAssignment.department,
         models.FacultyAssignment.subject_code,
         func.coalesce(models.MarkEntry.extra_data['status'].astext, 'pending').label('cia_status'),
         func.count(models.FacultyAssignment.id).label('count')
     ).outerjoin(
         models.MarkEntry, and_(
-            models.MarkEntry.subject_code == models.FacultyAssignment.subject_code,
-            models.MarkEntry.college_id == models.FacultyAssignment.college_id
-            # Distinct entry linkage assumed here for aggregation sake
+            models.MarkEntry.course_id == models.FacultyAssignment.subject_code,
+            models.MarkEntry.faculty_id == models.FacultyAssignment.teacher_id
         )
     ).where(
         models.FacultyAssignment.college_id == user["college_id"],
         models.FacultyAssignment.academic_year == academic_year
     ).group_by(
-        models.FacultyAssignment.department_id,
+        models.FacultyAssignment.department,
         models.FacultyAssignment.subject_code,
         func.coalesce(models.MarkEntry.extra_data['status'].astext, 'pending')
     )
@@ -8031,7 +8045,7 @@ async def get_cia_status(
     data = []
     for r in rows:
         data.append({
-            "department_id": r.department_id,
+            "department": r.department,
             "subject_code": r.subject_code,
             "status": r.cia_status,
             "count": r.count
@@ -8073,10 +8087,21 @@ async def reassign_grievance(
     user: dict = Depends(require_role("principal", "admin")),
     session: AsyncSession = Depends(get_db)
 ):
-    """Principal re-assigns a grievance to a specific department."""
+    """Principal re-assigns a grievance to the HOD of a target department.
+    Grievance model has assigned_to (FK to users), not assigned_department.
+    We look up the department's HOD and set assigned_to to that user."""
     target_dept = req.get("department_id")
     if not target_dept:
         raise HTTPException(status_code=400, detail="Missing department_id")
+    
+    # Find HOD of target department
+    dept_r = await session.execute(select(models.Department).where(
+        models.Department.college_id == user["college_id"],
+        or_(models.Department.id == target_dept, models.Department.code == target_dept)
+    ))
+    dept = dept_r.scalars().first()
+    if not dept or not dept.hod_user_id:
+        raise HTTPException(status_code=404, detail=f"Department '{target_dept}' not found or has no HOD assigned")
         
     gr = await session.execute(select(models.Grievance).where(
         models.Grievance.id == grievance_id,
@@ -8086,9 +8111,10 @@ async def reassign_grievance(
     if not grievance:
         raise HTTPException(status_code=404, detail="Grievance not found")
         
-    grievance.assigned_department = target_dept
+    grievance.assigned_to = dept.hod_user_id
+    grievance.status = "in_review"
     await session.commit()
-    return {"message": f"Grievance reassigned to {target_dept}"}
+    return {"message": f"Grievance reassigned to HOD of {dept.name}"}
 
 @app.get("/api/principal/infrastructure")
 async def get_principal_infrastructure(
@@ -8632,21 +8658,14 @@ class ExpertAssignRequest(BaseModel):
     department_id: Optional[str] = None
 
 @app.post("/api/admin/experts/assign")
-async def assign_expert(req: ExpertAssignRequest, request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    # Check if user is admin
-    u = (await session.execute(select(models.User).where(models.User.id == user_id))).scalars().first()
-    if u.role not in ["admin", "super_admin"]:
-        raise HTTPException(status_code=403, detail="Must be admin to assign experts")
-    
+async def assign_expert(req: ExpertAssignRequest, user: dict = Depends(require_role("admin", "super_admin")), session: AsyncSession = Depends(get_db)):
     assignment = models.ExpertAssignment(
-        college_id=college_id,
+        college_id=user["college_id"],
         expert_user_id=req.expert_user_id,
         subject_code=req.subject_code,
         department_id=req.department_id,
         academic_year=req.academic_year,
-        assigned_by=user_id
+        assigned_by=user["id"]
     )
     session.add(assignment)
     try:
@@ -8657,18 +8676,17 @@ async def assign_expert(req: ExpertAssignRequest, request: Request, session: Asy
     return {"message": "Expert assigned successfully", "id": assignment.id}
 
 @app.get("/api/expert/my-assignments")
-async def get_my_assignments(request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
+async def get_my_assignments(user: dict = Depends(require_role("expert")), session: AsyncSession = Depends(get_db)):
     res = await session.execute(
         select(models.ExpertAssignment)
-        .where(models.ExpertAssignment.expert_user_id == user_id, models.ExpertAssignment.is_active == True)
+        .where(models.ExpertAssignment.expert_user_id == user["id"], models.ExpertAssignment.is_active == True)
     )
     return res.scalars().all()
 
 @app.get("/api/expert/dashboard")
-async def get_expert_dashboard(request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
+async def get_expert_dashboard(user: dict = Depends(require_role("expert")), session: AsyncSession = Depends(get_db)):
+    user_id = user["id"]
+    college_id = user["college_id"]
     
     # Active assignments count
     assignments_res = await session.execute(
@@ -8728,15 +8746,14 @@ class QuestionPaperReview(BaseModel):
     comments: Optional[str] = None
 
 @app.put("/api/expert/question-papers/{paper_id}/review")
-async def review_question_paper(paper_id: str, req: QuestionPaperReview, request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
+async def review_question_paper(paper_id: str, req: QuestionPaperReview, user: dict = Depends(require_role("expert")), session: AsyncSession = Depends(get_db)):
     paper = (await session.execute(select(models.QuestionPaperSubmission).where(models.QuestionPaperSubmission.id == paper_id))).scalars().first()
     if not paper:
         raise HTTPException(status_code=404, detail="Paper not found")
     
     paper.status = req.status
     paper.expert_comments = req.comments
-    paper.expert_id = user_id
+    paper.expert_id = user["id"]
     paper.expert_reviewed_at = func.now()
     if req.status == "revision_requested":
         paper.revision_count += 1
@@ -8745,9 +8762,9 @@ async def review_question_paper(paper_id: str, req: QuestionPaperReview, request
     return {"message": "Review submitted successfully"}
 
 @app.get("/api/expert/question-papers")
-async def get_expert_question_papers(request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
+async def get_expert_question_papers(user: dict = Depends(require_role("expert")), session: AsyncSession = Depends(get_db)):
+    user_id = user["id"]
+    college_id = user["college_id"]
     
     subs_res = await session.execute(
         select(models.ExpertAssignment.subject_code)
@@ -8788,14 +8805,11 @@ class TeachingEvalRequest(BaseModel):
     evaluation_date: str
 
 @app.post("/api/expert/evaluations")
-async def submit_teaching_evaluation(req: TeachingEvalRequest, request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    
+async def submit_teaching_evaluation(req: TeachingEvalRequest, user: dict = Depends(require_role("expert")), session: AsyncSession = Depends(get_db)):
     import datetime
     eval_model = models.TeachingEvaluation(
-        college_id=college_id,
-        expert_id=user_id,
+        college_id=user["college_id"],
+        expert_id=user["id"],
         faculty_id=req.faculty_id,
         subject_code=req.subject_code,
         academic_year=req.academic_year,
@@ -8812,9 +8826,9 @@ async def submit_teaching_evaluation(req: TeachingEvalRequest, request: Request,
     return {"message": "Evaluation submitted successfully"}
 
 @app.get("/api/expert/study-materials")
-async def get_expert_study_materials(request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
+async def get_expert_study_materials(user: dict = Depends(require_role("expert")), session: AsyncSession = Depends(get_db)):
+    user_id = user["id"]
+    college_id = user["college_id"]
     
     subs_res = await session.execute(
         select(models.ExpertAssignment.subject_code)
@@ -8842,39 +8856,32 @@ async def get_expert_study_materials(request: Request, session: AsyncSession = D
     return results
 
 @app.put("/api/expert/study-materials/{mat_id}/review")
-async def review_study_material(mat_id: str, req: QuestionPaperReview, request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
+async def review_study_material(mat_id: str, req: QuestionPaperReview, user: dict = Depends(require_role("expert")), session: AsyncSession = Depends(get_db)):
     mat = (await session.execute(select(models.StudyMaterial).where(models.StudyMaterial.id == mat_id))).scalars().first()
     if not mat:
         raise HTTPException(status_code=404, detail="Material not found")
     
     mat.status = req.status
     mat.expert_comments = req.comments
-    mat.expert_id = user_id
+    mat.expert_id = user["id"]
     mat.expert_reviewed_at = func.now()
         
     await session.commit()
     return {"message": "Material review submitted successfully"}
 
 @app.get("/api/faculty/my-evaluations")
-async def get_faculty_evaluations(request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    
+async def get_faculty_evaluations(user: dict = Depends(require_role("teacher", "hod", "expert")), session: AsyncSession = Depends(get_db)):
     res = await session.execute(
         select(models.TeachingEvaluation)
-        .where(models.TeachingEvaluation.college_id == college_id, models.TeachingEvaluation.faculty_id == user_id)
+        .where(models.TeachingEvaluation.college_id == user["college_id"], models.TeachingEvaluation.faculty_id == user["id"])
         .order_by(models.TeachingEvaluation.evaluation_date.desc())
     )
     return res.scalars().all()
 
 @app.get("/api/student/study-materials")
-async def get_student_materials(subject_code: Optional[str] = None, request: Request = None, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    
+async def get_student_materials(subject_code: Optional[str] = None, user: dict = Depends(require_role("student")), session: AsyncSession = Depends(get_db)):
     query = select(models.StudyMaterial).where(
-        models.StudyMaterial.college_id == college_id,
+        models.StudyMaterial.college_id == user["college_id"],
         models.StudyMaterial.status == 'expert_approved'
     )
     if subject_code:
@@ -8893,13 +8900,10 @@ class FacultyQuestionPaper(BaseModel):
     paper_url: str
 
 @app.post("/api/faculty/question-papers")
-async def faculty_submit_qp(req: FacultyQuestionPaper, request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    
+async def faculty_submit_qp(req: FacultyQuestionPaper, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
     qp = models.QuestionPaperSubmission(
-        college_id=college_id,
-        faculty_id=user_id,
+        college_id=user["college_id"],
+        faculty_id=user["id"],
         subject_code=req.subject_code,
         academic_year=req.academic_year,
         semester=req.semester,
@@ -8912,13 +8916,10 @@ async def faculty_submit_qp(req: FacultyQuestionPaper, request: Request, session
     return {"message": "Question paper submitted successfully", "id": qp.id}
 
 @app.get("/api/faculty/question-papers")
-async def faculty_get_qps(request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    
+async def faculty_get_qps(user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
     res = await session.execute(
         select(models.QuestionPaperSubmission)
-        .where(models.QuestionPaperSubmission.college_id == college_id, models.QuestionPaperSubmission.faculty_id == user_id)
+        .where(models.QuestionPaperSubmission.college_id == user["college_id"], models.QuestionPaperSubmission.faculty_id == user["id"])
         .order_by(models.QuestionPaperSubmission.created_at.desc())
     )
     return res.scalars().all()
@@ -8931,13 +8932,10 @@ class FacultyStudyMaterial(BaseModel):
     material_type: str
 
 @app.post("/api/faculty/study-materials")
-async def faculty_submit_mat(req: FacultyStudyMaterial, request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    
+async def faculty_submit_mat(req: FacultyStudyMaterial, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
     sm = models.StudyMaterial(
-        college_id=college_id,
-        faculty_id=user_id,
+        college_id=user["college_id"],
+        faculty_id=user["id"],
         subject_code=req.subject_code,
         title=req.title,
         description=req.description,
@@ -8950,31 +8948,23 @@ async def faculty_submit_mat(req: FacultyStudyMaterial, request: Request, sessio
     return {"message": "Study material submitted successfully", "id": sm.id}
 
 @app.get("/api/faculty/study-materials")
-async def faculty_get_mats(request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    
+async def faculty_get_mats(user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
     res = await session.execute(
         select(models.StudyMaterial)
-        .where(models.StudyMaterial.college_id == college_id, models.StudyMaterial.faculty_id == user_id)
+        .where(models.StudyMaterial.college_id == user["college_id"], models.StudyMaterial.faculty_id == user["id"])
         .order_by(models.StudyMaterial.created_at.desc())
     )
     return res.scalars().all()
 
 @app.get("/api/admin/experts")
-async def get_admin_experts(request: Request, session: AsyncSession = Depends(get_db)):
-    user_id = await get_current_user(request)
-    college_id = await get_user_college(user_id, session)
-    u = (await session.execute(select(models.User).where(models.User.id == user_id))).scalars().first()
-    if u.role not in ["admin", "super_admin"]:
-        raise HTTPException(status_code=403, detail="Must be admin")
-    
+async def get_admin_experts(user: dict = Depends(require_role("admin", "super_admin")), session: AsyncSession = Depends(get_db)):
     res = await session.execute(
         select(models.User.id, models.User.name, models.User.email, models.User.profile_data)
-        .where(models.User.college_id == college_id, models.User.role == "expert")
+        .where(models.User.college_id == user["college_id"], models.User.role == "expert")
     )
     return [{"id": r[0], "name": r[1], "email": r[2], "profile": r[3]} for r in res.fetchall()]
 
 
 import nodal_routes
 nodal_routes.setup_nodal_routes(app, require_role, get_current_user)
+
