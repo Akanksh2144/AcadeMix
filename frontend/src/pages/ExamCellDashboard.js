@@ -13,6 +13,7 @@ import {
   Sun,
   Moon,
   Bell,
+  UserCircle,
 } from "@phosphor-icons/react";
 import { examCellAPI, marksAPI } from "../services/api";
 import { useTheme } from "../contexts/ThemeContext";
