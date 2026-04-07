@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import UserProfileModal from '../components/UserProfileModal';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BookOpen, Users, ChartBar, GraduationCap, SignOut, Database, Sun, Moon, Bell, Info } from '@phosphor-icons/react';
+import { BookOpen, Users, ChartBar, GraduationCap, SignOut, Database, Sun, Moon, Bell, Info, UserCircle } from '@phosphor-icons/react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { StudentResultsSearch } from '../components/StudentResultsSearch';
 import { analyticsAPI } from '../services/api';

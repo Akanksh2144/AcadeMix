@@ -32,7 +32,7 @@ const LoginPage = ({ onLogin }) => {
     { role: 'Alumni', collegeId: 'ALUMNI001', password: 'alumni123', color: 'bg-rose-500 hover:bg-rose-600', icon: '🌟' },
     { role: 'Parent', collegeId: 'PARENT001', password: 'parent123', color: 'bg-cyan-500 hover:bg-cyan-600', icon: '👨‍👩‍👧' },
     { role: 'Industry', collegeId: 'IND001', password: 'industry123', color: 'bg-violet-500 hover:bg-violet-600', icon: '🏢' },
-    { role: 'Principal', collegeId: 'PRIN001', password: 'principal123', color: 'bg-fuchsia-500 hover:bg-fuchsia-600', icon: '🏫' },
+    { role: 'Principal', collegeId: 'PRIN001', password: 'teacher123', color: 'bg-fuchsia-500 hover:bg-fuchsia-600', icon: '🏫' },
   ];
 
   const handleSubmit = async (e) => {

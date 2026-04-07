@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import UserProfileModal from '../components/UserProfileModal';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Buildings, Briefcase, FileText, ChartLineUp, SignOut, DownloadSimple, Users, Trophy, Plus, Sun, Moon, Bell, Info, BookOpen } from '@phosphor-icons/react';
+import { Buildings, Briefcase, FileText, ChartLineUp, SignOut, DownloadSimple, Users, Trophy, Plus, Sun, Moon, Bell, Info, BookOpen, UserCircle } from '@phosphor-icons/react';
 import { tpoAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import DashboardSkeleton from '../components/DashboardSkeleton';
