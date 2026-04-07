@@ -302,5 +302,17 @@ export const hodLeaveAPI = {
   reviewCancellation: (leaveId, data) => api.patch(`/api/hod/leave/${leaveId}/review-cancellation`, data),
 };
 
+export const tpoAPI = {
+  getCompanies: () => api.get('/api/tpo/companies'),
+  createCompany: (data) => api.post('/api/tpo/companies', data),
+  getDrives: () => api.get('/api/tpo/drives'),
+  createDrive: (data) => api.post('/api/tpo/drives', data),
+  updateDrive: (id, data) => api.put(`/api/tpo/drives/${id}`, data),
+  getApplicants: (id) => api.get(`/api/tpo/drives/${id}/applicants`),
+  shortlistBulk: (id, ids) => api.put(`/api/tpo/drives/${id}/shortlist`, { student_ids: ids }),
+  logResult: (id, data) => api.put(`/api/tpo/drives/${id}/results`, data),
+  selectCandidate: (id, data) => api.put(`/api/tpo/drives/${id}/select`, data),
+  getStats: () => api.get('/api/tpo/statistics'),
+};
 
 export default api;
