@@ -822,11 +822,12 @@ class AlumniEventRegistration(Base, SoftDeleteMixin):
     )
 
 class AlumniGuestLecture(Base, SoftDeleteMixin):
-    """Guest lecture by alumni — tracked separately for department queries."""
+    """Guest lecture by alumni, retired faculty, or industry — polymorphic via source_type."""
     __tablename__ = "alumni_guest_lectures"
     id              = Column(String, primary_key=True, index=True, default=generate_uuid)
     college_id      = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
-    alumni_id       = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    lecturer_id     = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    source_type     = Column(String, nullable=False, server_default='alumni')  # alumni/retired_faculty/industry
     department_id   = Column(String, ForeignKey("departments.id", ondelete="CASCADE"), nullable=False, index=True)
     date            = Column(Date, nullable=False)
     topic           = Column(String, nullable=False)
@@ -979,3 +980,50 @@ class EmployerFeedback(Base, SoftDeleteMixin):
     overall_feedback      = Column(String, nullable=False)
     feedback_period       = Column(String, nullable=False) # 3_months, 6_months, 1_year
     created_at            = Column(DateTime(timezone=True), server_default=func.now())
+
+# ─── Retired Faculty Module ─────────────────────────────────────
+
+class RetiredFacultyAdvisory(Base, SoftDeleteMixin):
+    """Advisory/committee appointments for retired faculty."""
+    __tablename__ = "retired_faculty_advisory"
+    id                  = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id          = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    retired_faculty_id  = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    role_type           = Column(String, nullable=False)  # research_advisor/board_of_studies/curriculum_committee/iqac_member
+    scope_description   = Column(String, nullable=True)
+    start_date          = Column(Date, nullable=False)
+    end_date            = Column(Date, nullable=True)
+    appointed_by        = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    is_active           = Column(Boolean, nullable=False, server_default='true')
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
+
+class RetiredFacultyResearch(Base, SoftDeleteMixin):
+    """Ongoing/completed research projects by retired faculty — feeds NAAC Criterion 3.3."""
+    __tablename__ = "retired_faculty_research"
+    id                  = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id          = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    retired_faculty_id  = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title               = Column(String, nullable=False)
+    funding_agency      = Column(String, nullable=True)
+    co_investigators    = Column(JSONB, nullable=True, server_default='[]')
+    start_date          = Column(Date, nullable=False)
+    end_date            = Column(Date, nullable=True)
+    status              = Column(String, nullable=False, server_default='ongoing')  # ongoing/completed/submitted
+    grant_amount        = Column(Float, nullable=True)
+    publication_urls    = Column(JSONB, nullable=True, server_default='[]')
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())
+
+class ConsultancyEngagement(Base, SoftDeleteMixin):
+    """Industry/institutional consultancy by retired faculty — feeds NAAC Criterion 3.5."""
+    __tablename__ = "consultancy_engagements"
+    id                  = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id          = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    retired_faculty_id  = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    client_organization = Column(String, nullable=False)
+    topic               = Column(String, nullable=False)
+    start_date          = Column(Date, nullable=False)
+    end_date            = Column(Date, nullable=True)
+    is_paid             = Column(Boolean, nullable=False, server_default='false')
+    fee_amount          = Column(Float, nullable=True)
+    description         = Column(String, nullable=True)
+    created_at          = Column(DateTime(timezone=True), server_default=func.now())

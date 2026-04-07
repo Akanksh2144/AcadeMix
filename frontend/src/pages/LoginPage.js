@@ -27,12 +27,14 @@ const LoginPage = ({ onLogin }) => {
     { role: 'Student', collegeId: '22WJ8A6745', password: '22WJ8A6745', color: 'bg-teal-500 hover:bg-teal-600', icon: '🎓' },
     { role: 'Teacher', collegeId: 'T001', password: 'teacher123', color: 'bg-indigo-500 hover:bg-indigo-600', icon: '👨‍🏫' },
     { role: 'HOD', collegeId: 'HOD001', password: 'hod123', color: 'bg-amber-500 hover:bg-amber-600', icon: '👔' },
+    { role: 'Exam Cell', collegeId: 'EC001', password: 'examcell123', color: 'bg-orange-500 hover:bg-orange-600', icon: '📋' },
     { role: 'Nodal Officer', collegeId: 'N001', password: 'nodal123', color: 'bg-emerald-500 hover:bg-emerald-600', icon: '🏛️' },
     { role: 'T&P Officer', collegeId: 'TPO001', password: 'tpo123', color: 'bg-blue-500 hover:bg-blue-600', icon: '💼' },
     { role: 'Alumni', collegeId: 'ALUMNI001', password: 'alumni123', color: 'bg-rose-500 hover:bg-rose-600', icon: '🌟' },
     { role: 'Parent', collegeId: 'PARENT001', password: 'parent123', color: 'bg-cyan-500 hover:bg-cyan-600', icon: '👨‍👩‍👧' },
     { role: 'Industry', collegeId: 'IND001', password: 'industry123', color: 'bg-violet-500 hover:bg-violet-600', icon: '🏢' },
     { role: 'Principal', collegeId: 'PRIN001', password: 'teacher123', color: 'bg-fuchsia-500 hover:bg-fuchsia-600', icon: '🏫' },
+    { role: 'Retired Faculty', collegeId: 'RF001', password: 'retired123', color: 'bg-lime-600 hover:bg-lime-700', icon: '🎖️' },
   ];
 
   const handleSubmit = async (e) => {

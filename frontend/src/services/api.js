@@ -404,3 +404,22 @@ export const principalAPI = {
   annualReportExportUrl: (year) => api.defaults.baseURL + '/api/principal/reports/annual?academic_year=' + year,
   calendarEvents: (data) => api.post('/api/principal/calendar-events', data)
 };
+
+export const retiredFacultyAPI = {
+  // Self-service
+  dashboard: () => api.get('/api/retired-faculty/dashboard'),
+  myRoles: () => api.get('/api/retired-faculty/my-roles'),
+  getResearch: () => api.get('/api/retired-faculty/research'),
+  createResearch: (data) => api.post('/api/retired-faculty/research', data),
+  getConsultancy: () => api.get('/api/retired-faculty/consultancy'),
+  createConsultancy: (data) => api.post('/api/retired-faculty/consultancy', data),
+  myEntitlements: () => api.get('/api/retired-faculty/my-entitlements'),
+  registerEvent: (eventId) => api.post('/api/retired-faculty/events/' + eventId + '/register'),
+  // Admin
+  availableLecturers: () => api.get('/api/admin/retired-faculty/available-lecturers'),
+  createAdvisoryRole: (userId, data) => api.post('/api/admin/retired-faculty/' + userId + '/advisory-roles', data),
+  getEntitlements: (userId) => api.get('/api/admin/retired-faculty/' + userId + '/entitlements'),
+  updateEntitlements: (userId, data) => api.put('/api/admin/retired-faculty/' + userId + '/entitlements', data),
+  researchReport: () => api.get('/api/admin/reports/retired-faculty-research'),
+  consultancyReport: () => api.get('/api/admin/reports/consultancy'),
+};
