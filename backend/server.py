@@ -6788,3 +6788,754 @@ async def request_mentorship(
     session.add(m)
     await session.commit()
     return {"message": "Mentorship requested"}
+
+# =====================================================================================
+# PARENTS MODULE
+# =====================================================================================
+
+async def verify_parent_link(user: dict, student_id: str, session: AsyncSession) -> models.User:
+    """Verify that parent is linked to the student and return the full student User object.
+    Returns the student User — gives college_id, profile_data, id in one query."""
+    link = (await session.execute(
+        select(models.ParentStudentLink).where(
+            models.ParentStudentLink.parent_id == user["id"],
+            models.ParentStudentLink.student_id == student_id,
+            models.ParentStudentLink.is_deleted == False
+        )
+    )).scalar_one_or_none()
+
+    if not link:
+        raise HTTPException(status_code=403, detail="You are not linked to this student")
+
+    student = await session.get(models.User, student_id)
+    if not student or student.is_deleted:
+        raise HTTPException(status_code=404, detail="Student not found")
+
+    return student
+
+
+# ─── Admin: Parent Link Management ───────────────────────────────
+
+@app.post("/api/admin/parents/link")
+async def link_parent_student(
+    req: dict = Body(...),
+    user: dict = Depends(require_role("admin", "nodal_officer", "super_admin")),
+    session: AsyncSession = Depends(get_db)
+):
+    """Admin creates a parent–student link."""
+    link = models.ParentStudentLink(
+        college_id=user["college_id"],
+        parent_id=req["parent_id"],
+        student_id=req["student_id"],
+        relationship=req.get("relationship", "guardian"),
+        is_primary=req.get("is_primary", False)
+    )
+    session.add(link)
+    await session.commit()
+    return {"message": "Parent-student link created"}
+
+@app.get("/api/admin/parents/links")
+async def list_parent_links(
+    user: dict = Depends(require_role("admin", "nodal_officer", "super_admin")),
+    session: AsyncSession = Depends(get_db)
+):
+    stmt = select(models.ParentStudentLink).where(
+        models.ParentStudentLink.college_id == user["college_id"],
+        models.ParentStudentLink.is_deleted == False
+    )
+    links = (await session.execute(stmt)).scalars().all()
+    return links
+
+
+# ─── Parent: Children List ───────────────────────────────────────
+
+@app.get("/api/parent/children")
+async def get_parent_children(
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    """List all students linked to this parent."""
+    stmt = select(models.ParentStudentLink, models.User).join(
+        models.User, models.User.id == models.ParentStudentLink.student_id
+    ).where(
+        models.ParentStudentLink.parent_id == user["id"],
+        models.ParentStudentLink.is_deleted == False,
+        models.User.is_deleted == False
+    )
+    results = (await session.execute(stmt)).all()
+
+    return [{
+        "student_id": u.id,
+        "name": u.name,
+        "email": u.email,
+        "relationship": link.relationship,
+        "is_primary": link.is_primary,
+        "profile": u.profile_data
+    } for link, u in results]
+
+
+# ─── Parent: Academics (grades, CGPA) ────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/academics")
+async def parent_child_academics(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+    cid = student.college_id
+
+    # Semester grades
+    grades_r = await session.execute(
+        select(models.SemesterGrade).where(
+            models.SemesterGrade.student_id == student_id,
+            models.SemesterGrade.college_id == cid,
+            models.SemesterGrade.is_deleted == False
+        ).order_by(models.SemesterGrade.semester)
+    )
+    grades = grades_r.scalars().all()
+
+    # Current registrations
+    regs_r = await session.execute(
+        select(models.CourseRegistration).where(
+            models.CourseRegistration.student_id == student_id,
+            models.CourseRegistration.is_deleted == False
+        ).order_by(models.CourseRegistration.semester.desc())
+    )
+    regs = regs_r.scalars().all()
+
+    return {
+        "student_name": student.name,
+        "profile": student.profile_data,
+        "semester_grades": [{
+            "semester": g.semester, "academic_year": g.academic_year,
+            "sgpa": g.sgpa, "cgpa": g.cgpa, "total_credits": g.total_credits,
+            "earned_credits": g.earned_credits, "arrear_count": g.arrear_count
+        } for g in grades],
+        "current_registrations": [{
+            "subject_code": r.subject_code, "subject_name": r.subject_name,
+            "semester": r.semester, "academic_year": r.academic_year,
+            "status": r.status
+        } for r in regs]
+    }
+
+
+# ─── Parent: Attendance (proxy) ──────────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/attendance")
+async def parent_child_attendance(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+
+    stmt = text("""
+        SELECT
+            subject_code,
+            COUNT(*) FILTER (WHERE status = 'present' OR status = 'od') AS present_count,
+            COUNT(*) AS total_count
+        FROM attendance_records
+        WHERE student_id = :student_id AND is_deleted = false
+        GROUP BY subject_code
+    """)
+    result = await session.execute(stmt, {"student_id": student_id})
+    rows = result.all()
+
+    return [{
+        "subject_code": r.subject_code,
+        "present_count": r.present_count,
+        "total_count": r.total_count,
+        "percentage": round(r.present_count * 100.0 / r.total_count, 1) if r.total_count > 0 else 0
+    } for r in rows]
+
+
+# ─── Parent: CIA Marks (proxy) ───────────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/cia-marks")
+async def parent_child_cia_marks(
+    student_id: str,
+    semester: Optional[int] = None,
+    academic_year: Optional[str] = None,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+    cid = student.college_id
+
+    # Mark entries
+    entries_r = await session.execute(
+        select(models.MarkEntry).where(
+            models.MarkEntry.student_id == student_id,
+            models.MarkEntry.is_deleted == False
+        )
+    )
+    entries = entries_r.scalars().all()
+
+    # CIA configs
+    cfg_stmt = select(models.SubjectCIAConfig).where(
+        models.SubjectCIAConfig.college_id == cid,
+        models.SubjectCIAConfig.is_deleted == False
+    )
+    if semester:
+        cfg_stmt = cfg_stmt.where(models.SubjectCIAConfig.semester == semester)
+    if academic_year:
+        cfg_stmt = cfg_stmt.where(models.SubjectCIAConfig.academic_year == academic_year)
+    configs = (await session.execute(cfg_stmt)).scalars().all()
+
+    # Templates
+    template_ids = list(set(c.template_id for c in configs))
+    tpl_map = {}
+    if template_ids:
+        tpl_r = await session.execute(
+            select(models.CIATemplate).where(models.CIATemplate.id.in_(template_ids))
+        )
+        tpl_map = {t.id: t for t in tpl_r.scalars().all()}
+
+    subject_map = {}
+    for cfg in configs:
+        tpl = tpl_map.get(cfg.template_id)
+        components = (tpl.components if tpl else []) or []
+        subj_entries = [e for e in entries if e.course_id == cfg.subject_code]
+        component_marks = []
+        total_obtained = 0
+        total_max = 0
+
+        for comp in components:
+            entry = next((e for e in subj_entries if e.exam_type == comp.get("type", "")), None)
+            obtained = entry.marks_obtained if entry else None
+            max_m = comp.get("max_marks", 0)
+            component_marks.append({
+                "name": comp.get("name", comp.get("type", "")),
+                "type": comp.get("type", ""),
+                "max_marks": max_m,
+                "marks_obtained": obtained
+            })
+            if obtained is not None:
+                total_obtained += obtained
+            total_max += max_m
+
+        subject_map[cfg.subject_code] = {
+            "subject_code": cfg.subject_code,
+            "subject_name": cfg.subject_name or cfg.subject_code,
+            "semester": cfg.semester,
+            "academic_year": cfg.academic_year,
+            "components": component_marks,
+            "total_cia": round(total_obtained, 1),
+            "total_max": total_max
+        }
+
+    return list(subject_map.values())
+
+
+# ─── Parent: Timetable (proxy) ───────────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/timetable")
+async def parent_child_timetable(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+    pd = student.profile_data or {}
+    department = pd.get("department")
+    batch = pd.get("batch")
+    section = pd.get("section")
+
+    if not all([department, batch, section]):
+        return []
+
+    dept_r = await session.execute(
+        select(models.Department).where(
+            models.Department.college_id == student.college_id,
+            or_(models.Department.code == department, models.Department.name == department)
+        )
+    )
+    dept = dept_r.scalars().first()
+    if not dept:
+        return []
+
+    current_academic_year = await get_current_academic_year(session, student.college_id)
+
+    result = await session.execute(
+        select(models.PeriodSlot).where(
+            models.PeriodSlot.department_id == dept.id,
+            models.PeriodSlot.batch == batch,
+            models.PeriodSlot.section == section,
+            models.PeriodSlot.academic_year == current_academic_year
+        )
+    )
+    slots = result.scalars().all()
+
+    faculty_ids = list(set([s.faculty_id for s in slots if s.faculty_id]))
+    faculty_map = {}
+    if faculty_ids:
+        fac_r = await session.execute(select(models.User.id, models.User.name).where(models.User.id.in_(faculty_ids)))
+        faculty_map = {f.id: f.name for f in fac_r.all()}
+
+    return [{
+        "id": s.id, "day": s.day, "period_no": s.period_no,
+        "start_time": s.start_time, "end_time": s.end_time,
+        "subject_code": s.subject_code, "subject_name": s.subject_name,
+        "faculty_id": s.faculty_id, "faculty_name": faculty_map.get(s.faculty_id, "Unknown"),
+        "slot_type": s.slot_type
+    } for s in slots]
+
+
+# ─── Parent: Subjects (proxy) ────────────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/subjects")
+async def parent_child_subjects(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+    pd = student.profile_data or {}
+    department = pd.get("department")
+    batch = pd.get("batch")
+    section = pd.get("section")
+
+    if not all([department, batch, section]):
+        return []
+
+    dept_r = await session.execute(
+        select(models.Department).where(
+            models.Department.college_id == student.college_id,
+            or_(models.Department.code == department, models.Department.name == department)
+        )
+    )
+    dept = dept_r.scalars().first()
+    if not dept:
+        return []
+
+    current_academic_year = await get_current_academic_year(session, student.college_id)
+
+    # Get distinct subjects from the timetable
+    result = await session.execute(
+        select(
+            models.PeriodSlot.subject_code,
+            models.PeriodSlot.subject_name,
+            models.PeriodSlot.faculty_id
+        ).where(
+            models.PeriodSlot.department_id == dept.id,
+            models.PeriodSlot.batch == batch,
+            models.PeriodSlot.section == section,
+            models.PeriodSlot.academic_year == current_academic_year
+        ).distinct(models.PeriodSlot.subject_code)
+    )
+    rows = result.all()
+
+    faculty_ids = list(set([r.faculty_id for r in rows if r.faculty_id]))
+    faculty_map = {}
+    if faculty_ids:
+        fac_r = await session.execute(select(models.User.id, models.User.name).where(models.User.id.in_(faculty_ids)))
+        faculty_map = {f.id: f.name for f in fac_r.all()}
+
+    return [{
+        "subject_code": r.subject_code,
+        "subject_name": r.subject_name,
+        "faculty_name": faculty_map.get(r.faculty_id, "TBA")
+    } for r in rows]
+
+
+# ─── Parent: Exam Schedule (proxy) ───────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/exam-schedule")
+async def parent_child_exam_schedule(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+    pd = student.profile_data or {}
+    department = pd.get("department")
+    batch = pd.get("batch")
+
+    if not department:
+        return []
+
+    dept_r = await session.execute(
+        select(models.Department).where(
+            models.Department.college_id == student.college_id,
+            or_(models.Department.code == department, models.Department.name == department)
+        )
+    )
+    dept = dept_r.scalars().first()
+    if not dept:
+        return []
+
+    stmt = select(models.ExamSchedule).where(
+        models.ExamSchedule.college_id == student.college_id,
+        models.ExamSchedule.department_id == dept.id,
+        models.ExamSchedule.is_published == True,
+        models.ExamSchedule.is_deleted == False
+    )
+    if batch:
+        stmt = stmt.where(models.ExamSchedule.batch == batch)
+    result = await session.execute(stmt.order_by(models.ExamSchedule.exam_date))
+    scheds = result.scalars().all()
+
+    return scheds
+
+
+# ─── Parent: Leaves (proxy) ──────────────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/leaves")
+async def parent_child_leaves(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+
+    result = await session.execute(
+        select(models.LeaveRequest).where(
+            models.LeaveRequest.applicant_id == student_id,
+            models.LeaveRequest.college_id == student.college_id
+        ).order_by(models.LeaveRequest.created_at.desc())
+    )
+    leaves = result.scalars().all()
+
+    return [{
+        "id": l.id, "leave_type": l.leave_type,
+        "from_date": l.from_date.isoformat(), "to_date": l.to_date.isoformat(),
+        "reason": l.reason, "status": l.status,
+        "reviewed_at": l.reviewed_at.isoformat() if l.reviewed_at else None,
+        "review_remarks": l.review_remarks
+    } for l in leaves]
+
+
+# ─── Parent: Faculty Contacts ────────────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/faculty-contacts")
+async def parent_child_faculty(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+    pd = student.profile_data or {}
+    department = pd.get("department")
+    batch = pd.get("batch")
+    section = pd.get("section")
+
+    if not all([department, batch, section]):
+        return []
+
+    dept_r = await session.execute(
+        select(models.Department).where(
+            models.Department.college_id == student.college_id,
+            or_(models.Department.code == department, models.Department.name == department)
+        )
+    )
+    dept = dept_r.scalars().first()
+    if not dept:
+        return []
+
+    current_academic_year = await get_current_academic_year(session, student.college_id)
+
+    # Get faculty IDs from period slots
+    slots_r = await session.execute(
+        select(models.PeriodSlot.faculty_id, models.PeriodSlot.subject_name).where(
+            models.PeriodSlot.department_id == dept.id,
+            models.PeriodSlot.batch == batch,
+            models.PeriodSlot.section == section,
+            models.PeriodSlot.academic_year == current_academic_year
+        ).distinct(models.PeriodSlot.faculty_id)
+    )
+    rows = slots_r.all()
+
+    faculty_ids = [r.faculty_id for r in rows if r.faculty_id]
+    if not faculty_ids:
+        return []
+
+    fac_r = await session.execute(
+        select(models.User).where(models.User.id.in_(faculty_ids))
+    )
+    faculty = fac_r.scalars().all()
+
+    return [{
+        "name": f.name,
+        "email": f.email,
+        "role": f.role,
+        "department": department
+    } for f in faculty]
+
+
+# ─── Parent: Mentor (proxy) ──────────────────────────────────────
+
+@app.get("/api/parent/children/{student_id}/mentor")
+async def parent_child_mentor(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+
+    stmt = select(models.MentorAssignment).where(
+        models.MentorAssignment.student_id == student_id,
+        models.MentorAssignment.college_id == student.college_id,
+        models.MentorAssignment.is_active == True,
+        models.MentorAssignment.is_deleted == False
+    )
+    assignment = (await session.execute(stmt)).scalar_one_or_none()
+    if not assignment:
+        return {"mentor": None}
+
+    mentor = await session.get(models.User, assignment.mentor_id)
+    return {
+        "mentor": {
+            "name": mentor.name if mentor else "Unknown",
+            "email": mentor.email if mentor else "",
+            "department": (student.profile_data or {}).get("department", "")
+        },
+        "assigned_date": assignment.created_at.isoformat() if assignment.created_at else None
+    }
+
+
+# ─── Parent: Academic Calendar (college-wide, no student gating) ─
+
+@app.get("/api/parent/academic-calendar")
+async def parent_academic_calendar(
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    result = await session.execute(
+        select(models.AcademicCalendar).where(
+            models.AcademicCalendar.college_id == user["college_id"],
+            models.AcademicCalendar.is_deleted == False
+        ).order_by(models.AcademicCalendar.start_date)
+    )
+    events = result.scalars().all()
+    return events
+
+
+# ─── Parent: Progress Report (HTMLResponse, print CSS) ───────────
+
+@app.get("/api/parent/children/{student_id}/progress-report", response_class=HTMLResponse)
+async def parent_progress_report(
+    student_id: str,
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    student = await verify_parent_link(user, student_id, session)
+    cid = student.college_id
+    pd = student.profile_data or {}
+
+    # College info
+    college = await session.get(models.College, cid)
+    college_name = college.name if college else "Institution"
+
+    # Attendance
+    att_r = await session.execute(text("""
+        SELECT subject_code,
+               COUNT(*) FILTER (WHERE status = 'present' OR status = 'od') AS present_count,
+               COUNT(*) AS total_count
+        FROM attendance_records
+        WHERE student_id = :sid AND is_deleted = false
+        GROUP BY subject_code
+    """), {"sid": student_id})
+    att_rows = att_r.all()
+
+    att_html = ""
+    total_present = 0
+    total_classes = 0
+    for a in att_rows:
+        pct = round(a.present_count * 100.0 / a.total_count, 1) if a.total_count > 0 else 0
+        color = "#22c55e" if pct >= 75 else "#ef4444"
+        att_html += f"<tr><td>{a.subject_code}</td><td>{a.present_count}</td><td>{a.total_count}</td><td style='color:{color};font-weight:bold'>{pct}%</td></tr>"
+        total_present += a.present_count
+        total_classes += a.total_count
+    overall_att = round(total_present * 100.0 / total_classes, 1) if total_classes > 0 else 0
+
+    # Semester grades
+    grades_r = await session.execute(
+        select(models.SemesterGrade).where(
+            models.SemesterGrade.student_id == student_id,
+            models.SemesterGrade.college_id == cid,
+            models.SemesterGrade.is_deleted == False
+        ).order_by(models.SemesterGrade.semester)
+    )
+    grades = grades_r.scalars().all()
+    grade_html = ""
+    for g in grades:
+        grade_html += f"<tr><td>Semester {g.semester}</td><td>{g.academic_year}</td><td>{g.sgpa or '-'}</td><td>{g.cgpa or '-'}</td><td>{g.earned_credits or 0}/{g.total_credits or 0}</td><td>{g.arrear_count or 0}</td></tr>"
+
+    # CIA marks summary
+    entries_r = await session.execute(
+        select(models.MarkEntry).where(models.MarkEntry.student_id == student_id, models.MarkEntry.is_deleted == False)
+    )
+    entries = entries_r.scalars().all()
+    cia_subjects = {}
+    for e in entries:
+        if e.course_id not in cia_subjects:
+            cia_subjects[e.course_id] = {"obtained": 0, "count": 0}
+        if e.marks_obtained is not None:
+            cia_subjects[e.course_id]["obtained"] += e.marks_obtained
+            cia_subjects[e.course_id]["count"] += 1
+    cia_html = ""
+    for subj, data in cia_subjects.items():
+        cia_html += f"<tr><td>{subj}</td><td>{round(data['obtained'], 1)}</td><td>{data['count']} components</td></tr>"
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+<title>Progress Report — {student.name}</title>
+<style>
+  @media print {{ body {{ margin: 0; }} @page {{ size: A4; margin: 15mm; }} }}
+  body {{ font-family: 'Segoe UI', sans-serif; color: #1e293b; max-width: 800px; margin: 0 auto; padding: 20px; }}
+  .header {{ text-align: center; border-bottom: 3px solid #4f46e5; padding-bottom: 16px; margin-bottom: 24px; }}
+  .header h1 {{ font-size: 22px; color: #4f46e5; margin: 0; }}
+  .header p {{ margin: 4px 0; color: #64748b; }}
+  .info-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 24px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; }}
+  .info-grid span {{ font-size: 13px; }} .info-grid strong {{ color: #334155; }}
+  h2 {{ font-size: 16px; border-bottom: 2px solid #e2e8f0; padding-bottom: 8px; margin-top: 28px; color: #334155; }}
+  table {{ width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }}
+  th, td {{ border: 1px solid #e2e8f0; padding: 8px 12px; text-align: left; }}
+  th {{ background: #f1f5f9; font-weight: 600; color: #475569; }}
+  .overall {{ font-size: 15px; font-weight: bold; color: {'#22c55e' if overall_att >= 75 else '#ef4444'}; }}
+  .print-btn {{ display: block; margin: 20px auto; padding: 10px 32px; background: #4f46e5; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }}
+  .print-btn:hover {{ background: #4338ca; }}
+  @media print {{ .print-btn {{ display: none; }} }}
+  .footer {{ text-align: center; font-size: 11px; color: #94a3b8; margin-top: 32px; padding-top: 16px; border-top: 1px solid #e2e8f0; }}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>{college_name}</h1>
+  <p>Student Progress Report</p>
+  <p style="font-size:12px; color:#94a3b8">Generated on {datetime.now().strftime('%d %B %Y')}</p>
+</div>
+
+<div class="info-grid">
+  <span><strong>Student Name:</strong> {student.name}</span>
+  <span><strong>Roll No:</strong> {student.email}</span>
+  <span><strong>Department:</strong> {pd.get('department', '-')}</span>
+  <span><strong>Batch:</strong> {pd.get('batch', '-')}</span>
+  <span><strong>Section:</strong> {pd.get('section', '-')}</span>
+  <span><strong>Overall Attendance:</strong> <span class="overall">{overall_att}%</span></span>
+</div>
+
+<h2>📊 Subject-wise Attendance</h2>
+<table>
+  <thead><tr><th>Subject</th><th>Present</th><th>Total</th><th>Percentage</th></tr></thead>
+  <tbody>{att_html if att_html else '<tr><td colspan="4" style="text-align:center;color:#94a3b8">No attendance data</td></tr>'}</tbody>
+</table>
+
+<h2>🎓 Semester Grades</h2>
+<table>
+  <thead><tr><th>Semester</th><th>Academic Year</th><th>SGPA</th><th>CGPA</th><th>Credits</th><th>Arrears</th></tr></thead>
+  <tbody>{grade_html if grade_html else '<tr><td colspan="6" style="text-align:center;color:#94a3b8">No grade data</td></tr>'}</tbody>
+</table>
+
+<h2>📝 CIA Summary</h2>
+<table>
+  <thead><tr><th>Subject</th><th>Total Marks Obtained</th><th>Components Evaluated</th></tr></thead>
+  <tbody>{cia_html if cia_html else '<tr><td colspan="3" style="text-align:center;color:#94a3b8">No CIA data</td></tr>'}</tbody>
+</table>
+
+<button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+
+<div class="footer">
+  <p>{college_name} | AcadMix ERP System | This is a computer-generated document</p>
+</div>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
+
+# ─── Parent: Notification Preferences ────────────────────────────
+
+@app.put("/api/parent/notification-preferences")
+async def update_notification_prefs(
+    prefs: dict = Body(...),
+    user: dict = Depends(require_role("parent")),
+    session: AsyncSession = Depends(get_db)
+):
+    u = await session.get(models.User, user["id"])
+    pd = u.profile_data or {}
+    pd["notification_preferences"] = prefs
+    u.profile_data = pd
+    await session.commit()
+    return {"message": "Notification preferences updated"}
+
+
+# ─── Grievances (cross-role) ─────────────────────────────────────
+
+@app.post("/api/grievances")
+async def submit_grievance(
+    req: dict = Body(...),
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db)
+):
+    """Any authenticated user can submit a grievance."""
+    grievance = models.Grievance(
+        college_id=user["college_id"],
+        submitted_by=user["id"],
+        submitted_by_role=user["role"],
+        category=req["category"],
+        subject=req["subject"],
+        description=req["description"]
+    )
+    session.add(grievance)
+    await session.commit()
+    return {"message": "Grievance submitted"}
+
+@app.get("/api/grievances/my")
+async def my_grievances(
+    user: dict = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db)
+):
+    result = await session.execute(
+        select(models.Grievance).where(
+            models.Grievance.submitted_by == user["id"],
+            models.Grievance.is_deleted == False
+        ).order_by(models.Grievance.created_at.desc())
+    )
+    return result.scalars().all()
+
+@app.get("/api/admin/grievances")
+async def admin_grievances(
+    status: Optional[str] = None,
+    role: Optional[str] = None,
+    user: dict = Depends(require_role("admin", "nodal_officer", "super_admin", "hod")),
+    session: AsyncSession = Depends(get_db)
+):
+    stmt = select(models.Grievance, models.User.name).join(
+        models.User, models.User.id == models.Grievance.submitted_by
+    ).where(
+        models.Grievance.college_id == user["college_id"],
+        models.Grievance.is_deleted == False
+    )
+    if status:
+        stmt = stmt.where(models.Grievance.status == status)
+    if role:
+        stmt = stmt.where(models.Grievance.submitted_by_role == role)
+    stmt = stmt.order_by(models.Grievance.created_at.desc())
+
+    results = (await session.execute(stmt)).all()
+    return [{
+        "id": g.id, "category": g.category, "subject": g.subject,
+        "description": g.description, "status": g.status,
+        "submitted_by_role": g.submitted_by_role, "submitted_by_name": name,
+        "assigned_to": g.assigned_to, "resolution_notes": g.resolution_notes,
+        "created_at": g.created_at.isoformat() if g.created_at else None
+    } for g, name in results]
+
+@app.put("/api/admin/grievances/{grievance_id}/resolve")
+async def resolve_grievance(
+    grievance_id: str,
+    req: dict = Body(...),
+    user: dict = Depends(require_role("admin", "nodal_officer", "super_admin", "hod")),
+    session: AsyncSession = Depends(get_db)
+):
+    g = await session.get(models.Grievance, grievance_id)
+    if not g or g.college_id != user["college_id"]:
+        raise HTTPException(status_code=404, detail="Grievance not found")
+
+    g.status = req.get("status", "resolved")
+    g.resolution_notes = req.get("resolution_notes")
+    g.assigned_to = req.get("assigned_to", user["id"])
+    await session.commit()
+    return {"message": f"Grievance marked as {g.status}"}

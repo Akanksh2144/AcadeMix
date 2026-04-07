@@ -861,3 +861,35 @@ class AlumniFeedback(Base, SoftDeleteMixin):
     is_anonymous  = Column(Boolean, nullable=False, server_default='false')
     status        = Column(String, nullable=False, server_default='new')  # new/acknowledged/resolved
     created_at    = Column(DateTime(timezone=True), server_default=func.now())
+
+# ─── Parents Module ─────────────────────────────────────────────
+
+class ParentStudentLink(Base, SoftDeleteMixin):
+    """Many-to-many parent–student link with relationship metadata."""
+    __tablename__ = "parent_student_links"
+    id           = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id   = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id    = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id   = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    relationship = Column(String, nullable=False)  # father/mother/guardian
+    is_primary   = Column(Boolean, nullable=False, server_default='false')
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("parent_id", "student_id", name="uq_parent_student"),
+    )
+
+class Grievance(Base, SoftDeleteMixin):
+    """Cross-role grievance system — parents, students, faculty can all submit."""
+    __tablename__ = "grievances"
+    id               = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id       = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    submitted_by     = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    submitted_by_role = Column(String, nullable=False)
+    category         = Column(String, nullable=False)  # academic/administrative/infrastructure/other
+    subject          = Column(String, nullable=False)
+    description      = Column(String, nullable=False)
+    status           = Column(String, nullable=False, server_default='open')  # open/in_review/resolved/closed
+    assigned_to      = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    resolution_notes = Column(String, nullable=True)
+    created_at       = Column(DateTime(timezone=True), server_default=func.now())

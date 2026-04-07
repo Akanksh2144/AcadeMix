@@ -347,4 +347,26 @@ export const alumniAPI = {
   verifyAchievement: (id, verified, featured) => api.put(`/api/admin/alumni/achievements/${id}/verify`, { is_verified: verified, is_featured: featured }),
 };
 
+export const parentAPI = {
+  getChildren: () => api.get('/api/parent/children'),
+  getAcademics: (id) => api.get(`/api/parent/children/${id}/academics`),
+  getAttendance: (id) => api.get(`/api/parent/children/${id}/attendance`),
+  getCIAMarks: (id) => api.get(`/api/parent/children/${id}/cia-marks`),
+  getTimetable: (id) => api.get(`/api/parent/children/${id}/timetable`),
+  getSubjects: (id) => api.get(`/api/parent/children/${id}/subjects`),
+  getExamSchedule: (id) => api.get(`/api/parent/children/${id}/exam-schedule`),
+  getLeaves: (id) => api.get(`/api/parent/children/${id}/leaves`),
+  getFacultyContacts: (id) => api.get(`/api/parent/children/${id}/faculty-contacts`),
+  getMentor: (id) => api.get(`/api/parent/children/${id}/mentor`),
+  getAcademicCalendar: () => api.get('/api/parent/academic-calendar'),
+  updateNotificationPrefs: (prefs) => api.put('/api/parent/notification-preferences', prefs),
+};
+
+export const grievanceAPI = {
+  submit: (data) => api.post('/api/grievances', data),
+  getMine: () => api.get('/api/grievances/my'),
+  getAll: (params) => api.get('/api/admin/grievances', { params }),
+  resolve: (id, data) => api.put(`/api/admin/grievances/${id}/resolve`, data),
+};
+
 export default api;
