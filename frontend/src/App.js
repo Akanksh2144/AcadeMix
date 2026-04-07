@@ -33,6 +33,7 @@ import ParentDashboard from './pages/ParentDashboard';
 import IndustryDashboard from './pages/IndustryDashboard';
 import PrincipalDashboard from './pages/PrincipalDashboard';
 import RetiredFacultyDashboard from './pages/RetiredFacultyDashboard';
+import ExpertDashboard from './pages/ExpertDashboard';
 
 const ROLE_DASHBOARD = {
   student: 'student-dashboard',
@@ -47,6 +48,7 @@ const ROLE_DASHBOARD = {
   industry: 'industry-dashboard',
   principal: 'principal-dashboard',
   retired_faculty: 'retired-faculty-dashboard',
+  expert: 'expert-dashboard',
 };
 
 function App() {
@@ -162,6 +164,7 @@ function App() {
       case 'industry-dashboard': return <IndustryDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       case 'principal-dashboard': return <PrincipalDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       case 'retired-faculty-dashboard': return <RetiredFacultyDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
+      case 'expert-dashboard': return <ExpertDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       default: return <LoginPage onLogin={handleLogin} />;
     }
   };

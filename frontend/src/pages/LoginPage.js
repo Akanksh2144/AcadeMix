@@ -35,6 +35,7 @@ const LoginPage = ({ onLogin }) => {
     { role: 'Industry', collegeId: 'IND001', password: 'industry123', color: 'bg-violet-500 hover:bg-violet-600', icon: '🏢' },
     { role: 'Principal', collegeId: 'PRIN001', password: 'teacher123', color: 'bg-fuchsia-500 hover:bg-fuchsia-600', icon: '🏫' },
     { role: 'Retired Faculty', collegeId: 'RF001', password: 'retired123', color: 'bg-lime-600 hover:bg-lime-700', icon: '🎖️' },
+    { role: 'Expert', collegeId: 'EXP001', password: 'expert123', color: 'bg-amber-600 hover:bg-amber-700', icon: '🧠' },
   ];
 
   const handleSubmit = async (e) => {

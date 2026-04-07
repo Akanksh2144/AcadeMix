@@ -423,3 +423,13 @@ export const retiredFacultyAPI = {
   researchReport: () => api.get('/api/admin/reports/retired-faculty-research'),
   consultancyReport: () => api.get('/api/admin/reports/consultancy'),
 };
+
+export const expertAPI = {
+  dashboard: () => api.get('/api/expert/dashboard'),
+  myAssignments: () => api.get('/api/expert/my-assignments'),
+  getQuestionPapers: () => api.get('/api/expert/question-papers'),
+  reviewQuestionPaper: (id, data) => api.put(`/api/expert/question-papers/${id}/review`, data),
+  getStudyMaterials: () => api.get('/api/expert/study-materials'),
+  reviewStudyMaterial: (id, data) => api.put(`/api/expert/study-materials/${id}/review`, data),
+  submitEvaluation: (data) => api.post('/api/expert/evaluations', data),
+};
