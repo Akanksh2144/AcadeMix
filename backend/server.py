@@ -193,7 +193,10 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
             user_dict["tenant_id"] = user_dict.get("college_id", "")
         
         import database
-        database.tenant_context.set(user.college_id)
+        if user.role == "nodal_officer" and not user.college_id:
+            database.tenant_context.set("nodal_officer")
+        else:
+            database.tenant_context.set(user.college_id)
             
         return user_dict
     except jwt.ExpiredSignatureError:
@@ -8971,3 +8974,7 @@ async def get_admin_experts(request: Request, session: AsyncSession = Depends(ge
         .where(models.User.college_id == college_id, models.User.role == "expert")
     )
     return [{"id": r[0], "name": r[1], "email": r[2], "profile": r[3]} for r in res.fetchall()]
+
+
+import nodal_routes
+nodal_routes.setup_nodal_routes(app, require_role, get_current_user)

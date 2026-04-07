@@ -433,3 +433,20 @@ export const expertAPI = {
   reviewStudyMaterial: (id, data) => api.put(`/api/expert/study-materials/${id}/review`, data),
   submitEvaluation: (data) => api.post('/api/expert/evaluations', data),
 };
+export const nodalAPI = {
+  getColleges: () => api.get('/api/nodal/colleges'),
+  getAttendanceCompliance: () => api.get('/api/nodal/reports/attendance-compliance'),
+  getResultsStatus: () => api.get('/api/nodal/reports/results-status'),
+  getCiaSubmission: () => api.get('/api/nodal/reports/cia-submission'),
+  getFacultyProfiles: () => api.get('/api/nodal/reports/faculty-profiles'),
+  getAccreditation: () => api.get('/api/nodal/reports/accreditation'),
+  getActivityReports: () => api.get('/api/nodal/activity-reports'),
+  acknowledgeActivity: (id, data) => api.put(`/api/nodal/activity-reports/${id}/acknowledge`, data),
+  createCircular: (data) => api.post('/api/nodal/circulars', data),
+  getCirculars: () => api.get('/api/nodal/circulars'),
+  createSubmissionRequirement: (data) => api.post('/api/nodal/submission-requirements', data),
+  getSubmissionsStatus: () => api.get('/api/nodal/submissions/status'),
+  assignExpert: (data) => api.post('/api/nodal/experts/assign', data),
+  createInspection: (data) => api.post('/api/nodal/inspections', data),
+  getInspections: () => api.get('/api/nodal/inspections'),
+};

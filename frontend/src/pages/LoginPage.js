@@ -28,7 +28,7 @@ const LoginPage = ({ onLogin }) => {
     { role: 'Teacher', collegeId: 'T001', password: 'teacher123', color: 'bg-indigo-500 hover:bg-indigo-600', icon: '👨‍🏫' },
     { role: 'HOD', collegeId: 'HOD001', password: 'hod123', color: 'bg-amber-500 hover:bg-amber-600', icon: '👔' },
     { role: 'Exam Cell', collegeId: 'EC001', password: 'examcell123', color: 'bg-orange-500 hover:bg-orange-600', icon: '📋' },
-    { role: 'Nodal Officer', collegeId: 'N001', password: 'nodal123', color: 'bg-emerald-500 hover:bg-emerald-600', icon: '🏛️' },
+    { role: 'Nodal Officer', collegeId: 'nodal@dhte.gov', password: 'nodal123', color: 'bg-emerald-500 hover:bg-emerald-600', icon: '🏛️' },
     { role: 'T&P Officer', collegeId: 'TPO001', password: 'tpo123', color: 'bg-blue-500 hover:bg-blue-600', icon: '💼' },
     { role: 'Alumni', collegeId: 'ALUMNI001', password: 'alumni123', color: 'bg-rose-500 hover:bg-rose-600', icon: '🌟' },
     { role: 'Parent', collegeId: 'PARENT001', password: 'parent123', color: 'bg-cyan-500 hover:bg-cyan-600', icon: '👨‍👩‍👧' },

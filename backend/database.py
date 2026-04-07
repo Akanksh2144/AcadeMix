@@ -62,7 +62,7 @@ def receive_do_orm_execute(orm_execute_state):
                 )
                 
             # 2. Tenant Isolation
-            if college_id and college_id != "super_admin":
+            if college_id and college_id not in ["super_admin", "nodal_officer"]:
                 if hasattr(mapper.class_, "college_id") and mapper.class_.__name__ not in ["User", "College", "CodingChallenge"]:
                     orm_execute_state.statement = orm_execute_state.statement.where(
                         mapper.class_.college_id == college_id

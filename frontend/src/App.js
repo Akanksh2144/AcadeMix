@@ -34,6 +34,7 @@ import IndustryDashboard from './pages/IndustryDashboard';
 import PrincipalDashboard from './pages/PrincipalDashboard';
 import RetiredFacultyDashboard from './pages/RetiredFacultyDashboard';
 import ExpertDashboard from './pages/ExpertDashboard';
+import NodalOfficerDashboard from './pages/NodalOfficerDashboard';
 
 const ROLE_DASHBOARD = {
   student: 'student-dashboard',
@@ -41,7 +42,7 @@ const ROLE_DASHBOARD = {
   admin: 'admin-dashboard',
   hod: 'hod-dashboard',
   exam_cell: 'examcell-dashboard',
-  nodal_officer: 'admin-dashboard',
+  nodal_officer: 'nodal-officer-dashboard',
   tp_officer: 'tpo-dashboard',
   alumni: 'alumni-dashboard',
   parent: 'parent-dashboard',
@@ -165,6 +166,7 @@ function App() {
       case 'principal-dashboard': return <PrincipalDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       case 'retired-faculty-dashboard': return <RetiredFacultyDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       case 'expert-dashboard': return <ExpertDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
+      case 'nodal-officer-dashboard': return <NodalOfficerDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       default: return <LoginPage onLogin={handleLogin} />;
     }
   };
