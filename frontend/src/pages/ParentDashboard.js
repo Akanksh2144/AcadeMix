@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Users, GraduationCap, ChartBar, CalendarDots, ClockCountdown, Chalkboard, SignOut, Sun, Moon, FileText, ChatCircleDots, CaretDown, Warning, CheckCircle, XCircle, Clock, BookOpen, UserCircle, Download } from '@phosphor-icons/react';
+import { Users, GraduationCap, ChartBar, CalendarDots, ClockCountdown, Chalkboard, SignOut, Sun, Moon, FileText, ChatCircleDots, CaretDown, Warning, CheckCircle, XCircle, Clock, BookOpen, UserCircle, Download, Bell } from '@phosphor-icons/react';
 import { parentAPI, grievanceAPI } from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
 import DashboardSkeleton from '../components/DashboardSkeleton';
@@ -55,6 +55,10 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
   const [grievances, setGrievances] = useState([]);
   const [grievanceForm, setGrievanceForm] = useState({ category: 'academic', subject: '', description: '' });
   const [childDropdown, setChildDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const notifKey = `acadmix_last_notif_parent_${user?.id || 'default'}`;
+  const [lastReadTime, setLastReadTime] = useState(() => localStorage.getItem(notifKey) || '1970-01-01T00:00:00.000Z');
 
   useEffect(() => {
     parentAPI.getChildren().then(r => {
@@ -101,6 +105,40 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
     ? academics.semester_grades[academics.semester_grades.length - 1].cgpa
     : null;
 
+  /* ── Derived Notifications ─────────────────────── */
+  const notifications = React.useMemo(() => {
+    const items = [];
+    const now = new Date().toISOString();
+    // Attendance alerts
+    attendance.filter(a => a.percentage < 75).forEach(a => {
+      items.push({ type: 'warning', title: `Low attendance: ${a.subject_code}`, subtitle: `${a.percentage}% — below 75% threshold`, timestamp: now });
+    });
+    // Leave status updates
+    leaves.filter(l => l.status === 'approved' || l.status === 'rejected').forEach(l => {
+      items.push({ type: l.status === 'approved' ? 'success' : 'error', title: `Leave ${l.status}`, subtitle: `${l.leave_type} (${l.from_date} → ${l.to_date})`, timestamp: l.updated_at || l.created_at || now });
+    });
+    // Grievance responses
+    grievances.filter(g => g.status === 'resolved' || g.status === 'in_review').forEach(g => {
+      items.push({ type: g.status === 'resolved' ? 'success' : 'info', title: `Grievance ${g.status.replace('_', ' ')}`, subtitle: g.subject, timestamp: g.updated_at || g.created_at || now });
+    });
+    // Overall attendance warning
+    if (overallAtt > 0 && overallAtt < 80) {
+      items.push({ type: 'warning', title: `Overall attendance: ${overallAtt}%`, subtitle: 'Below 80% threshold — action needed', timestamp: now });
+    }
+    return items;
+  }, [attendance, leaves, grievances, overallAtt]);
+
+  const unreadCount = notifications.filter(n => new Date(n.timestamp) > new Date(lastReadTime)).length;
+
+  const handleBellClick = () => {
+    setShowNotifications(!showNotifications);
+    if (!showNotifications && notifications.length > 0) {
+      const latestTs = new Date().toISOString();
+      setLastReadTime(latestTs);
+      localStorage.setItem(notifKey, latestTs);
+    }
+  };
+
   const submitGrievance = async () => {
     if (!grievanceForm.subject || !grievanceForm.description) return;
     await grievanceAPI.submit(grievanceForm);
@@ -118,6 +156,53 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
+      {/* Notification overlay */}
+      <AnimatePresence>
+        {showNotifications && (
+          <>
+            <div className="fixed inset-0 z-[60]" onClick={() => setShowNotifications(false)}></div>
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="fixed top-16 right-4 sm:right-8 z-[61] w-80 sm:w-96 bg-white dark:bg-[#1A202C] rounded-2xl shadow-2xl border border-slate-100 dark:border-white/10 overflow-hidden"
+            >
+              <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10 flex items-center justify-between">
+                <h4 className="font-extrabold text-slate-800 dark:text-slate-100">Notifications</h4>
+                <button
+                  onClick={() => setShowNotifications(false)}
+                  className="text-xs font-bold text-indigo-500 hover:text-indigo-600 transition-colors"
+                >
+                  Mark all as read
+                </button>
+              </div>
+              <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-white/5">
+                {notifications.slice(0, 8).map((item, i) => (
+                  <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      item.type === 'warning' ? 'bg-amber-50 dark:bg-amber-500/15' :
+                      item.type === 'error' ? 'bg-red-50 dark:bg-red-500/15' :
+                      item.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/15' :
+                      'bg-blue-50 dark:bg-blue-500/15'
+                    }`}>
+                      {item.type === 'warning' ? <Warning size={14} weight="duotone" className="text-amber-500" /> :
+                       item.type === 'error' ? <XCircle size={14} weight="duotone" className="text-red-500" /> :
+                       item.type === 'success' ? <CheckCircle size={14} weight="duotone" className="text-emerald-500" /> :
+                       <Bell size={14} weight="duotone" className="text-blue-500" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{item.title}</p>
+                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">{item.subtitle}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* ── Header ──────────────────────────── */}
       <header className="glass-header">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -169,6 +254,24 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
                     </>
                   )}
                 </AnimatePresence>
+              </div>
+            )}
+
+            {/* Notification Bell */}
+            {notifications.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={handleBellClick}
+                  className="p-2.5 rounded-full bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 transition-colors relative"
+                  aria-label="Notifications"
+                >
+                  <Bell size={20} weight={showNotifications ? 'fill' : 'duotone'} />
+                  {unreadCount > 0 && (
+                    <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center">
+                      {Math.min(unreadCount, 9)}
+                    </div>
+                  )}
+                </button>
               </div>
             )}
 
