@@ -186,12 +186,13 @@ const PrincipalDashboard = ({ navigate, user, onLogout }) => {
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       
       {/* Header Profile Trigger Component (Reusable) */}
-      <UserProfileModal 
-         isOpen={showProfile} 
-         onClose={() => setShowProfile(false)} 
-         user={user} 
-         onLogout={onLogout} 
-      />
+      {showProfile && (
+        <UserProfileModal 
+           onClose={() => setShowProfile(false)} 
+           user={user} 
+           onLogout={onLogout} 
+        />
+      )}
 
       <header className="glass-header z-40 relative">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
