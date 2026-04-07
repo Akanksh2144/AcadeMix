@@ -369,4 +369,16 @@ export const grievanceAPI = {
   resolve: (id, data) => api.put(`/api/admin/grievances/${id}/resolve`, data),
 };
 
+export const industryAPI = {
+  getDashboard: () => api.get('/api/industry/dashboard'),
+  getMOUs: () => api.get('/api/industry/mous'),
+  createMOU: (data) => api.post('/api/industry/mous', data),
+  getProjects: () => api.get('/api/industry/projects'),
+  createProject: (data) => api.post('/api/industry/projects', data),
+  requestDrive: (data) => api.post('/api/industry/drives', data),
+  submitCurriculumFeedback: (data) => api.post('/api/industry/curriculum-feedback', data),
+  submitEmployerFeedback: (data) => api.post('/api/industry/employer-feedback', data),
+  scheduleTrainingProgram: (data) => api.post('/api/industry/training-programs', data),
+};
+
 export default api;

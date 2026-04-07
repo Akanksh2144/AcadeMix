@@ -783,6 +783,8 @@ class AlumniEvent(Base, SoftDeleteMixin):
     id                    = Column(String, primary_key=True, index=True, default=generate_uuid)
     college_id            = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
     created_by            = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    source_type           = Column(String, nullable=False, server_default='alumni')  # alumni/industry/college
+    source_id             = Column(String, nullable=True) # polymorphic id depending on source_type
     title                 = Column(String, nullable=False)
     description           = Column(String, nullable=True)
     event_type            = Column(String, nullable=False)  # reunion/meetup/workshop/networking/fundraiser
@@ -893,3 +895,75 @@ class Grievance(Base, SoftDeleteMixin):
     assigned_to      = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     resolution_notes = Column(String, nullable=True)
     created_at       = Column(DateTime(timezone=True), server_default=func.now())
+
+# ==============================================================================
+# INDUSTRY MODULE MODELS
+# ==============================================================================
+
+class MOU(Base, SoftDeleteMixin):
+    __tablename__ = "mous"
+    id                    = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id            = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    company_id            = Column(String, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    purpose               = Column(String, nullable=False)
+    signed_date           = Column(Date, nullable=False)
+    valid_until           = Column(Date, nullable=False)
+    document_url          = Column(String, nullable=True)
+    status                = Column(String, nullable=False, server_default='active')  # active/expired/renewed
+    benefits              = Column(JSONB, nullable=True)
+    created_at            = Column(DateTime(timezone=True), server_default=func.now())
+
+class CurriculumFeedback(Base, SoftDeleteMixin):
+    __tablename__ = "curriculum_feedback"
+    id                    = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id            = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    submitted_by          = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    department_id         = Column(String, ForeignKey("departments.id", ondelete="CASCADE"), nullable=True)
+    academic_year         = Column(String, nullable=False)
+    feedback_items        = Column(JSONB, nullable=False)
+    overall_rating        = Column(Integer, nullable=False)
+    status                = Column(String, nullable=False, server_default='submitted')  # submitted/reviewed/actioned
+    created_at            = Column(DateTime(timezone=True), server_default=func.now())
+
+class IndustryProject(Base, SoftDeleteMixin):
+    __tablename__ = "industry_projects"
+    id                    = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id            = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    company_id            = Column(String, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    proposed_by           = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    title                 = Column(String, nullable=False)
+    description           = Column(String, nullable=False)
+    domain                = Column(String, nullable=True)
+    max_students          = Column(Integer, nullable=False, default=1)
+    stipend_if_any        = Column(Float, nullable=True)
+    duration_weeks        = Column(Integer, nullable=True)
+    status                = Column(String, nullable=False, server_default='proposed')  # proposed/approved/ongoing/completed
+    faculty_supervisor_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at            = Column(DateTime(timezone=True), server_default=func.now())
+
+class IndustryProjectApplication(Base, SoftDeleteMixin):
+    __tablename__ = "industry_project_applications"
+    id                    = Column(String, primary_key=True, index=True, default=generate_uuid)
+    project_id            = Column(String, ForeignKey("industry_projects.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id            = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    college_id            = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    status                = Column(String, nullable=False, server_default='applied')  # applied/shortlisted/approved/rejected
+    applied_at            = Column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("project_id", "student_id", name="uq_project_student_application"),
+    )
+
+class EmployerFeedback(Base, SoftDeleteMixin):
+    __tablename__ = "employer_feedback"
+    id                    = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id            = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False, index=True)
+    company_id            = Column(String, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)
+    student_id            = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    submitted_by          = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    performance_rating    = Column(Integer, nullable=False) # 1-5
+    technical_skills_rating = Column(Integer, nullable=False) # 1-5
+    soft_skills_rating    = Column(Integer, nullable=False) # 1-5
+    overall_feedback      = Column(String, nullable=False)
+    feedback_period       = Column(String, nullable=False) # 3_months, 6_months, 1_year
+    created_at            = Column(DateTime(timezone=True), server_default=func.now())

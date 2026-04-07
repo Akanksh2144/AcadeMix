@@ -30,6 +30,7 @@ import AttendanceMarker from './components/faculty/AttendanceMarker';
 import TPODashboard from './pages/TPODashboard';
 import AlumniDashboard from './pages/AlumniDashboard';
 import ParentDashboard from './pages/ParentDashboard';
+import IndustryDashboard from './pages/IndustryDashboard';
 
 const ROLE_DASHBOARD = {
   student: 'student-dashboard',
@@ -41,6 +42,7 @@ const ROLE_DASHBOARD = {
   tp_officer: 'tpo-dashboard',
   alumni: 'alumni-dashboard',
   parent: 'parent-dashboard',
+  industry: 'industry-dashboard',
 };
 
 function App() {
@@ -153,6 +155,7 @@ function App() {
       case 'tpo-dashboard': return <TPODashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       case 'alumni-dashboard': return <AlumniDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       case 'parent-dashboard': return <ParentDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
+      case 'industry-dashboard': return <IndustryDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       default: return <LoginPage onLogin={handleLogin} />;
     }
   };
