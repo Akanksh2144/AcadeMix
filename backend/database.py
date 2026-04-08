@@ -45,7 +45,7 @@ Base = declarative_base()
 import contextvars
 from sqlalchemy import event
 from sqlalchemy.orm import Session
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 
 tenant_context = contextvars.ContextVar("tenant_context", default=None)
 

@@ -10,6 +10,10 @@ from database import get_db
 # We need the require_role and get_current_user from server.py, but since we cannot easily import them 
 # without circular imports, we will inject them into setup_nodal_routes.
 
+def _row_to_dict(row):
+    if not row: return None
+    return {c.name: getattr(row, c.name) for c in row.__table__.columns}
+
 def setup_nodal_routes(app, require_role, get_current_user):
     
     async def get_nodal_jurisdiction_colleges(user_id: str, session: AsyncSession) -> List[str]:
@@ -150,7 +154,7 @@ def setup_nodal_routes(app, require_role, get_current_user):
             .where(models.ActivityPermission.college_id.in_(c_ids))
             .where(models.ActivityPermission.principal_noted_at != None)
         )
-        return {"data": [a.__dict__ for a in res.scalars().all() if not a.__dict__.pop('_sa_instance_state', None)]}
+        return {"data": [_row_to_dict(a) for a in res.scalars().all()]}
 
     class AcknowledgePayload(BaseModel):
         notes: str
@@ -160,7 +164,8 @@ def setup_nodal_routes(app, require_role, get_current_user):
         res = await session.execute(select(models.ActivityPermission).where(models.ActivityPermission.id == report_id))
         act = res.scalars().first()
         if not act: raise HTTPException(status_code=404)
-        act.nodal_acknowledged_at = func.now()
+        from datetime import datetime, timezone
+        act.nodal_acknowledged_at = datetime.now(timezone.utc)
         act.nodal_notes = payload.notes
         await session.commit()
         return {"success": True}
@@ -196,7 +201,7 @@ def setup_nodal_routes(app, require_role, get_current_user):
         for c in circs:
             ack_res = await session.execute(select(models.CircularAcknowledgment).where(models.CircularAcknowledgment.circular_id == c.id))
             acks = ack_res.scalars().all()
-            c_dict = {k:v for k,v in c.__dict__.items() if k != '_sa_instance_state'}
+            c_dict = _row_to_dict(c)
             c_dict["acknowledgments"] = [{"college_id": a.college_id, "date": a.acknowledged_at} for a in acks]
             ans.append(c_dict)
         return {"data": ans}
@@ -231,7 +236,7 @@ def setup_nodal_routes(app, require_role, get_current_user):
         for r in reqs:
             rec_res = await session.execute(select(models.DHSubmissionRecord).where(models.DHSubmissionRecord.requirement_id == r.id))
             recs = rec_res.scalars().all()
-            r_dict = {k:v for k,v in r.__dict__.items() if k != '_sa_instance_state'}
+            r_dict = _row_to_dict(r)
             r_dict["records"] = [{"college_id": rec.college_id, "status": rec.status} for rec in recs]
             ans.append(r_dict)
         return {"data": ans}
@@ -291,7 +296,7 @@ def setup_nodal_routes(app, require_role, get_current_user):
         insps = res.scalars().all()
         ans = []
         for insp in insps:
-            r_dict = {k:v for k,v in insp.__dict__.items() if k != '_sa_instance_state'}
+            r_dict = _row_to_dict(insp)
             rsp_res = await session.execute(select(models.InspectionResponse).where(models.InspectionResponse.inspection_id == insp.id))
             resps = rsp_res.scalars().all()
             r_dict["responses"] = [{"response": r.response_text, "date": r.response_date} for r in resps]

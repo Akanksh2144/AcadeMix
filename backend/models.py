@@ -182,7 +182,8 @@ class Appeal(Base, SoftDeleteMixin):
 class MarkEntry(Base, SoftDeleteMixin):
     __tablename__ = "mark_entries"
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
-    student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
+    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=True, index=True)
+    student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True, index=True)
     course_id = Column(String, nullable=False)  # subject_code, not FK (avoids missing-course errors)
     faculty_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     exam_type = Column(String, nullable=False)
@@ -193,6 +194,7 @@ class MarkEntry(Base, SoftDeleteMixin):
 class SemesterGrade(Base, SoftDeleteMixin):
     __tablename__ = "semester_grades"
     id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=True, index=True)
     student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     semester = Column(Integer, nullable=False)
     # NOTE: course_id is intentionally NOT a FK. The courses table is empty and not seeded.

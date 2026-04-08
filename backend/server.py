@@ -1436,7 +1436,8 @@ async def get_current_academic_year(session: AsyncSession, college_id: str) -> s
     )
     calendar = result.scalars().first()
     if not calendar:
-        raise HTTPException(status_code=400, detail="No active Academic Calendar configured for today.")
+        y = today.year
+        return f"{y-1}-{y}" if today.month < 6 else f"{y}-{y+1}"
     return calendar.academic_year
 
 @app.get("/api/faculty/timetable/today")
@@ -1950,13 +1951,29 @@ async def get_student_cia_marks(
     session: AsyncSession = Depends(get_db)
 ):
     """Component-wise CIA marks breakdown for the student."""
-    # Get mark entries for this student
+    # Get mark entries that contain this student's ID in the bulk entries JSON
+    from sqlalchemy import String
     stmt = select(models.MarkEntry).where(
-        models.MarkEntry.student_id == user["id"],
-        models.MarkEntry.is_deleted == False
-    )
+        models.MarkEntry.is_deleted == False,
+        models.MarkEntry.college_id == user["college_id"]
+    ).where(models.MarkEntry.extra_data.cast(String).like(f'%"{user["id"]}"%'))
+    
     result = await session.execute(stmt)
-    entries = result.scalars().all()
+    all_entries = result.scalars().all()
+    
+    # Filter pythonically to be 100% sure and extract the specific mark
+    student_marks_by_entry = {}
+    entries = []
+    for entry in all_entries:
+        if not entry.extra_data: continue
+        if entry.extra_data.get("status") != "approved": continue
+        
+        bulk_entries = entry.extra_data.get("entries", [])
+        for bulk in bulk_entries:
+            if bulk.get("student_id") == user["id"]:
+                student_marks_by_entry[entry.id] = float(bulk.get("marks", 0))
+                entries.append(entry)
+                break
 
     # Get CIA configs for context
     cfg_stmt = select(models.SubjectCIAConfig).where(
@@ -1993,7 +2010,7 @@ async def get_student_cia_marks(
         
         for comp in components:
             entry = next((e for e in subj_entries if e.exam_type == comp.get("type", "")), None)
-            obtained = entry.marks_obtained if entry else None
+            obtained = student_marks_by_entry.get(entry.id, None) if entry else None
             max_m = comp.get("max_marks", 0)
             component_marks.append({
                 "name": comp.get("name", comp.get("type", "")),
@@ -3833,7 +3850,10 @@ async def search_students(
     offset: int = Query(0, ge=0),
     user: dict = Depends(require_role("hod", "admin", "exam_cell", "teacher")), 
     session: AsyncSession = Depends(get_db)):
-    stmt = select(models.User).where(models.User.role == "student")
+    stmt = select(models.User).where(
+        models.User.role == "student",
+        models.User.college_id == user["college_id"]
+    )
     if q:
         stmt = stmt.where(
             models.User.name.ilike(f"%{q}%") |
@@ -4002,7 +4022,10 @@ async def class_results_analytics(user: dict = Depends(require_role("teacher", "
 
 @app.get("/api/analytics/teacher/quiz-results/{quiz_id}")
 async def get_quiz_detailed_analytics(quiz_id: str, department: str = "", batch: str = "", section: str = "", user: dict = Depends(require_role("teacher", "hod", "exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
-    stmt = select(models.User).where(models.User.role == "student")
+    stmt = select(models.User).where(
+        models.User.role == "student",
+        models.User.college_id == user["college_id"]
+    )
     result = await session.execute(stmt)
     students = result.scalars().all()
     attempts_r = await session.execute(
@@ -4302,7 +4325,7 @@ async def get_students_for_marks(department: str, batch: str, section: str, user
 async def get_mark_entry(assignment_id: str, exam_type: str, component_id: Optional[str] = None, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
     result = await session.execute(
         select(models.MarkEntry).where(
-            models.MarkEntry.assignment_id == assignment_id,
+            func.jsonb_extract_path_text(models.MarkEntry.extra_data, 'assignment_id') == assignment_id,
             models.MarkEntry.exam_type == exam_type,
             models.MarkEntry.faculty_id == user["id"],
         )
@@ -4361,7 +4384,7 @@ async def save_mark_entry(req: MarkEntrySave, user: dict = Depends(require_permi
         await session.commit()
         return {"id": existing.id, "status": "draft", "entries": entries_data}
     row = models.MarkEntry(
-        student_id=user["id"],
+        student_id=None,
         course_id=assignment.subject_code,
         faculty_id=user["id"],
         exam_type=req.exam_type,
@@ -5800,7 +5823,7 @@ async def _seed_db():
 
 class AttendanceOverride(BaseModel):
     date: str
-    period_no: int
+    period_slot_id: str
     status: str
     reason: str
 
@@ -5818,7 +5841,7 @@ async def override_student_attendance(
         models.AttendanceRecord.student_id == student_id,
         models.AttendanceRecord.subject_code == subject_code,
         models.AttendanceRecord.date == cast(req.date, Date),
-        models.AttendanceRecord.period_slot_id == str(req.period_no),
+        models.AttendanceRecord.period_slot_id == req.period_slot_id,
         models.AttendanceRecord.is_deleted == False
     )
     result = await session.execute(stmt)
@@ -6040,7 +6063,7 @@ async def reset_user_password(user_id: str, admin: dict = Depends(require_role("
         raise HTTPException(status_code=404, detail="User not found")
         
     new_temp = secrets.token_urlsafe(8)
-    target.password_hash = get_password_hash(new_temp)
+    target.password_hash = hash_password(new_temp)
     
     pd = target.profile_data or {}
     pd["force_password_change"] = True
@@ -6194,12 +6217,12 @@ async def get_timetable_conflicts(academic_year: str, session: AsyncSession = De
     seen = {}
     conflicts = []
     for s in slots:
-        key = (s.faculty_id, s.day_of_week, s.period_no)
+        key = (s.faculty_id, s.day, s.time_slot)
         if key in seen:
             conflicts.append({
                 "faculty_id": s.faculty_id,
-                "day": s.day_of_week,
-                "period": s.period_no,
+                "day": s.day,
+                "period": s.time_slot,
                 "dept_1": seen[key],
                 "dept_2": s.department_id
             })
@@ -7383,22 +7406,50 @@ async def parent_progress_report(
         ).order_by(models.SemesterGrade.semester)
     )
     grades = grades_r.scalars().all()
-    grade_html = ""
+    
+    from collections import defaultdict
+    sem_grades = defaultdict(list)
     for g in grades:
-        grade_html += f"<tr><td>Semester {g.semester}</td><td>{g.academic_year}</td><td>{g.sgpa or '-'}</td><td>{g.cgpa or '-'}</td><td>{g.earned_credits or 0}/{g.total_credits or 0}</td><td>{g.arrear_count or 0}</td></tr>"
+        sem_grades[g.semester].append(g)
+        
+    grade_html = ""
+    cumulative_points = 0
+    cumulative_credits = 0
+    
+    for sem in sorted(sem_grades.keys()):
+        sem_list = sem_grades[sem]
+        sem_points = sum(grade_to_points(g.grade) * g.credits_earned for g in sem_list)
+        sem_credits = sum(g.credits_earned for g in sem_list)
+        arrears = sum(1 for g in sem_list if g.grade in ["U", "F"])
+        sgpa = round(sem_points / sem_credits, 2) if sem_credits > 0 else 0
+        
+        cumulative_points += sem_points
+        cumulative_credits += sem_credits
+        cgpa = round(cumulative_points / cumulative_credits, 2) if cumulative_credits > 0 else 0
+        
+        grade_html += f"<tr><td>Semester {sem}</td><td>-</td><td>{sgpa}</td><td>{cgpa}</td><td>{sem_credits}</td><td>{arrears}</td></tr>"
 
     # CIA marks summary
-    entries_r = await session.execute(
-        select(models.MarkEntry).where(models.MarkEntry.student_id == student_id, models.MarkEntry.is_deleted == False)
-    )
+    from sqlalchemy import String
+    entries_stmt = select(models.MarkEntry).where(
+        models.MarkEntry.college_id == cid,
+        models.MarkEntry.is_deleted == False
+    ).where(models.MarkEntry.extra_data.cast(String).like(f'%"{student_id}"%'))
+    entries_r = await session.execute(entries_stmt)
     entries = entries_r.scalars().all()
+    
     cia_subjects = {}
     for e in entries:
-        if e.course_id not in cia_subjects:
-            cia_subjects[e.course_id] = {"obtained": 0, "count": 0}
-        if e.marks_obtained is not None:
-            cia_subjects[e.course_id]["obtained"] += e.marks_obtained
+        if not e.extra_data or e.extra_data.get("status") != "approved": continue
+        
+        student_mark = next((float(bulk.get("marks", 0)) for bulk in e.extra_data.get("entries", []) if bulk.get("student_id") == student_id), None)
+        
+        if student_mark is not None:
+            if e.course_id not in cia_subjects:
+                cia_subjects[e.course_id] = {"obtained": 0, "count": 0}
+            cia_subjects[e.course_id]["obtained"] += student_mark
             cia_subjects[e.course_id]["count"] += 1
+            
     cia_html = ""
     for subj, data in cia_subjects.items():
         cia_html += f"<tr><td>{subj}</td><td>{round(data['obtained'], 1)}</td><td>{data['count']} components</td></tr>"
@@ -9337,9 +9388,9 @@ async def faculty_get_qps(user: dict = Depends(require_role("teacher", "hod")), 
 class FacultyStudyMaterial(BaseModel):
     subject_code: str
     title: str
-    description: Optional[str] = None
-    material_url: str
+    file_url: str          # renamed from material_url
     material_type: str
+    academic_year: str     # also required by model but was missing
 
 @app.post("/api/faculty/study-materials")
 async def faculty_submit_mat(req: FacultyStudyMaterial, user: dict = Depends(require_role("teacher", "hod")), session: AsyncSession = Depends(get_db)):
@@ -9347,9 +9398,9 @@ async def faculty_submit_mat(req: FacultyStudyMaterial, user: dict = Depends(req
         college_id=user["college_id"],
         faculty_id=user["id"],
         subject_code=req.subject_code,
+        academic_year=req.academic_year,
         title=req.title,
-        description=req.description,
-        material_url=req.material_url,
+        file_url=req.file_url,
         material_type=req.material_type,
         status="submitted"
     )
