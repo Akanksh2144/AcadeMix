@@ -12,6 +12,7 @@ import { Toaster, toast } from 'sonner';
 
 import UserPermissionsManager from '../components/admin/UserPermissionsManager';
 import CIATemplateBuilder from '../components/admin/CIATemplateBuilder';
+import AdminFinanceModule from '../components/admin/AdminFinanceModule';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -91,7 +92,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <Toaster position="top-right" richColors />
       <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center"><BookOpen size={22} weight="duotone" className="text-white" /></div>
@@ -195,9 +196,10 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
               { id: 'metrics', label: 'Metrics' },
               { id: 'student-profiles', label: 'Student Profiles' },
               { id: 'results', label: 'Student Results' },
+              { id: 'finance', label: 'Fee Invoicing' },
               { id: 'permissions', label: 'Permission Matrix' },
-              { id: 'cia-builder', label: 'CIA Engine' }
-              ,{ id: 'experts', label: 'Expert Management' }
+              { id: 'cia-builder', label: 'CIA Engine' },
+              { id: 'experts', label: 'Expert Management' }
             ].map(tab => (
               <button 
                 key={tab.id} 
@@ -510,6 +512,15 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
             </motion.div>
           </motion.div>
         )}
+
+        {activeTab === 'finance' && (
+          <motion.div data-testid="finance-content" variants={containerVariants} initial="hidden" animate="show">
+            <motion.div variants={itemVariants}>
+              <AdminFinanceModule collegeId={user?.college_id} />
+            </motion.div>
+          </motion.div>
+        )}
+
         <AnimatePresence>
         {showProfile && <UserProfileModal user={user} onClose={() => setShowProfile(false)} />}
       </AnimatePresence>
@@ -519,3 +530,4 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
 };
 
 export default AdminDashboard;
+

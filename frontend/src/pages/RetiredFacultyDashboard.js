@@ -471,7 +471,7 @@ const RetiredFacultyDashboard = ({ navigate, user, onLogout }) => {
       )}
 
       <header className="glass-header z-40 relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-10 h-10 bg-teal-600 rounded-xl flex items-center justify-center">
               <Medal size={22} weight="duotone" className="text-white" />
@@ -550,3 +550,4 @@ const RetiredFacultyDashboard = ({ navigate, user, onLogout }) => {
 };
 
 export default RetiredFacultyDashboard;
+

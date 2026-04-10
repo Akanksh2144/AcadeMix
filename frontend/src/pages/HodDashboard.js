@@ -41,6 +41,7 @@ import HODProgressionTab from "../components/hod/HODProgressionTab";
 import HODLeaveApprovalsTab from "../components/hod/HODLeaveApprovalsTab";
 import { useTheme } from "../contexts/ThemeContext";
 import DashboardSkeleton from "../components/DashboardSkeleton";
+import { mockSubjects } from "../lib/constants";
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -111,7 +112,8 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
   const [assignments, setAssignments] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [submissions, setSubmissions] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const { isDark, toggle: toggleTheme } = useTheme();
   const [showAddForm, setShowAddForm] = useState(false);
@@ -135,347 +137,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
     localStorage.setItem(notifKey, String(val));
   };
 
-  // Real subjects from GNITC R22 curriculum (extracted from semester result PDFs)
-  const mockSubjects = [
-    // ── Semester 1 (1-1) ──────────────────────────────────
-    {
-      code: "22BS0MA01",
-      name: "Matrices and Calculus",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22BS0CH01",
-      name: "Engineering Chemistry",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22ES0CS01",
-      name: "Programming for Problem Solving",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22ES0EE01",
-      name: "Basic Electrical Engineering",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22ES0ME02",
-      name: "Computer Aided Engineering Graphics",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22HS0EN01",
-      name: "English for Skill Enhancement",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22BS0CH02",
-      name: "Engineering Chemistry Laboratory",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22ES0CS02",
-      name: "Programming for Problem Solving Laboratory",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22ES0EE02",
-      name: "Basic Electrical Engineering Laboratory",
-      department: "ET",
-      semester: 1,
-    },
-    {
-      code: "22ES0ME01",
-      name: "Engineering Workshop",
-      department: "ET",
-      semester: 1,
-    },
-    // ── Semester 2 (1-2) ──────────────────────────────────
-    {
-      code: "22BS0MA02",
-      name: "Ordinary Differential Equations and Vector Calculus",
-      department: "ET",
-      semester: 2,
-    },
-    {
-      code: "22BS0PH01",
-      name: "Applied Physics",
-      department: "ET",
-      semester: 2,
-    },
-    {
-      code: "22PC0CS01",
-      name: "Elements of Computer Science & Engineering",
-      department: "ET",
-      semester: 2,
-    },
-    {
-      code: "22ES0EC01",
-      name: "Electronic Devices and Circuits",
-      department: "ET",
-      semester: 2,
-    },
-    {
-      code: "22ES0EC02",
-      name: "Digital Electronics",
-      department: "ET",
-      semester: 2,
-    },
-    {
-      code: "22HS0EN02",
-      name: "English Language and Communication Skills Laboratory",
-      department: "ET",
-      semester: 2,
-    },
-    {
-      code: "22BS0PH02",
-      name: "Applied Physics Laboratory",
-      department: "ET",
-      semester: 2,
-    },
-    { code: "22ES0IT01", name: "IT Workshop", department: "ET", semester: 2 },
-    {
-      code: "22ES0CS07",
-      name: "Python Programming Laboratory",
-      department: "ET",
-      semester: 2,
-    },
-    {
-      code: "22MC0CH03",
-      name: "Environmental Science",
-      department: "ET",
-      semester: 2,
-    },
-    // ── Semester 3 (2-1) ──────────────────────────────────
-    {
-      code: "22BS0MA05",
-      name: "Computer Oriented Statistical Methods",
-      department: "ET",
-      semester: 3,
-    },
-    {
-      code: "22PC0DS01",
-      name: "Data Structures",
-      department: "ET",
-      semester: 3,
-    },
-    {
-      code: "22PC0DS02",
-      name: "Computer Organization and Architecture",
-      department: "ET",
-      semester: 3,
-    },
-    {
-      code: "22PC0DS03",
-      name: "Object Oriented Programming through Java",
-      department: "ET",
-      semester: 3,
-    },
-    {
-      code: "22PC0DS04",
-      name: "Data Structures Lab",
-      department: "ET",
-      semester: 3,
-    },
-    {
-      code: "22PC0DS05",
-      name: "Object Oriented Programming through Java Lab",
-      department: "ET",
-      semester: 3,
-    },
-    {
-      code: "22MC0EN04",
-      name: "Gender Sensitization Lab",
-      department: "ET",
-      semester: 3,
-    },
-    // ── Semester 4 (2-2) ──────────────────────────────────
-    {
-      code: "22PC0DS06",
-      name: "Discrete Mathematics",
-      department: "ET",
-      semester: 4,
-    },
-    {
-      code: "22PC0DS07",
-      name: "Operating Systems",
-      department: "ET",
-      semester: 4,
-    },
-    {
-      code: "22PC0DS08",
-      name: "Database Management Systems",
-      department: "ET",
-      semester: 4,
-    },
-    {
-      code: "22PC0DS09",
-      name: "Software Engineering",
-      department: "ET",
-      semester: 4,
-    },
-    {
-      code: "22PC0DS10",
-      name: "Operating Systems Lab",
-      department: "ET",
-      semester: 4,
-    },
-    {
-      code: "22PC0DS11",
-      name: "Database Management Systems Lab",
-      department: "ET",
-      semester: 4,
-    },
-    {
-      code: "22SS0MB01",
-      name: "Business Economics & Financial Analysis",
-      department: "ET",
-      semester: 4,
-    },
-    {
-      code: "22SD0DS01",
-      name: "Data Visualization - R Programming, Power BI",
-      department: "ET",
-      semester: 4,
-    },
-    // ── Semester 5 (3-1) ──────────────────────────────────
-    {
-      code: "22PC0DS12",
-      name: "Algorithm Design and Analysis",
-      department: "ET",
-      semester: 5,
-    },
-    {
-      code: "22PC0DS13",
-      name: "Introduction to Data Science",
-      department: "ET",
-      semester: 5,
-    },
-    {
-      code: "22PC0DS14",
-      name: "Computer Networks",
-      department: "ET",
-      semester: 5,
-    },
-    {
-      code: "22PE0DS1B",
-      name: "Artificial Intelligence",
-      department: "ET",
-      semester: 5,
-    },
-    { code: "22PE0DS2D", name: "DevOps", department: "ET", semester: 5 },
-    {
-      code: "22PC0DS15",
-      name: "R Programming Lab",
-      department: "ET",
-      semester: 5,
-    },
-    {
-      code: "22PC0DS16",
-      name: "Computer Networks Lab",
-      department: "ET",
-      semester: 5,
-    },
-    {
-      code: "22HS0EN03",
-      name: "Advanced Communication Skills Lab",
-      department: "ET",
-      semester: 5,
-    },
-    {
-      code: "22SD0DS03",
-      name: "ETL - Kafka / Talend",
-      department: "ET",
-      semester: 5,
-    },
-    {
-      code: "22MC0MB03",
-      name: "Intellectual Property Rights",
-      department: "ET",
-      semester: 5,
-    },
-    // ── Semester 6 (3-2) ──────────────────────────────────
-    {
-      code: "22PC0DS17",
-      name: "Automata Theory and Compiler Design",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22PC0DS18",
-      name: "Machine Learning",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22PC0DS19",
-      name: "Big Data Analytics",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22PE0DS3A",
-      name: "Software Testing Methodologies",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22OE0EE1A",
-      name: "Renewable Energy Sources",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22PC0DS20",
-      name: "Machine Learning Lab",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22PC0DS21",
-      name: "Big Data Analytics Lab",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22PE0DS3F",
-      name: "Software Testing Methodologies Lab",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22SD0DS02",
-      name: "Full Stack Development",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22MC0MB01",
-      name: "Constitution of India",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22SD0DS04",
-      name: "Industrial Oriented Mini Project / Internship",
-      department: "ET",
-      semester: 6,
-    },
-    {
-      code: "22PR0DS01",
-      name: "Real-time Research Project / Field Based Project",
-      department: "ET",
-      semester: 6,
-    },
-  ];
+
 
   // ET department encompasses all sections, show all subjects
   const departmentSubjects = mockSubjects;
@@ -515,6 +177,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
       setFetchError(err?.response?.data?.detail || err?.message || "Failed to load dashboard data. Please check if the backend is running.");
     }
     setLoading(false);
+    setInitialLoading(false);
   };
 
   const handleSubjectSelect = (subject) => {
@@ -650,7 +313,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           value: dashboard ? String(dashboard.total_students) : "—",
           sub: "enrolled",
           icon: BookOpen,
-          color: "bg-emerald-50 text-emerald-500",
+          color: "bg-emerald-50 dark:bg-emerald-500/15 text-emerald-500",
           gradient: "from-emerald-500 to-teal-500",
           onClick: () => setActiveTab("results"),
         },
@@ -659,7 +322,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           value: "2",
           sub: "reports",
           icon: ChartLine,
-          color: "bg-purple-50 text-purple-500",
+          color: "bg-purple-50 dark:bg-purple-500/15 text-purple-500",
           gradient: "from-purple-500 to-fuchsia-500",
           onClick: () => setActiveTab("analytics"),
         },
@@ -668,7 +331,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           value: dashboard ? String(dashboard.pending_reviews) : "—",
           sub: "needs action",
           icon: Clock,
-          color: "bg-rose-50 text-rose-500",
+          color: "bg-rose-50 dark:bg-rose-500/15 text-rose-500",
           gradient: "from-rose-500 to-pink-500",
           onClick: () => setActiveTab("review"),
         },
@@ -677,7 +340,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           value: "6",
           sub: "periods/day",
           icon: Calendar,
-          color: "bg-blue-50 text-blue-500",
+          color: "bg-blue-50 dark:bg-blue-500/15 text-blue-500",
           gradient: "from-blue-500 to-cyan-500",
           onClick: () => setActiveTab("timetable"),
         },
@@ -686,7 +349,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           value: "—",
           sub: "board",
           icon: Megaphone,
-          color: "bg-violet-50 text-violet-500",
+          color: "bg-violet-50 dark:bg-violet-500/15 text-violet-500",
           gradient: "from-violet-500 to-purple-500",
           onClick: () => setActiveTab("announcements"),
         },
@@ -695,7 +358,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           value: "!",
           sub: "student alerts",
           icon: WarningOctagon,
-          color: "bg-red-50 text-red-500",
+          color: "bg-red-50 dark:bg-red-500/15 text-red-500",
           gradient: "from-red-500 to-orange-500",
           onClick: () => setActiveTab("at-risk"),
         },
@@ -704,13 +367,13 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           value: "📋",
           sub: "audit trail",
           icon: ClipboardText,
-          color: "bg-slate-100 text-slate-500 dark:text-slate-400",
+          color: "bg-slate-100 dark:bg-slate-500/15 text-slate-500 dark:text-slate-400",
           gradient: "from-slate-500 to-slate-700",
           onClick: () => setActiveTab("activity-log"),
         },
       ];
 
-  if (loading) return <DashboardSkeleton />;
+  if (initialLoading) return <DashboardSkeleton />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -800,10 +463,10 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
         )}
       </AnimatePresence>
 
-      <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+      <header className="glass-header border-b border-white/10">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3 sm:gap-4">
-            <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/20">
               <PresentationChart
                 size={22}
                 weight="duotone"
@@ -814,8 +477,8 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
               <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                 AcadMix
               </h1>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                Head of Department
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                HOD Workspace
               </p>
             </div>
           </div>
@@ -874,7 +537,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
             <button
               data-testid="logout-button"
               onClick={onLogout}
-              className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
+              className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-500 transition-colors"
               aria-label="Sign out"
             >
               <SignOut size={20} weight="duotone" />
@@ -892,9 +555,9 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
           className="mb-6 sm:mb-8 flex items-start justify-between"
         >
           <div>
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-1">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">
               {getGreeting()},{" "}
-              <span className="gradient-text">
+              <span className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 bg-clip-text text-transparent">
                 {user?.name?.split(" ").pop() || "HOD"}!
               </span>
             </h2>
@@ -938,7 +601,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
         </motion.div>
 
         {/* Unified Navigation */}
-        <div className="flex overflow-x-auto gap-2 p-1.5 bg-slate-100 dark:bg-white/5 rounded-2xl mb-8 hide-scrollbar">
+        <div className="flex overflow-x-auto gap-1 p-1 bg-slate-100/80 dark:bg-white/[0.04] rounded-2xl mb-8 hide-scrollbar backdrop-blur-sm border border-slate-200/50 dark:border-white/[0.06]">
             {[
               { id: "overview", label: "Overview" },
               { id: "marks-entry", label: "Marks Entry" },
@@ -955,10 +618,10 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                 key={tab.id}
                 data-testid={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
                   activeTab === tab.id
-                    ? "bg-slate-900 text-white shadow-md"
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
+                    ? "bg-gradient-to-r from-slate-800 to-slate-900 dark:from-white dark:to-slate-100 text-white dark:text-slate-900 shadow-lg shadow-slate-900/20 dark:shadow-white/10"
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-white/[0.06]'
                 }`}
               >
                 {tab.label}
@@ -986,7 +649,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
             )}
             <motion.div
               variants={containerVariants}
-              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 mb-8"
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-5 mb-8"
             >
               {stats.map((stat, i) => {
                 const Icon = stat.icon;
@@ -997,7 +660,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                     whileHover={cardHover}
                     key={i}
                     onClick={stat.onClick || undefined}
-                    className={`stat-card relative overflow-hidden group text-left ${stat.onClick ? "cursor-pointer" : ""}`}
+                    className={`stat-card relative overflow-hidden group text-left backdrop-blur-sm border border-white/60 dark:border-white/[0.06] hover:border-indigo-200 dark:hover:border-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/5 transition-all duration-300 ${stat.onClick ? "cursor-pointer" : ""}`}
                     data-testid={`stat-card-${stat.label.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -1137,16 +800,16 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
         {activeTab === "faculty" && (
           <div data-testid="faculty-content">
             <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-1 bg-slate-100 rounded-2xl p-1.5">
+              <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-white/[0.04] rounded-2xl p-1.5 border border-slate-200/50 dark:border-white/[0.06]">
                 <button
                   onClick={() => setFacultySubView("assignments")}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${facultySubView === "assignments" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-300"}`}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${facultySubView === "assignments" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-300"}`}
                 >
                   Assignments
                 </button>
                 <button
                   onClick={() => setFacultySubView("workload")}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${facultySubView === "workload" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-300"}`}
+                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${facultySubView === "workload" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-300"}`}
                 >
                   Workload Matrix
                 </button>
@@ -1155,7 +818,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                 <button
                   data-testid="add-assignment-button"
                   onClick={() => setShowAddForm(!showAddForm)}
-                  className="btn-primary !px-4 !py-2.5 text-sm flex items-center gap-2"
+                  className="btn-primary !px-4 !py-2.5 text-sm flex items-center gap-2 shadow-lg shadow-indigo-500/20"
                 >
                   <UserPlus size={18} weight="duotone" /> Add Assignment
                 </button>
@@ -1431,7 +1094,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                       </div>
                       <button
                         onClick={() => handleDeleteAssignment(a.id)}
-                        className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors"
+                        className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 text-red-500 transition-colors"
                       >
                         <Trash size={18} weight="duotone" />
                       </button>
@@ -1710,7 +1373,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
 
             {/* Analytics Tabs */}
             <div className="mb-6">
-              <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5 w-fit">
+              <div className="flex items-center gap-2 bg-slate-100/80 dark:bg-white/[0.04] rounded-2xl p-1.5 w-fit border border-slate-200/50 dark:border-white/[0.06]">
                 <button
                   onClick={() => setAnalyticsTab("quiz")}
                   className={`pill-tab ${analyticsTab === "quiz" ? "pill-tab-active" : "pill-tab-inactive"}`}
@@ -1786,7 +1449,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                               </div>
                               <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
                                 <div
-                                  className="h-full bg-gradient-to-r from-indigo-500 to-teal-400 rounded-full"
+                                  className="h-full bg-gradient-to-r from-indigo-500 via-blue-500 to-teal-400 rounded-full transition-all duration-500"
                                   style={{ width: `${score}%` }}
                                 />
                               </div>
@@ -2006,7 +1669,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
               {/* Create Quiz Card */}
               <button
                 onClick={() => navigate("quiz-builder")}
-                className="soft-card-hover p-8 text-left flex items-center gap-5 group"
+                className="soft-card-hover p-8 text-left flex items-center gap-5 group border border-transparent hover:border-indigo-200 dark:hover:border-indigo-500/30 transition-all duration-300"
               >
                 <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-500/15 rounded-2xl flex items-center justify-center group-hover:bg-indigo-100 transition-colors flex-shrink-0">
                   <span className="text-3xl">📝</span>
@@ -2023,7 +1686,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
               {/* Quiz Analytics Card */}
               <button
                 onClick={() => navigate("class-results")}
-                className="soft-card-hover p-8 text-left flex items-center gap-5 group"
+                className="soft-card-hover p-8 text-left flex items-center gap-5 group border border-transparent hover:border-emerald-200 dark:hover:border-emerald-500/30 transition-all duration-300"
               >
                 <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center group-hover:bg-emerald-100 transition-colors flex-shrink-0">
                   <span className="text-3xl">📊</span>
@@ -2072,3 +1735,4 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
 };
 
 export default HodDashboard;
+

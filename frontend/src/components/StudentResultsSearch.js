@@ -67,7 +67,7 @@ const SemesterTabView = ({ semesters }) => {
               {currentSem.subjects && currentSem.subjects.length > 0 ? (
                 <table className="w-full text-sm" data-testid="profile-subjects-table">
                   <thead>
-                    <tr className="border-b border-slate-100">
+                <tr className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/[0.05]">
                       <th className="text-left p-3 text-xs font-bold uppercase tracking-widest text-slate-400">Subject</th>
                       <th className="text-center p-3 text-xs font-bold uppercase tracking-widest text-slate-400">Credits</th>
                       <th className="text-center p-3 text-xs font-bold uppercase tracking-widest text-slate-400">Grade</th>
@@ -76,7 +76,7 @@ const SemesterTabView = ({ semesters }) => {
                   </thead>
                   <tbody>
                     {currentSem.subjects.map((sub, j) => (
-                      <tr key={j} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors" data-testid={`profile-subject-row-${j}`}>
+                      <tr key={j} className="border-b border-slate-50 dark:border-white/[0.05] hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors" data-testid={`profile-subject-row-${j}`}>
                         <td className="p-3">
                           <p className="font-bold text-slate-800">{sub.name}</p>
                           <p className="text-xs font-medium text-slate-400">{sub.code}</p>
@@ -223,7 +223,7 @@ const StudentProfileView = ({ studentId, onBack }) => {
           <div className="soft-card overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
+                <tr className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/[0.05]">
                   <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Subject</th>
                   <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Exam</th>
                   <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Marks</th>
@@ -234,7 +234,7 @@ const StudentProfileView = ({ studentId, onBack }) => {
                 {mid_marks.map((m, i) => {
                   const pct = m.max_marks > 0 ? ((m.marks / m.max_marks) * 100).toFixed(1) : '-';
                   return (
-                    <tr key={i} className="border-b border-slate-50">
+                    <tr key={i} className="border-b border-slate-50 dark:border-white/[0.05]">
                       <td className="py-2.5 px-4 font-medium text-slate-800">{m.subject_name} ({m.subject_code})</td>
                       <td className="py-2.5 px-4 text-center"><span className="soft-badge bg-slate-100 text-slate-600">{m.exam_type?.toUpperCase()}</span></td>
                       <td className="py-2.5 px-4 text-center font-bold text-slate-900">{m.marks ?? '-'} / {m.max_marks}</td>
@@ -259,7 +259,7 @@ const StudentProfileView = ({ studentId, onBack }) => {
           <div className="soft-card overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
+                <tr className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/[0.05]">
                   <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Quiz</th>
                   <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Score</th>
                   <th className="text-center py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Percentage</th>
@@ -267,7 +267,7 @@ const StudentProfileView = ({ studentId, onBack }) => {
               </thead>
               <tbody>
                 {quiz_attempts.map((a, i) => (
-                  <tr key={i} className="border-b border-slate-50">
+                  <tr key={i} className="border-b border-slate-50 dark:border-white/[0.05]">
                     <td className="py-2.5 px-4 font-medium text-slate-800">{a.quiz_title}</td>
                     <td className="py-2.5 px-4 text-center font-bold text-slate-900">{a.score} / {a.total}</td>
                     <td className="py-2.5 px-4 text-center">
@@ -427,7 +427,7 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
       <div className="soft-card overflow-hidden">
         <table className="w-full">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-100">
+            <tr className="bg-slate-50 dark:bg-white/[0.02] border-b border-slate-100 dark:border-white/[0.05]">
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">College ID</th>
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Name</th>
               <th className="text-left py-3 px-4 font-bold text-slate-500 text-xs uppercase tracking-widest">Department</th>
@@ -438,7 +438,7 @@ const StudentResultsSearch = ({ user, departmentLocked }) => {
           </thead>
           <tbody>
             {students.map(s => (
-              <tr key={s.id} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors" data-testid={`result-student-${s.college_id}`}>
+              <tr key={s.id} className="border-b border-slate-50 dark:border-white/[0.05] hover:bg-slate-50/50 dark:hover:bg-white/[0.02] transition-colors" data-testid={`result-student-${s.college_id}`}>
                 <td className="py-3 px-4 font-bold text-indigo-600">{s.college_id}</td>
                 <td className="py-3 px-4 font-medium text-slate-800">{s.name}</td>
                 <td className="py-3 px-4 text-sm font-bold text-slate-500">{s.department || '-'}</td>

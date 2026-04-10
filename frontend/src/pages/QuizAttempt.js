@@ -1,18 +1,56 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Clock, Warning, Camera, CheckCircle, XCircle, Play, Code, ArrowsOut, CameraSlash, ShieldWarning, LockSimple, Eraser, BookmarkSimple, X, PaperPlaneTilt, Eye, Question } from '@phosphor-icons/react';
 import { attemptsAPI, quizzesAPI } from '../services/api';
+import { toast } from 'sonner';
 import Editor from '@monaco-editor/react';
 import api from '../services/api';
 import AlertModal from '../components/AlertModal';
 
 const MOBILE_WIDTH = 768;
 
-const CodeEditor = ({ value, onChange, language, onRun, running, output }) => {
+const CodeEditor = ({ value, onChange, language, onRun, running, output, onCheatPaste }) => {
   const [isMobile] = useState(() => window.innerWidth < MOBILE_WIDTH);
   const monacoLang = { python: 'python', javascript: 'javascript', java: 'java', c: 'c', cpp: 'cpp' }[language] || 'python';
+  const editorRef = useRef(null);
+
+  const handleEditorMount = (editor) => {
+    editorRef.current = editor;
+  };
+
+  const handleCopyOrCut = () => {
+    try {
+      if (editorRef.current) {
+        const selection = editorRef.current.getSelection();
+        let text = editorRef.current.getModel().getValueInRange(selection);
+        if (!text && selection.startLineNumber) {
+           text = editorRef.current.getModel().getLineContent(selection.startLineNumber) + '\n';
+        }
+        window.__editorCopiedText = text;
+      } else if (isMobile) {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.tagName === 'TEXTAREA') {
+          window.__editorCopiedText = activeEl.value.substring(activeEl.selectionStart, activeEl.selectionEnd);
+        }
+      }
+    } catch(err) {}
+  };
+
+  const handlePasteCapture = (e) => {
+    let pastedText = e.clipboardData.getData('text') || '';
+    let copiedText = window.__editorCopiedText || '';
+    pastedText = pastedText.replace(/\r\n/g, '\n');
+    copiedText = copiedText.replace(/\r\n/g, '\n');
+
+    if (pastedText && pastedText !== copiedText) {
+      if (pastedText.trim() === copiedText.trim()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (onCheatPaste) onCheatPaste();
+    }
+  };
 
   return (
-    <div className="space-y-3" data-testid="code-editor-container">
+    <div className="space-y-3" data-testid="code-editor-container" onCopyCapture={handleCopyOrCut} onCutCapture={handleCopyOrCut} onPasteCapture={handlePasteCapture}>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <Code size={18} weight="duotone" className="text-indigo-500" />
@@ -41,6 +79,7 @@ const CodeEditor = ({ value, onChange, language, onRun, running, output }) => {
             language={monacoLang}
             value={value || ''}
             onChange={(val) => onChange(val || '')}
+            onMount={handleEditorMount}
             theme="vs-dark"
             options={{
               minimap: { enabled: false },
@@ -659,6 +698,12 @@ const QuizAttempt = ({ quizData, navigate, user }) => {
                     onRun={() => handleRunCode(currentQuestion)}
                     running={runningCode}
                     output={codeOutputs[currentQuestion]}
+                    onCheatPaste={() => {
+                        toast.error("🛡️ Integrity Lock Active: Pasting from external sources is disabled during this session. You may only move code copied from within this editor.", { duration: 5000 });
+                        if (attempt?.id) {
+                            attemptsAPI.logTelemetryViolation(attempt.id).catch(()=>{});
+                        }
+                    }}
                   />
                 )}
 

@@ -159,7 +159,7 @@ const NodalOfficerDashboard = ({ navigate, user, onLogout }) => {
       
       {/* Header */}
       <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <ShieldCheck size={22} weight="duotone" className="text-white" />
@@ -458,3 +458,4 @@ const NodalOfficerDashboard = ({ navigate, user, onLogout }) => {
 };
 
 export default NodalOfficerDashboard;
+

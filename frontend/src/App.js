@@ -1,40 +1,40 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import AlertModal from './components/AlertModal';
 import PageTransition from './components/PageTransition';
 import './App.css';
 import { authAPI, setAuthToken, clearAuthToken } from './services/api';
-import LoginPage from './pages/LoginPage';
-import StudentDashboard from './pages/StudentDashboard';
-import TeacherDashboard from './pages/TeacherDashboard';
-import AdminDashboard from './pages/AdminDashboard';
-import HodDashboard from './pages/HodDashboard';
-import ExamCellDashboard from './pages/ExamCellDashboard';
-import QuizAttempt from './pages/QuizAttempt';
-import QuizResults from './pages/QuizResults';
-import SemesterResults from './pages/SemesterResults';
-import Analytics from './pages/Analytics';
-import Leaderboard from './pages/Leaderboard';
-import QuizBuilder from './pages/QuizBuilder';
-import LiveMonitor from './pages/LiveMonitor';
-import UserManagement from './pages/UserManagement';
-import CodePlayground from './pages/CodePlayground';
-import MarksEntry from './pages/MarksEntry';
-import StudentManagement from './pages/StudentManagement';
-import ClassResults from './pages/ClassResults';
-import AvailableQuizzes from './pages/AvailableQuizzes';
-import Placements from './pages/Placements';
-import TeacherQuizzes from './pages/TeacherQuizzes';
-import QuizCalendar from './pages/QuizCalendar';
-import QuizSummary from './pages/QuizSummary';
-import AttendanceMarker from './components/faculty/AttendanceMarker';
-import TPODashboard from './pages/TPODashboard';
-import AlumniDashboard from './pages/AlumniDashboard';
-import ParentDashboard from './pages/ParentDashboard';
-import IndustryDashboard from './pages/IndustryDashboard';
-import PrincipalDashboard from './pages/PrincipalDashboard';
-import RetiredFacultyDashboard from './pages/RetiredFacultyDashboard';
-import ExpertDashboard from './pages/ExpertDashboard';
-import NodalOfficerDashboard from './pages/NodalOfficerDashboard';
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const StudentDashboard = React.lazy(() => import('./pages/StudentDashboard'));
+const TeacherDashboard = React.lazy(() => import('./pages/TeacherDashboard'));
+const AdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
+const HodDashboard = React.lazy(() => import('./pages/HodDashboard'));
+const ExamCellDashboard = React.lazy(() => import('./pages/ExamCellDashboard'));
+const QuizAttempt = React.lazy(() => import('./pages/QuizAttempt'));
+const QuizResults = React.lazy(() => import('./pages/QuizResults'));
+const SemesterResults = React.lazy(() => import('./pages/SemesterResults'));
+const Analytics = React.lazy(() => import('./pages/Analytics'));
+const Leaderboard = React.lazy(() => import('./pages/Leaderboard'));
+const QuizBuilder = React.lazy(() => import('./pages/QuizBuilder'));
+const LiveMonitor = React.lazy(() => import('./pages/LiveMonitor'));
+const UserManagement = React.lazy(() => import('./pages/UserManagement'));
+const CodePlayground = React.lazy(() => import('./pages/CodePlayground'));
+const MarksEntry = React.lazy(() => import('./pages/MarksEntry'));
+const StudentManagement = React.lazy(() => import('./pages/StudentManagement'));
+const ClassResults = React.lazy(() => import('./pages/ClassResults'));
+const AvailableQuizzes = React.lazy(() => import('./pages/AvailableQuizzes'));
+const Placements = React.lazy(() => import('./pages/Placements'));
+const TeacherQuizzes = React.lazy(() => import('./pages/TeacherQuizzes'));
+const QuizCalendar = React.lazy(() => import('./pages/QuizCalendar'));
+const QuizSummary = React.lazy(() => import('./pages/QuizSummary'));
+const AttendanceMarker = React.lazy(() => import('./components/faculty/AttendanceMarker'));
+const TPODashboard = React.lazy(() => import('./pages/TPODashboard'));
+const AlumniDashboard = React.lazy(() => import('./pages/AlumniDashboard'));
+const ParentDashboard = React.lazy(() => import('./pages/ParentDashboard'));
+const IndustryDashboard = React.lazy(() => import('./pages/IndustryDashboard'));
+const PrincipalDashboard = React.lazy(() => import('./pages/PrincipalDashboard'));
+const RetiredFacultyDashboard = React.lazy(() => import('./pages/RetiredFacultyDashboard'));
+const ExpertDashboard = React.lazy(() => import('./pages/ExpertDashboard'));
+const NodalOfficerDashboard = React.lazy(() => import('./pages/NodalOfficerDashboard'));
 
 const ROLE_DASHBOARD = {
   student: 'student-dashboard',
@@ -174,7 +174,13 @@ function App() {
   return (
     <div className="App">
       <PageTransition pageKey={currentPage}>
-        {renderPage()}
+        <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC] dark:bg-[#0B0F19]">
+             <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        }>
+          {renderPage()}
+        </Suspense>
       </PageTransition>
       <AlertModal
         open={showLogoutModal}

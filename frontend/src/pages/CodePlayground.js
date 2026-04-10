@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Play, Terminal, Copy, Trash, CaretDown, Lightning, Clock, CheckCircle, ChartBar, WarningCircle, X, Funnel, ArrowCounterClockwise } from '@phosphor-icons/react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ArrowLeft, Play, Terminal, Copy, Trash, CaretDown, Lightning, Clock, CheckCircle, ChartBar, WarningCircle, X, Funnel, ArrowCounterClockwise, Sparkle, ChartLineUp, Eye } from '@phosphor-icons/react';
+import { toast } from 'sonner';
+
 import Editor from '@monaco-editor/react';
 import api from '../services/api';
 import { useTheme } from '../contexts/ThemeContext';
@@ -34,10 +38,31 @@ const CodePlayground = ({ navigate, user }) => {
   const [showInsightsModal, setShowInsightsModal] = useState(false);
   const [difficultyFilter, setDifficultyFilter] = useState('');
   
+  const [aiReview, setAiReview] = useState(null);
+  const [reviewing, setReviewing] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  
+  const [showCoach, setShowCoach] = useState(false);
+  const [coachMessages, setCoachMessages] = useState([]);
+  const [isCoachTyping, setIsCoachTyping] = useState(false);
+  const [coachInput, setCoachInput] = useState('');
+  const endOfMessagesRef = useRef(null);
+  
   const [history, setHistory] = useState([]);
   const [challenges, setChallenges] = useState([]);
   const [stats, setStats] = useState(null);
-  const [activeChallenge, setActiveChallenge] = useState(null);
+  const [activeChallenge, setActiveChallenge] = useState(() => {
+    const saved = localStorage.getItem('acadmix_active_challenge');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    if (activeChallenge) {
+      localStorage.setItem('acadmix_active_challenge', JSON.stringify(activeChallenge));
+    } else {
+      localStorage.removeItem('acadmix_active_challenge');
+    }
+  }, [activeChallenge]);
   
   // Resizable Pane State
   const [leftWidth, setLeftWidth] = useState(40); // Initial 40% width for left pane
@@ -136,22 +161,184 @@ const CodePlayground = ({ navigate, user }) => {
       
       setOutput(result);
       
-      if (!activeChallenge) {
-        setHistory(prev => [{
-          language,
-          code: code.substring(0, 100) + (code.length > 100 ? '...' : ''),
-          output: result.substring(0, 80),
-          time: elapsed,
-          timestamp: new Date().toLocaleTimeString(),
-          success: data.exit_code === 0,
-        }, ...prev].slice(0, 10));
-      }
+      setHistory(prev => [{
+        language,
+        code: code.substring(0, 100) + (code.length > 100 ? '...' : ''),
+        rawCode: code,
+        output: result.substring(0, 80),
+        rawOutput: result,
+        time: elapsed,
+        timestamp: new Date().toLocaleTimeString(),
+        success: data.exit_code === 0,
+      }, ...prev].slice(0, 10));
 
     } catch (err) {
-      setOutput(err.response?.data?.detail || 'Execution failed. Please try again.');
+      console.error("CodeRunner Error:", err, err.response?.data);
+      const errDetail = err.response?.data?.detail 
+                     || err.response?.data?.error 
+                     || (err.message === 'Network Error' ? 'Network Error: Backend is unreachable or CORS failed' : null)
+                     || 'Execution failed. Please try again.';
+      
+      if (err.response?.status === 404 && typeof errDetail === 'string' && errDetail.includes('Challenge not found')) {
+        setActiveChallenge(null);
+        localStorage.removeItem('acadmix_active_challenge');
+        toast.error("The challenge you were working on was no longer found. Returning to free-code mode.", { duration: 5000 });
+      }
+
+      setOutput(`Error: ${typeof errDetail === 'string' ? errDetail : JSON.stringify(errDetail)}`);
       setExecTime(Date.now() - startTime);
     }
     setRunning(false);
+  };
+
+  const handleCoachSubmit = async (e) => {
+    if (e) e.preventDefault();
+    if (!coachInput.trim() || isCoachTyping) return;
+    
+    const newMessages = [...coachMessages, { role: "user", content: coachInput }];
+    setCoachMessages(newMessages);
+    setCoachInput('');
+    setIsCoachTyping(true);
+
+    try {
+      const isError = output && output.startsWith('Error:');
+      const token = localStorage.getItem('auth_token');
+      const url = `${process.env.REACT_APP_BACKEND_URL || ''}/api/code/coach`;
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          messages: newMessages,
+          language,
+          code,
+          output: isError ? '' : (output || ''),
+          error: isError ? output : '',
+          challenge_title: activeChallenge?.title,
+          challenge_description: activeChallenge?.description
+        })
+      });
+
+      if (!res.ok) throw new Error("Network Error");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      
+      let messageStarted = false;
+      
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        if (!chunk) continue;
+        
+        if (!messageStarted) {
+           messageStarted = true;
+           setIsCoachTyping(false);
+           setCoachMessages(prev => [...prev, { role: "assistant", content: chunk }]);
+        } else {
+           setCoachMessages(prev => {
+              const updated = [...prev];
+              const lastMessage = { ...updated[updated.length - 1] };
+              lastMessage.content += chunk;
+              updated[updated.length - 1] = lastMessage;
+              return updated;
+           });
+        }
+      }
+    } catch (err) {
+      console.error("AI Coach Error:", err);
+      setCoachMessages(prev => [...prev, { role: "assistant", content: "*Transmission failed. Please try again.*" }]);
+    }
+    setIsCoachTyping(false);
+  };
+
+  useEffect(() => {
+    if (endOfMessagesRef.current) {
+      endOfMessagesRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [coachMessages, isCoachTyping]);
+
+  const handleAnalysis = async (run) => {
+    setReviewing(true);
+    setShowReviewModal(true);
+    
+    if (run.aiReview) {
+      setAiReview(run.aiReview);
+      setReviewing(false);
+      return;
+    }
+    
+    setAiReview("");
+    try {
+      const isError = run.rawOutput && run.rawOutput.startsWith('Error:');
+      const token = localStorage.getItem('auth_token');
+      const url = `${process.env.REACT_APP_BACKEND_URL || ''}/api/code/review`;
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        },
+        body: JSON.stringify({
+          language: run.language,
+          code: run.rawCode || run.code,
+          output: isError ? '' : (run.rawOutput || ''),
+          error: isError ? run.rawOutput : '',
+          execution_time_ms: run.time || 0
+        })
+      });
+
+      if (!res.ok) throw new Error("Network Error");
+
+      const initData = await res.json();
+      
+      // Short-circuit if the backend executed synchronously (ARQ fallback)
+      if (initData.status === "completed" && initData.task_id === "sync-fallback") {
+          run.aiReview = initData.review;
+          setAiReview(initData.review);
+          return;
+      }
+      
+      const taskId = initData.task_id;
+      
+      // Polling Mechanism for Async Event Queue Simulation
+      let attempts = 0;
+      while (attempts < 60) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          attempts++;
+          
+          const statusRes = await fetch(`${process.env.REACT_APP_BACKEND_URL || ''}/api/code/review_status/${taskId}`, {
+              headers: { ...(token && { 'Authorization': `Bearer ${token}` }) }
+          });
+          if (!statusRes.ok) continue;
+          
+          const statusData = await statusRes.json();
+          if (statusData.status === "completed") {
+              run.aiReview = statusData.review;
+              setAiReview(statusData.review);
+              break;
+          } else if (statusData.status === "failed") {
+              throw new Error(statusData.error || "Async task failed");
+          }
+      }
+      
+    } catch (err) {
+      console.error("AI Review Error:", err);
+      // Wait, we don't want to crash. Let's show a graceful fallback if polling times out or fails
+      setAiReview({
+          time_complexity: "N/A",
+          space_complexity: "N/A",
+          logic_summary: "AI Code Analysis is currently unavailable or timed out.",
+          suggested_improvements: ["Please try submitting the review request again."]
+      });
+    }
+    setReviewing(false);
   };
 
   const handleCopyOutput = () => {
@@ -174,6 +361,37 @@ const CodePlayground = ({ navigate, user }) => {
 
   const handleEditorMount = (editor) => {
     editorRef.current = editor;
+  };
+
+  const handleCopyOrCut = () => {
+    try {
+      if (editorRef.current) {
+        const selection = editorRef.current.getSelection();
+        let text = editorRef.current.getModel().getValueInRange(selection);
+        // Handle empty selection (Monaco full line copy)
+        if (!text && selection.startLineNumber) {
+           text = editorRef.current.getModel().getLineContent(selection.startLineNumber) + '\n';
+        }
+        window.__editorCopiedText = text;
+      }
+    } catch(err) {}
+  };
+
+  const handlePasteCapture = (e) => {
+    let pastedText = e.clipboardData.getData('text') || '';
+    let copiedText = window.__editorCopiedText || '';
+    
+    // Normalize line endings to prevent cross-OS paste mismatch blocks
+    pastedText = pastedText.replace(/\r\n/g, '\n');
+    copiedText = copiedText.replace(/\r\n/g, '\n');
+
+    if (pastedText && pastedText !== copiedText) {
+      // Final fallback for edge-case whitespace/line-endings mismatch in line copies
+      if (pastedText.trim() === copiedText.trim()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      toast.error("🛡️ Integrity Lock Active: Pasting from external sources is disabled during this session. You may only move code copied from within this editor.", { duration: 5000 });
+    }
   };
 
   const dashboardPage = user?.role === 'teacher' ? 'teacher-dashboard' : user?.role === 'admin' ? 'admin-dashboard' : 'student-dashboard';
@@ -276,13 +494,14 @@ const CodePlayground = ({ navigate, user }) => {
                   <button onClick={() => { setCode(DEFAULT_TEMPLATES[language] || ''); setOutput(null); }} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 dark:text-slate-400 transition-colors" title="Reset Code">
                     <ArrowCounterClockwise size={18} weight="duotone" />
                   </button>
+
                   <button onClick={handleRun} disabled={running} className="btn-primary !px-4 !py-1.5 text-sm flex items-center gap-2 disabled:opacity-60 shadow-none">
                     {running ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Play size={16} weight="fill" />}
                     Run
                   </button>
                 </div>
               </div>
-              <div className="flex-1">
+              <div className="flex-1" onCopyCapture={handleCopyOrCut} onCutCapture={handleCopyOrCut} onPasteCapture={handlePasteCapture}>
                 <Editor
                   height="100%"
                   language={language}
@@ -370,6 +589,7 @@ const CodePlayground = ({ navigate, user }) => {
                       className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 text-slate-500 dark:text-slate-400 transition-colors" title="Reset to template">
                       <ArrowCounterClockwise size={18} weight="duotone" />
                     </button>
+
                     <button onClick={handleRun} disabled={running}
                       className="btn-primary !px-5 !py-2.5 text-sm flex items-center gap-2 disabled:opacity-60">
                       {running ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Play size={16} weight="fill" />}
@@ -378,7 +598,7 @@ const CodePlayground = ({ navigate, user }) => {
                   </div>
                 </div>
 
-                <div className="soft-card overflow-hidden flex-1 min-h-[400px]">
+                <div className="soft-card overflow-hidden flex-1 min-h-[400px]" onCopyCapture={handleCopyOrCut} onCutCapture={handleCopyOrCut} onPasteCapture={handlePasteCapture}>
                   <Editor
                     height="100%"
                     language={language}
@@ -459,21 +679,55 @@ const CodePlayground = ({ navigate, user }) => {
                     {history.length === 0 ? (
                       <p className="text-sm text-slate-400 font-medium py-2">No runs yet. Start coding!</p>
                     ) : (
-                      history.map((h, i) => (
-                        <div key={i} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 flex items-start gap-3">
-                          <div className={`mt-0.5 ${h.success ? 'text-emerald-500' : 'text-red-500'}`}>
-                            <CheckCircle size={16} weight={h.success ? 'fill' : 'duotone'} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-0.5">
-                              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{LANGUAGES.find(l => l.id === h.language)?.label || 'Lang'}</span>
-                              <span className="text-xs text-slate-400">{h.timestamp}</span>
-                            </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate">{h.output}</p>
-                          </div>
-                          <span className="text-xs font-medium text-slate-400 whitespace-nowrap">{h.time}ms</span>
-                        </div>
-                      ))
+                      <div className="overflow-x-auto w-full border border-slate-200 dark:border-slate-800 rounded-xl bg-white dark:bg-[#1A202C]">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                          <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold text-[11px]">
+                            <tr>
+                              <th className="px-4 py-3">No.</th>
+                              <th className="px-4 py-3">Status</th>
+                              <th className="px-4 py-3 text-center">Language</th>
+                              <th className="px-4 py-3 text-center">Code</th>
+                              <th className="px-4 py-3 text-center">Analysis</th>
+                              <th className="px-4 py-3 text-center">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                            {history.map((h, i) => (
+                              <tr key={i} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/20 transition-colors">
+                                <td className="px-4 py-3 font-medium text-slate-700 dark:text-slate-300">{i + 1}</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex flex-col">
+                                    <span className={`font-bold ${h.success ? 'text-emerald-500' : 'text-red-500'}`}>
+                                      {h.success ? 'Accepted' : 'Failed'}
+                                    </span>
+                                    <span className="text-[11px] text-slate-400">{h.timestamp}</span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3">
+                                  <div className="flex justify-center items-center w-full" title={LANGUAGES.find(l => l.id === h.language)?.label || 'Lang'}>
+                                    {LANGUAGES.find(l => l.id === h.language)?.icon || <Terminal size={18} className="text-slate-400" />}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <button onClick={() => setCode(h.rawCode || '')} className="text-slate-400 hover:text-indigo-500 transition-colors" title="Load this code">
+                                    <Eye size={18} weight="duotone" />
+                                  </button>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <button onClick={() => handleAnalysis(h)} className="text-slate-400 hover:text-indigo-500 transition-colors" title="Run AI Analysis">
+                                    <ChartLineUp size={18} weight="bold" />
+                                  </button>
+                                </td>
+                                <td className="px-4 py-3 text-center">
+                                  <button onClick={() => setHistory(history.filter((_, idx) => idx !== i))} className="text-red-400 hover:text-red-500 transition-colors" title="Delete run">
+                                    <Trash size={18} weight="duotone" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -607,6 +861,173 @@ const CodePlayground = ({ navigate, user }) => {
              </div>
            </div>
          </div>
+      )}
+       {/* AI Review Modal */}
+      {showReviewModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-[2px] animate-fade-in" onClick={() => setShowReviewModal(false)}>
+          <div className="w-full max-w-3xl max-h-[85vh] bg-white rounded-3xl dark:bg-[#1A202C] shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/80">
+              <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-3">
+                <Sparkle className="text-indigo-500 text-2xl" weight="fill" />
+                Code Review by Ami
+              </h2>
+              <button onClick={() => setShowReviewModal(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 flex-1 overflow-y-auto custom-scrollbar">
+              {reviewing ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500 dark:text-slate-400">
+                  <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin mb-4"></div>
+                  <p className="font-semibold">Analyzing your code...</p>
+                </div>
+              ) : aiReview ? (
+                typeof aiReview === 'object' ? (
+                  <div className="flex flex-col gap-5">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Time Complexity</h3>
+                        <p className="font-semibold text-slate-800 dark:text-slate-100 text-[15px]">{aiReview.time_complexity}</p>
+                      </div>
+                      <div className="bg-slate-50 dark:bg-slate-800/80 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Space Complexity</h3>
+                        <p className="font-semibold text-slate-800 dark:text-slate-100 text-[15px]">{aiReview.space_complexity}</p>
+                      </div>
+                    </div>
+                    <div className="bg-indigo-50 dark:bg-indigo-500/10 p-5 rounded-2xl border border-indigo-100 dark:border-indigo-500/30">
+                      <h3 className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                        <Sparkle weight="fill" />
+                        Logic Summary
+                      </h3>
+                      <p className="font-medium text-slate-700 dark:text-slate-300 leading-relaxed text-[15px]">{aiReview.logic_summary}</p>
+                    </div>
+                    {aiReview.suggested_improvements && aiReview.suggested_improvements.length > 0 && (
+                      <div className="bg-white dark:bg-[#1A202C] p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                        <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100 mb-3 tracking-widest uppercase flex items-center gap-2">
+                          <CheckCircle weight="fill" className="text-emerald-500 text-base" />
+                          Suggested Improvements
+                        </h3>
+                        <ul className="space-y-2.5">
+                          {aiReview.suggested_improvements.map((imp, idx) => (
+                            <li key={idx} className="flex gap-3 items-start text-[14px] font-medium text-slate-600 dark:text-slate-400 leading-relaxed">
+                              <span className="text-indigo-500 mt-1 font-black">→</span>
+                              {imp}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="prose prose-sm dark:prose-invert max-w-none prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-a:text-indigo-500">
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        table: ({node, ...props}) => <div className="overflow-x-auto my-6"><table className="w-full text-left border-collapse" {...props} /></div>,
+                        th: ({node, ...props}) => <th className="bg-slate-50 dark:bg-slate-800/80 py-3 px-4 font-bold text-slate-800 dark:text-slate-200 border-b-2 border-slate-200 dark:border-slate-700 whitespace-nowrap" {...props} />,
+                        td: ({node, ...props}) => <td className="py-4 px-4 border-b border-slate-100 dark:border-slate-700/60 align-top text-slate-700 dark:text-slate-300" {...props} />,
+                        tr: ({node, ...props}) => <tr className="transition-colors hover:bg-slate-50/50 dark:hover:bg-slate-800/30" {...props} />
+                      }}
+                    >
+                      {aiReview}
+                    </ReactMarkdown>
+                  </div>
+                )
+              ) : (
+                <div className="text-center py-10 text-slate-500">No review generated.</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Floating Action Button (FAB) for AI Coach */}
+      {!showCoach && (
+        <button 
+          onClick={() => setShowCoach(true)}
+          className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg shadow-indigo-500/30 flex items-center justify-center z-[90] transition-transform hover:scale-110 active:scale-95 group"
+          title="Chat with Ami"
+        >
+          <Sparkle size={24} weight="fill" className="text-amber-300 group-hover:animate-pulse" />
+        </button>
+      )}
+
+      {/* AI Coach Floating Window */}
+      {showCoach && (
+        <div className="fixed bottom-6 right-6 w-[400px] max-h-[600px] h-[75vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col z-[100] animate-fade-in overflow-hidden">
+          <div className="px-5 py-4 border-b border-indigo-600 bg-indigo-600 flex justify-between items-center text-white">
+            <div className="flex items-center gap-3">
+              <Sparkle weight="fill" size={20} className="text-amber-300" />
+              <h3 className="font-bold text-lg">Ami</h3>
+            </div>
+            <button onClick={() => setShowCoach(false)} className="hover:bg-white/20 p-2 rounded-full transition-colors flex items-center justify-center">
+              <X size={18} weight="bold" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50 dark:bg-slate-800/20">
+            {coachMessages.length === 0 && (
+              <div className="text-center text-slate-500 dark:text-slate-400 py-10 px-4 text-[13px] font-medium leading-relaxed bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mx-2">
+                <span className="text-2xl block mb-3">👋</span>
+                Hi! I'm Ami — your partner in crime for coding 😜.<br/>
+                {activeChallenge ? (
+                  <span>I see you're working on <span className="font-bold text-indigo-500 dark:text-indigo-400">{activeChallenge.title}</span>. Ask for a hint if you're stuck!</span>
+                ) : (
+                  <span>Describe what you're trying to build, or ask for a hint if you're stuck!</span>
+                )}
+                <br/><br/><span className="text-indigo-500 dark:text-indigo-400 font-bold">I can automatically see your code and output.</span>
+              </div>
+            )}
+            {coachMessages.map((msg, idx) => (
+              <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-5 py-3 text-[14px] ${msg.role === 'user' ? 'bg-indigo-600 text-white rounded-br-sm shadow-md' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 border border-slate-100 dark:border-slate-700/60 rounded-bl-sm shadow-sm'}`}>
+                  {msg.role === 'user' ? (
+                     msg.content
+                  ) : (
+                     <div className="prose prose-sm prose-slate dark:prose-invert max-w-none prose-p:my-1 prose-pre:my-2 prose-pre:bg-slate-100 dark:prose-pre:bg-slate-900 prose-pre:text-slate-800 dark:prose-pre:text-slate-200">
+                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {msg.content}
+                       </ReactMarkdown>
+                     </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isCoachTyping && (
+              <div className="flex justify-start">
+                <div className="max-w-[85%] rounded-2xl px-5 py-4 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700/60 rounded-bl-sm shadow-sm flex items-center gap-1.5">
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-[bounce_1s_infinite]"></div>
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-[bounce_1s_infinite]" style={{animationDelay: '150ms'}}></div>
+                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-[bounce_1s_infinite]" style={{animationDelay: '300ms'}}></div>
+                </div>
+              </div>
+            )}
+            <div ref={endOfMessagesRef} />
+          </div>
+          
+          <form onSubmit={handleCoachSubmit} className="p-4 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-2 rounded-[20px] focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all shadow-sm">
+              <input 
+                type="text" 
+                value={coachInput} 
+                onChange={(e) => setCoachInput(e.target.value)} 
+                placeholder="Ask for a hint..." 
+                className="flex-1 bg-transparent px-3 py-1.5 text-[15px] border-transparent focus:border-transparent focus:ring-0 outline-none shadow-none text-slate-800 dark:text-slate-100 placeholder:text-slate-400"
+                style={{ border: 'none', outline: 'none', boxShadow: 'none' }}
+                disabled={isCoachTyping}
+              />
+              <button 
+                type="submit" 
+                disabled={!coachInput.trim() || isCoachTyping}
+                className="bg-indigo-600 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:text-white/60 text-white p-2.5 rounded-2xl transition-colors hover:bg-indigo-700 shadow-sm"
+              >
+                {isCoachTyping ? <ArrowCounterClockwise size={18} weight="bold" className="animate-spin" /> : <Play size={18} weight="fill" />}
+              </button>
+            </div>
+            <div className="text-center mt-2 text-[11px] text-slate-400 dark:text-slate-500 font-medium tracking-wide">
+              Ami sees your code automatically
+            </div>
+          </form>
+        </div>
       )}
     </div>
   );

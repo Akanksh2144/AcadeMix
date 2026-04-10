@@ -188,21 +188,70 @@ const DrivesContent = () => {
   );
 };
 
-// ─── Applications Tab ──────────────────────────────────────────
 const ApplicationsContent = () => {
+  const [drives, setDrives] = useState([]);
+  const [selectedDrive, setSelectedDrive] = useState('');
+  const [applicants, setApplicants] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    tpoAPI.getDrives().then(res => { 
+        setDrives(res.data);
+        if (res.data.length > 0) setSelectedDrive(res.data[0].id);
+        setLoading(false); 
+    }).catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+      if (selectedDrive) {
+          tpoAPI.getApplicants(selectedDrive).then(res => setApplicants(res.data || []));
+      }
+  }, [selectedDrive]);
+
+  if (loading) return <DashboardSkeleton />;
+
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show">
       <motion.div variants={itemVariants} className="flex items-center justify-between mb-6">
         <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Applicant Tracking</h3>
+        <select value={selectedDrive} onChange={e => setSelectedDrive(e.target.value)} className="px-4 py-2 rounded-xl text-sm font-semibold bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none">
+             {drives.length === 0 && <option value="">No Drives Available</option>}
+             {drives.map(d => <option key={d.id} value={d.id}>{d.role} (₹{d.package_lpa} LPA)</option>)}
+        </select>
       </motion.div>
 
-      <motion.div variants={itemVariants} className="soft-card p-12 text-center">
-        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-          <FileText size={36} weight="duotone" className="text-slate-400" />
-        </div>
-        <h4 className="font-bold text-lg text-slate-600 dark:text-slate-400 mb-1">Select a placement drive</h4>
-        <p className="text-sm text-slate-400">Choose an active drive from the Drives tab to view and shortlist applicants.</p>
-      </motion.div>
+      {applicants.length === 0 ? (
+        <motion.div variants={itemVariants} className="soft-card p-12 text-center">
+          <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+            <FileText size={36} weight="duotone" className="text-slate-400" />
+          </div>
+          <h4 className="font-bold text-lg text-slate-600 dark:text-slate-400 mb-1">Select a placement drive</h4>
+          <p className="text-sm text-slate-400">Choose an active drive to view and shortlist applicants.</p>
+        </motion.div>
+      ) : (
+          <div className="space-y-4">
+              {applicants.map(app => (
+                  <motion.div variants={itemVariants} whileHover={cardHover} key={app.id} className="soft-card p-4 sm:p-6 flex items-center justify-between">
+                      <div>
+                          <div className="flex items-center gap-2 mb-1">
+                              <h4 className="font-extrabold text-lg text-slate-900 dark:text-white">
+                                  {app.student_name}
+                              </h4>
+                              {app.telemetry_strikes >= 3 && (
+                                  <div title="Integrity Risk: Multiple external paste attempts detected" className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-500/20 text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-widest border border-amber-200 dark:border-amber-500/30">
+                                      🚩 <span>{app.telemetry_strikes} Strikes</span>
+                                  </div>
+                              )}
+                          </div>
+                          <p className="text-sm font-medium text-slate-400">{app.email}</p>
+                      </div>
+                      <span className={`soft-badge ${app.status === 'shortlisted' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 dark:bg-slate-800/50 text-slate-500'}`}>
+                          {app.status || 'applied'}
+                      </span>
+                  </motion.div>
+              ))}
+          </div>
+      )}
     </motion.div>
   );
 };
@@ -224,7 +273,7 @@ const TPODashboard = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center"><Briefcase size={22} weight="duotone" className="text-white" /></div>
@@ -348,3 +397,4 @@ const TPODashboard = ({ navigate, user, onLogout }) => {
 };
 
 export default TPODashboard;
+

@@ -31,6 +31,11 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Standardize backend DomainException structure for frontend components
+    if (error.response?.data && error.response.data.error) {
+      error.response.data.detail = error.response.data.error;
+    }
+
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.url?.includes('/api/auth/')) {
       originalRequest._retry = true;
@@ -146,6 +151,7 @@ export const attemptsAPI = {
   result: (attemptId) => api.get(`/api/attempts/${attemptId}/result`),
   list: (quizId) => api.get('/api/attempts', { params: quizId ? { quiz_id: quizId } : {} }),
   violation: (attemptId) => api.post(`/api/attempts/${attemptId}/violation`),
+  logTelemetryViolation: (attemptId) => api.post(`/api/quizzes/attempts/${attemptId}/telemetry/violation`),
 };
 
 // Code Execution
@@ -167,9 +173,9 @@ export const marksAPI = {
   students: (department, batch, section) => api.get('/api/marks/students', { params: { department, batch, section } }),
   getEntry: (assignmentId, examType) => api.get(`/api/marks/entry/${assignmentId}/${examType}`),
   saveEntry: (data) => api.post('/api/marks/entry', data),
-  submit: (entryId) => api.post(`/api/marks/submit/${entryId}`),
+  submit: (entryId) => api.put(`/api/marks/entry/${entryId}/submit`),
   submissions: (status) => api.get('/api/marks/submissions', { params: status ? { status } : {} }),
-  review: (entryId, data) => api.post(`/api/marks/review/${entryId}`, data),
+  review: (entryId, data) => api.put(`/api/hod/marks/entry/${entryId}/review`, data),
 };
 
 // Exam Cell
@@ -442,7 +448,7 @@ export const nodalAPI = {
   getAccreditation: () => api.get('/api/nodal/reports/accreditation'),
   getActivityReports: () => api.get('/api/nodal/activity-reports'),
   acknowledgeActivity: (id, data) => api.put(`/api/nodal/activity-reports/${id}/acknowledge`, data),
-  createCircular: (data) => api.post('/api/nodal/circulars', data),
+  acknowledgeCircular: (id) => api.post(`/api/admin/circulars/${id}/acknowledge`),
   getCirculars: () => api.get('/api/nodal/circulars'),
   createSubmissionRequirement: (data) => api.post('/api/nodal/submission-requirements', data),
   getSubmissionsStatus: () => api.get('/api/nodal/submissions/status'),
@@ -450,3 +456,12 @@ export const nodalAPI = {
   createInspection: (data) => api.post('/api/nodal/inspections', data),
   getInspections: () => api.get('/api/nodal/inspections'),
 };
+
+// Fee Management & Razorpay
+export const feesAPI = {
+  getDue: () => api.get('/api/fees/due'),
+  createOrder: (data) => api.post('/api/fees/create-order', data),
+  verifyPayment: (data) => api.post('/api/fees/verify-payment', data),
+  bulkGenerateInvoices: (data) => api.post('/api/admin/fees/invoices/bulk', data),
+};
+

@@ -307,7 +307,7 @@ const AlumniDashboard = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-10 h-10 bg-indigo-500 rounded-xl flex items-center justify-center"><GraduationCap size={22} weight="fill" className="text-white" /></div>
@@ -390,3 +390,4 @@ const AlumniDashboard = ({ navigate, user, onLogout }) => {
 };
 
 export default AlumniDashboard;
+

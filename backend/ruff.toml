@@ -1,0 +1,10 @@
+[line-length]
+120
+
+[lint]
+select = ["E", "F", "I"] # pycodestyle, pyflakes, isort
+ignore = ["E501"] # Ignore line too long (relying on formatter)
+
+[format]
+quote-style = "double"
+indent-style = "space"

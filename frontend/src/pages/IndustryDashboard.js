@@ -99,7 +99,7 @@ export default function IndustryDashboard({ navigate, user, onLogout }) {
 
       {/* ── Header ──────────────────────────── */}
       <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
               <Buildings weight="duotone" className="text-white text-2xl" />
@@ -274,3 +274,4 @@ export default function IndustryDashboard({ navigate, user, onLogout }) {
     </div>
   );
 }
+
