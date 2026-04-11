@@ -112,11 +112,11 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
     { label: 'Avg Quiz Score', value: dashboard?.avg_score ? `${dashboard.avg_score}%` : '-', sub: dashboard?.total_quizzes ? `across ${dashboard.total_quizzes} quizzes` : 'no quizzes yet', icon: Target, color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', gradient: 'from-emerald-500 to-teal-500' },
     { label: 'Quizzes Taken', value: dashboard?.total_quizzes || 0, sub: 'completed', icon: BookOpen, color: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400', gradient: 'from-indigo-500 to-blue-500' },
     { label: 'Active Quizzes', value: dashboard?.upcoming_quizzes?.length || 0, sub: 'available now', icon: Fire, color: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400', gradient: 'from-rose-500 to-pink-500', onClick: () => navigate('available-quizzes') },
-    { label: 'Placements', value: 'View', sub: 'Campus drives', icon: Briefcase, color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400', gradient: 'from-purple-500 to-fuchsia-500', onClick: () => navigate('placements') },
+    { label: 'Campus Drives', value: dashboard?.active_drives || 0, sub: 'open for applications', icon: Briefcase, color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400', gradient: 'from-purple-500 to-fuchsia-500', onClick: () => navigate('placements') },
   ];
 
   /* ── Skeleton screen while loading ─────────────────────── */
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="student" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -135,7 +135,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
               <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10 flex items-center justify-between">
                 <h4 className="font-extrabold text-slate-800 dark:text-slate-100">Notifications</h4>
                 <button
-                  onClick={() => { setNotifRead(true); setShowNotifications(false); }}
+                  onClick={() => { const now = new Date().toISOString(); setLastReadTime(now); localStorage.setItem(notifKey, now); setShowNotifications(false); }}
                   className="text-xs font-bold text-indigo-500 hover:text-indigo-600 transition-colors"
                 >
                   Mark all as read
@@ -223,7 +223,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
               </div>
               <div className="flex flex-col justify-center">
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight">{user?.name}</p>
-                <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-500 leading-tight mt-0.5">{user?.college_id} • {user?.department} • {user?.section}</p>
+                <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-500 leading-tight mt-0.5">{user?.roll_number || user?.email} • {user?.department} • {user?.section}</p>
               </div>
             </button>
             <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 transition-colors" aria-label="Sign out">
@@ -254,13 +254,13 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
             </div>
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">CGPA</p>
-              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">{dashboard?.cgpa?.toFixed(1) || '-'} <span className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">/ 10</span></p>
+              <p className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">{dashboard?.cgpa > 0 ? dashboard.cgpa.toFixed(1) : 'N/A'} <span className="text-xs sm:text-sm font-bold text-slate-500 dark:text-slate-400">/ 10</span></p>
             </div>
           </motion.div>
         </motion.div>
 
         {/* Tabs */}
-        <div className="flex overflow-x-auto gap-2 p-1.5 bg-slate-100 dark:bg-white/5 rounded-2xl mb-8 hide-scrollbar">
+        <div className="flex overflow-x-auto gap-1 p-1.5 bg-slate-100 dark:bg-white/[0.04] rounded-xl mb-8 hide-scrollbar">
             {[
               { id: 'overview', label: 'Overview' }, 
               { id: 'attendance', label: 'Attendance' },
@@ -273,10 +273,10 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
               <button 
                 key={tab.id} 
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap border border-transparent ${
                   activeTab === tab.id 
-                    ? 'bg-white dark:bg-[#1A202C] text-cyan-600 dark:text-cyan-400 shadow-sm' 
-                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
+                    ? 'bg-white dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 shadow-sm dark:border-indigo-500/25' 
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/[0.04]'
                 }`}
               >
                 {tab.label}
@@ -438,6 +438,7 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                 </div>
                 <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Take some quizzes first</p>
                 <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Topic analysis will appear after completing quizzes</p>
+                <button onClick={() => navigate('available-quizzes')} className="mt-3 text-xs font-bold text-indigo-500 hover:text-indigo-600 flex items-center gap-1 mx-auto">Take a quiz <ArrowRight size={10} weight="bold" /></button>
               </div>
             )}
           </motion.div>
@@ -485,13 +486,14 @@ const StudentDashboard = ({ navigate, user, onLogout }) => {
                 </div>
                 <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No activity yet</p>
                 <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">Your quiz activity will show up here</p>
+                <button onClick={() => navigate('available-quizzes')} className="mt-3 text-xs font-bold text-indigo-500 hover:text-indigo-600 flex items-center gap-1 mx-auto">Get started <ArrowRight size={10} weight="bold" /></button>
               </div>
             )}
           </motion.div>
 
           {/* Leaderboard CTA */}
           <motion.div variants={itemVariants} whileHover={cardHover}
-            className="soft-card-hover p-5 sm:p-6 bg-gradient-to-br from-indigo-500 to-purple-600 !border-transparent text-white flex flex-col justify-between"
+            className="soft-card-hover p-5 sm:p-6 bg-gradient-to-br from-indigo-500/80 to-purple-600/80 dark:from-indigo-600/30 dark:to-purple-700/30 !border-transparent dark:!border-indigo-500/20 text-white flex flex-col justify-between transition-all duration-300"
           >
             <div>
               <div className="flex items-center gap-3 mb-4">

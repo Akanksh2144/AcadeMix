@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from fastapi import HTTPException
+from app.core.exceptions import ResourceNotFoundError, InputValidationError, AuthorizationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import update, func, text, delete
@@ -55,7 +55,7 @@ class AttendanceService:
         try:
             mark_date = datetime.strptime(req.date, "%Y-%m-%d").date()
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format")
+            raise InputValidationError("Invalid date format")
 
         slot_r = await self.session.execute(
             select(models.PeriodSlot).where(
@@ -65,10 +65,10 @@ class AttendanceService:
         )
         slot = slot_r.scalars().first()
         if not slot:
-            raise HTTPException(status_code=404, detail="Period slot not found")
+            raise ResourceNotFoundError("PeriodSlot", req.period_slot_id)
 
         if slot.faculty_id != user["id"]:
-            raise HTTPException(status_code=403, detail="You are not assigned to this period slot")
+            raise AuthorizationError("You are not assigned to this period slot")
 
         now = datetime.now()
         try:
@@ -211,7 +211,7 @@ class AttendanceService:
         record = result.scalars().first()
         
         if not record:
-            raise HTTPException(status_code=404, detail="Attendance slot not found")
+            raise ResourceNotFoundError("AttendanceRecord", f"{student_id}/{subject_code}/{req.date}")
             
         record.status = req.status
         record.is_override = True

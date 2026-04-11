@@ -180,7 +180,7 @@ const PrincipalDashboard = ({ navigate, user, onLogout }) => {
     },
   ];
 
-  if (loading && !dashboard) return <DashboardSkeleton />;
+  if (loading && !dashboard) return <DashboardSkeleton variant="admin" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -279,7 +279,7 @@ const PrincipalDashboard = ({ navigate, user, onLogout }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${
                   activeTab === tab.id
                     ? "bg-slate-900 text-white shadow-md dark:bg-indigo-600"
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
@@ -378,7 +378,7 @@ const PrincipalDashboard = ({ navigate, user, onLogout }) => {
                             <button 
                                 key={tab} 
                                 onClick={() => setExpandedCompliance(tab)}
-                                className={`flex-1 py-2 text-sm font-bold uppercase rounded-lg transition-colors ${expandedCompliance === tab ? 'bg-white dark:bg-slate-700 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
+                                className={`flex-1 py-2 text-sm font-bold uppercase rounded-xl transition-colors ${expandedCompliance === tab ? 'bg-white dark:bg-indigo-500/15 shadow-sm text-indigo-600 dark:text-indigo-400' : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
                             >
                                 {tab}
                             </button>

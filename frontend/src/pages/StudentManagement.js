@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Users, MagnifyingGlass, GraduationCap } from '@phosphor-icons/react';
+import { Users, MagnifyingGlass, GraduationCap } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { marksAPI } from '../services/api';
 
-const StudentManagement = ({ navigate, user }) => {
+const StudentManagement = ({ navigate, user, onLogout }) => {
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [students, setStudents] = useState([]);
@@ -42,18 +43,11 @@ const StudentManagement = ({ navigate, user }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button data-testid="back-button" onClick={() => navigate('teacher-dashboard')}
-            className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
-            <ArrowLeft size={22} weight="duotone" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">My Students</h1>
-            <p className="text-sm font-medium text-slate-400">Students in your assigned classes</p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="My Students"
+        subtitle="Students in your assigned classes"
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Class Buttons */}

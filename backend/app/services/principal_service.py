@@ -10,6 +10,7 @@ from sqlalchemy.future import select
 from sqlalchemy import func, text, and_, or_
 
 from app import models
+from app.models.core import UserProfile
 from app.core.exceptions import ResourceNotFoundError, BusinessLogicError
 from app.core.audit import log_audit
 from app.services.marks_service import MarksService
@@ -126,7 +127,7 @@ class PrincipalService:
         from sqlalchemy import Integer
         stmt = select(
             models.SemesterGrade.course_id,
-            models.User.profile_data['department'].astext.label('department_id'),
+            UserProfile.department.label('department_id'),
             func.count(models.SemesterGrade.id).label("total_students"),
             func.sum(
                 func.cast(
@@ -143,7 +144,7 @@ class PrincipalService:
             models.SemesterGrade.semester == semester
         ).group_by(
             models.SemesterGrade.course_id,
-            models.User.profile_data['department'].astext
+            UserProfile.department
         )
         
         result = await self.db.execute(stmt)
@@ -165,15 +166,15 @@ class PrincipalService:
         # Defaulters (<75%) grouped by department
         defaulters_stmt = text('''
             SELECT 
-                u.profile_data->>'department' AS department,
+                user_profiles.department AS department,
                 COUNT(u.id) AS total_students,
                 SUM(CASE WHEN 
-                    (CAST(u.profile_data->>'total_classes_attended' AS FLOAT) / 
+                    (CAST(user_profiles.telemetry_strikes AS FLOAT) / 
                      NULLIF(CAST(u.profile_data->>'total_classes_held' AS FLOAT), 0)) < 0.75 
                 THEN 1 ELSE 0 END) AS defaulters_count
             FROM users u
             WHERE u.college_id = :college_id AND u.role = 'student'
-            GROUP BY u.profile_data->>'department'
+            GROUP BY user_profiles.department
         ''')
         
         defaulters_r = await self.db.execute(defaulters_stmt, {"college_id": college_id})

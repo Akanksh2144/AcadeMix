@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, TrendUp, Target, BookOpen, CheckCircle, GraduationCap, ChartBar } from '@phosphor-icons/react';
+import { TrendUp, Target, BookOpen, CheckCircle, GraduationCap, ChartBar } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts';
 import { analyticsAPI } from '../services/api';
 
@@ -17,7 +18,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const Analytics = ({ navigate, user, userRole }) => {
+const Analytics = ({ navigate, user, userRole, onLogout }) => {
   const [activeTab, setActiveTab] = useState('quiz');
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,24 +68,15 @@ const Analytics = ({ navigate, user, userRole }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button data-testid="back-button" onClick={() => navigate(role === 'student' ? 'student-dashboard' : role === 'hod' ? 'hod-dashboard' : role === 'exam_cell' ? 'examcell-dashboard' : role === 'admin' ? 'admin-dashboard' : 'teacher-dashboard')}
-              className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
-              <ArrowLeft size={22} weight="duotone" />
-            </button>
-            <div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Performance Analytics</h1>
-              <p className="text-sm font-medium text-slate-400">Comprehensive academic insights</p>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="Performance Analytics"
+        subtitle="Comprehensive academic insights"
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Tab Switcher */}
-        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 rounded-2xl p-1.5 w-fit mb-8" data-testid="analytics-tabs">
+        <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1.5 w-fit mb-8" data-testid="analytics-tabs">
           <button
             data-testid="quiz-tab"
             onClick={() => setActiveTab('quiz')}
@@ -141,10 +133,10 @@ const Analytics = ({ navigate, user, userRole }) => {
                 <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100 mb-4">Subject-wise Quiz Average</h3>
                 <ResponsiveContainer width="100%" height={300}>
                   <BarChart data={subjectComparison}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-slate-200 dark:text-slate-700/50" />
                     <XAxis dataKey="subject" stroke="#94A3B8" style={{ fontSize: '12px', fontWeight: 600 }} />
                     <YAxis stroke="#94A3B8" style={{ fontSize: '12px', fontWeight: 600 }} domain={[0, 100]} />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }} />
                     <Bar dataKey="quizAvg" fill="#6366F1" radius={[8, 8, 0, 0]} name="Quiz Average %" />
                   </BarChart>
                 </ResponsiveContainer>

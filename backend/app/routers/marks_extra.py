@@ -23,22 +23,25 @@ async def my_assignments(user: dict = Depends(require_role("teacher", "hod")), s
 
 @router.get("/marks/submissions")
 async def list_submissions(status: Optional[str] = None, user: dict = Depends(require_role("hod", "admin")), session: AsyncSession = Depends(get_db)):
-    from sqlalchemy import func
-    stmt = select(models.MarkEntry).where(models.MarkEntry.college_id == user["college_id"])
+    stmt = select(models.MarkSubmission).where(models.MarkSubmission.college_id == user["college_id"])
     
     if status:
-        stmt = stmt.where(func.jsonb_extract_path_text(models.MarkEntry.extra_data, 'status') == status)
+        stmt = stmt.where(models.MarkSubmission.status == status)
     else:
-        stmt = stmt.where(func.jsonb_extract_path_text(models.MarkEntry.extra_data, 'status').in_(['submitted', 'approved', 'rejected']))
+        stmt = stmt.where(models.MarkSubmission.status.in_(['submitted', 'approved', 'rejected']))
         
     result = await session.execute(stmt)
     submissions = result.scalars().all()
     
     return [{
         "id": r.id, 
-        "course_id": r.course_id, 
+        "course_id": r.subject_code, 
         "exam_type": r.exam_type,
         "max_marks": r.max_marks,
-        "status": (r.extra_data or {}).get("status", "draft"), 
-        **(r.extra_data or {})
+        "status": r.status or "draft",
+        "faculty_id": r.faculty_id,
+        "semester": r.semester,
+        "submitted_at": r.submitted_at.isoformat() if r.submitted_at else None,
+        "reviewed_by": r.reviewed_by,
+        "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
     } for r in submissions]

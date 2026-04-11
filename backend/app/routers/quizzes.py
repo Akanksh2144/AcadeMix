@@ -1,7 +1,8 @@
-from app.core.config import limiter
+from app.core.limiter import limiter
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.sql import func, case
 from typing import List, Optional
 
 from database import get_db
@@ -303,8 +304,10 @@ async def log_telemetry_violation(attempt_id: str, payload: dict = {}, user: dic
     if not attempt:
         raise HTTPException(status_code=404, detail="Active attempt not found")
     
-    # Increment per-quiz cheat strike
-    attempt.telemetry_strikes = (attempt.telemetry_strikes or 0) + 1
+    # Atomic database-level increment — prevents lost-update race conditions
+    # when multiple violations fire in the same millisecond.
+    attempt.telemetry_strikes = func.coalesce(models.QuizAttempt.telemetry_strikes, 0) + 1
     await session.commit()
+    await session.refresh(attempt)
     
     return {"message": "Violation logged securely", "strikes": attempt.telemetry_strikes}

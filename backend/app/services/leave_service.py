@@ -1,5 +1,5 @@
 from datetime import datetime, timezone, timedelta
-from fastapi import HTTPException
+from app.core.exceptions import ResourceNotFoundError, InputValidationError, AuthorizationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import delete
@@ -21,7 +21,7 @@ class LeaveService:
         result = await self.session.execute(query)
         leave = result.scalars().first()
         if not leave:
-            raise HTTPException(status_code=404, detail="Leave request not found")
+            raise ResourceNotFoundError("LeaveRequest", leave_id)
         return leave
 
     async def apply(self, req, user: dict) -> models.LeaveRequest:
@@ -29,7 +29,7 @@ class LeaveService:
             from_dt = datetime.strptime(req.from_date, "%Y-%m-%d")
             to_dt = datetime.strptime(req.to_date, "%Y-%m-%d")
         except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
+            raise InputValidationError("Invalid date format, use YYYY-MM-DD")
 
         leave = models.LeaveRequest(
             college_id=user["college_id"],
@@ -54,28 +54,28 @@ class LeaveService:
             return leave
             
         if leave.status != "approved":
-            raise HTTPException(status_code=400, detail="Only approved or pending leaves can be cancelled")
+            raise InputValidationError("Only approved or pending leaves can be cancelled")
 
         if cancel_from or cancel_to:
             if not cancel_from or not cancel_to:
-                raise HTTPException(status_code=400, detail="Both cancel_from and cancel_to are required for partial cancellation")
+                raise InputValidationError("Both cancel_from and cancel_to are required for partial cancellation")
             try:
                 cancel_from_dt = datetime.strptime(cancel_from, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                 cancel_to_dt = datetime.strptime(cancel_to, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid date format, use YYYY-MM-DD")
+                raise InputValidationError("Invalid date format, use YYYY-MM-DD")
                 
             if cancel_from_dt < leave.from_date or cancel_to_dt > leave.to_date or cancel_from_dt > cancel_to_dt:
-                raise HTTPException(status_code=400, detail="Cancellation dates must be valid and fall within the originally approved leave period")
+                raise InputValidationError("Cancellation dates must be valid and fall within the originally approved leave period")
                 
             if cancel_to_dt.date() < datetime.now(timezone.utc).date() and leave.to_date.date() < datetime.now(timezone.utc).date():
-                raise HTTPException(status_code=400, detail="Cannot cancel a leave that has already been fully completed")
+                raise InputValidationError("Cannot cancel a leave that has already been fully completed")
 
             leave.status = "partially_cancelled"
             leave.cancellation_meta = {"cancel_from": cancel_from, "cancel_to": cancel_to}
         else:
             if leave.to_date.date() < datetime.now(timezone.utc).date():
-                 raise HTTPException(status_code=400, detail="Cannot cancel a leave that has already been fully completed")
+                 raise InputValidationError("Cannot cancel a leave that has already been fully completed")
             leave.status = "cancellation_requested"
             leave.cancellation_meta = None
 
@@ -118,12 +118,12 @@ class LeaveService:
     async def review_leave(self, leave: models.LeaveRequest, action: str, remarks: str, user: dict, current_academic_year: str = None):
         reviewer_role = user["role"]
         if leave.applicant_role == "hod" and reviewer_role not in ["principal", "admin"]:
-            raise HTTPException(status_code=403, detail="HOD leaves can only be approved by Principal or Admin.")
+            raise AuthorizationError("HOD leaves can only be approved by Principal or Admin.")
         if leave.applicant_role in ["teacher", "faculty"] and reviewer_role not in ["hod", "principal", "admin"]:
-            raise HTTPException(status_code=403, detail="Faculty leaves must be approved by HOD, Principal or Admin.")
+            raise AuthorizationError("Faculty leaves must be approved by HOD, Principal or Admin.")
 
         if leave.status != "pending":
-            raise HTTPException(status_code=400, detail="Leave is already reviewed")
+            raise InputValidationError("Leave is already reviewed")
 
         leave.status = action
         leave.reviewed_by = user["id"]
@@ -140,7 +140,7 @@ class LeaveService:
 
     async def review_cancellation(self, leave: models.LeaveRequest, action: str, remarks: str, user: dict):
         if leave.status not in ["cancellation_requested", "partially_cancelled"]:
-            raise HTTPException(status_code=400, detail="Leave does not have a pending cancellation request")
+            raise InputValidationError("Leave does not have a pending cancellation request")
 
         if action == "reject":
             # Revert status to approved

@@ -13,6 +13,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm.attributes import flag_modified
 
 from app import models
+from app.models.core import UserProfile
 from app.core.security import hash_password
 from app.core.exceptions import (
     ResourceNotFoundError,
@@ -31,7 +32,7 @@ class UserService:
     async def get_user(self, user_id: str, college_id: str) -> Dict[str, Any]:
         """Fetch a single user within the tenant boundary."""
         result = await self.db.execute(
-            select(models.User).where(
+            select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
                 models.User.id == user_id,
                 models.User.college_id == college_id,
             )
@@ -45,7 +46,7 @@ class UserService:
         self, college_id: str, role: Optional[str] = None, skip: int = 0, limit: int = 50
     ) -> List[Dict[str, Any]]:
         """List users within a tenant, optionally filtered by role."""
-        stmt = select(models.User).where(models.User.college_id == college_id)
+        stmt = select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(models.User.college_id == college_id)
         if role:
             stmt = stmt.where(models.User.role == role)
         stmt = stmt.offset(skip).limit(limit)
@@ -57,8 +58,9 @@ class UserService:
         normalized_cid = data["college_id"].upper()
 
         existing = await self.db.execute(
-            select(models.User).where(
-                models.User.profile_data["college_id"].astext == normalized_cid
+            select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
+                UserProfile.roll_number == normalized_cid,
+                models.User.college_id == college_id
             )
         )
         if existing.scalars().first():
@@ -70,15 +72,19 @@ class UserService:
             password_hash=hash_password(data["password"]),
             role=data.get("role", "student"),
             college_id=college_id,
-            profile_data={
-                "college_id": normalized_cid,
-                "college": data.get("college", ""),
-                "department": data.get("department", ""),
-                "batch": data.get("batch", ""),
-                "section": data.get("section", ""),
-            },
         )
         self.db.add(new_user)
+        await self.db.flush()
+
+        profile = UserProfile(
+            user_id=new_user.id,
+            college_id=college_id,
+            roll_number=normalized_cid,
+            department=data.get("department", ""),
+            batch=data.get("batch", ""),
+            section=data.get("section", ""),
+        )
+        self.db.add(profile)
         await self.db.commit()
         await self.db.refresh(new_user)
         return self._to_dict(new_user)
@@ -88,7 +94,7 @@ class UserService:
     ) -> Dict[str, Any]:
         """Update a user's attributes. Profile data is merged, not replaced."""
         result = await self.db.execute(
-            select(models.User).where(
+            select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
                 models.User.id == user_id,
                 models.User.college_id == college_id,
             )
@@ -106,13 +112,20 @@ class UserService:
         if data.get("password") and data["password"].strip():
             u.password_hash = hash_password(data["password"])
 
-        profile = dict(u.profile_data or {})
-        for field in ("college_id", "department", "batch", "section"):
-            if data.get(field) is not None:
-                val = data[field].upper() if field == "college_id" else data[field]
-                profile[field] = val
-        u.profile_data = profile
-        flag_modified(u, "profile_data")
+        if not u.profile:
+            p = UserProfile(user_id=u.id, college_id=u.college_id)
+            self.db.add(p)
+            u.profile = p
+            await self.db.flush()
+
+        if "college_id" in data:
+            u.profile.roll_number = data["college_id"].upper()
+        if "department" in data:
+            u.profile.department = data["department"]
+        if "batch" in data:
+            u.profile.batch = data["batch"]
+        if "section" in data:
+            u.profile.section = data["section"]
 
         await self.db.commit()
         await self.db.refresh(u)
@@ -121,7 +134,7 @@ class UserService:
     async def delete_user(self, user_id: str, college_id: str) -> None:
         """Hard-delete a user within the tenant boundary."""
         result = await self.db.execute(
-            select(models.User).where(
+            select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
                 models.User.id == user_id,
                 models.User.college_id == college_id,
             )
@@ -137,7 +150,7 @@ class UserService:
     ) -> str:
         """Generate a temporary password and flag force-change."""
         result = await self.db.execute(
-            select(models.User).where(
+            select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
                 models.User.id == user_id,
                 models.User.college_id == college_id,
             )
@@ -149,10 +162,13 @@ class UserService:
         temp_password = secrets.token_urlsafe(8)
         target.password_hash = hash_password(temp_password)
 
-        pd = target.profile_data or {}
-        pd["force_password_change"] = True
-        target.profile_data = pd
-        flag_modified(target, "profile_data")
+        if not target.profile:
+            p = UserProfile(user_id=target.id, college_id=target.college_id)
+            self.db.add(p)
+            target.profile = p
+            await self.db.flush()
+            
+        target.profile.force_password_change = True
 
         await log_audit(self.db, admin_id, "user", "reset_password", {"target_id": user_id})
         await self.db.commit()
@@ -183,7 +199,7 @@ class UserService:
                 raise BusinessLogicError(f"Invalid format for Student ID: {student_id}. Import aborted.")
 
             existing_r = await self.db.execute(
-                select(models.User).where(
+                select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
                     models.User.id == student_id,
                     models.User.college_id == college_id,
                 )
@@ -198,13 +214,19 @@ class UserService:
                 role=role,
                 college_id=college_id,
                 password_hash=hash_password("password123"),
-                profile_data={
-                    "department": row.get("department", ""),
-                    "batch": row.get("batch", ""),
-                    "force_password_change": True,
-                },
             )
             self.db.add(new_user)
+            await self.db.flush()
+            
+            profile = UserProfile(
+                user_id=new_user.id,
+                college_id=college_id,
+                roll_number=student_id,
+                department=row.get("department", ""),
+                batch=row.get("batch", ""),
+                force_password_change=True,
+            )
+            self.db.add(profile)
             created += 1
 
         await self.db.commit()
@@ -214,7 +236,7 @@ class UserService:
         self, college_id: str, role: str = "student", batch: Optional[str] = None
     ) -> str:
         """Export users as CSV string."""
-        stmt = select(models.User).where(
+        stmt = select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
             models.User.college_id == college_id,
             models.User.role == role,
         )

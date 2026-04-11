@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { ArrowLeft, Play, Terminal, Copy, Trash, CaretDown, Lightning, Clock, CheckCircle, ChartBar, WarningCircle, X, Funnel, ArrowCounterClockwise, Sparkle, ChartLineUp, Eye } from '@phosphor-icons/react';
+import { Play, Terminal, Copy, Trash, CaretDown, Lightning, Clock, CheckCircle, ChartBar, WarningCircle, X, Funnel, ArrowCounterClockwise, Sparkle, ChartLineUp, Eye } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { toast } from 'sonner';
 
 import Editor from '@monaco-editor/react';
@@ -24,7 +25,7 @@ const DEFAULT_TEMPLATES = {
   cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n'
 };
 
-const CodePlayground = ({ navigate, user }) => {
+const CodePlayground = ({ navigate, user, onLogout }) => {
   const { isDark } = useTheme();
   const [language, setLanguage] = useState('python');
   const [code, setCode] = useState(DEFAULT_TEMPLATES['python']);
@@ -33,6 +34,18 @@ const CodePlayground = ({ navigate, user }) => {
   const [running, setRunning] = useState(false);
   const [execTime, setExecTime] = useState(null);
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const langMenuRef = useRef(null);
+
+  // Close language dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (langMenuRef.current && !langMenuRef.current.contains(e.target)) {
+        setShowLangMenu(false);
+      }
+    };
+    if (showLangMenu) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLangMenu]);
   
   const [showChallengesModal, setShowChallengesModal] = useState(false);
   const [showInsightsModal, setShowInsightsModal] = useState(false);
@@ -50,6 +63,7 @@ const CodePlayground = ({ navigate, user }) => {
   
   const [history, setHistory] = useState([]);
   const [challenges, setChallenges] = useState([]);
+  const [isChallengesLoading, setIsChallengesLoading] = useState(true);
   const [stats, setStats] = useState(null);
   const [activeChallenge, setActiveChallenge] = useState(() => {
     const saved = localStorage.getItem('acadmix_active_challenge');
@@ -106,10 +120,12 @@ const CodePlayground = ({ navigate, user }) => {
   }, [difficultyFilter]);
 
   const fetchChallenges = async () => {
+    setIsChallengesLoading(true);
     try {
       const res = await api.get('/api/challenges', { params: { difficulty: difficultyFilter, limit: 100 } });
       setChallenges(res.data.data);
     } catch(err) { console.error(err); }
+    setIsChallengesLoading(false);
   };
   
   const fetchStats = async () => {
@@ -302,6 +318,7 @@ const CodePlayground = ({ navigate, user }) => {
       if (initData.status === "completed" && initData.task_id === "sync-fallback") {
           run.aiReview = initData.review;
           setAiReview(initData.review);
+          setReviewing(false);
           return;
       }
       
@@ -309,8 +326,9 @@ const CodePlayground = ({ navigate, user }) => {
       
       // Polling Mechanism for Async Event Queue Simulation
       let attempts = 0;
-      while (attempts < 60) {
-          await new Promise(resolve => setTimeout(resolve, 1500));
+      while (attempts < 30) {
+          const delay = attempts < 5 ? 500 : 1500;
+          await new Promise(resolve => setTimeout(resolve, delay));
           attempts++;
           
           const statusRes = await fetch(`${process.env.REACT_APP_BACKEND_URL || ''}/api/code/review_status/${taskId}`, {
@@ -398,44 +416,31 @@ const CodePlayground = ({ navigate, user }) => {
 
   return (
     <div className="h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header shrink-0">
-        <div className="w-full max-w-[1600px] mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button data-testid="back-button" onClick={() => navigate(dashboardPage)}
-                className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
-                <ArrowLeft size={22} weight="duotone" />
-              </button>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center">
-                  <Terminal size={22} weight="duotone" className="text-white" />
-                </div>
-                <div>
-                  <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Code Playground</h1>
-                  <p className="text-xs font-medium text-slate-400">Practice coding algorithms & data structures</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowInsightsModal(true)}
-                className="hidden lg:flex bg-white hover:bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 !px-4 !py-2.5 text-sm font-semibold rounded-xl transition-all shadow-sm items-center gap-2"
-              >
-                <ChartBar size={16} weight="duotone" />
-                Insights
-              </button>
-              <button
-                data-testid="challenges-button"
-                onClick={() => setShowChallengesModal(true)}
-                className="hidden lg:flex btn-primary !px-4 !py-2.5 text-sm items-center gap-2"
-              >
-                <Lightning size={16} weight="duotone" />
-                Problem List
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="Code Playground"
+        subtitle="Practice coding algorithms & data structures"
+        maxWidth="max-w-[1600px]"
+        rightContent={
+          <>
+            <button
+              onClick={() => setShowInsightsModal(true)}
+              className="hidden lg:flex bg-white hover:bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 !px-4 !py-2.5 text-sm font-semibold rounded-xl transition-all shadow-sm items-center gap-2"
+            >
+              <ChartBar size={16} weight="duotone" />
+              Insights
+            </button>
+            <button
+              data-testid="challenges-button"
+              onClick={() => setShowChallengesModal(true)}
+              className="hidden lg:flex btn-primary !px-4 !py-2.5 text-sm items-center gap-2"
+            >
+              <Lightning size={16} weight="duotone" />
+              Problem List
+            </button>
+          </>
+        }
+      />
 
       {/* Main Layout Area */}
       {activeChallenge ? (
@@ -446,10 +451,10 @@ const CodePlayground = ({ navigate, user }) => {
             <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between bg-slate-50 dark:bg-slate-800/50">
               <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100 line-clamp-1 flex-1 mr-4">{activeChallenge.title}</h2>
               <div className="flex items-center gap-3 shrink-0">
-                <span className={`text-xs px-2.5 py-1 rounded border font-bold ${activeChallenge.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : activeChallenge.difficulty === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-rose-50 text-rose-600 border-rose-100'}`}>
+                <span className={`text-xs px-2.5 py-1 rounded-xl border font-bold ${activeChallenge.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-400 dark:border-emerald-500/25' : activeChallenge.difficulty === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-100 dark:bg-amber-500/15 dark:text-amber-400 dark:border-amber-500/25' : 'bg-rose-50 text-rose-600 border-rose-100 dark:bg-rose-500/15 dark:text-rose-400 dark:border-rose-500/25'}`}>
                   {activeChallenge.difficulty}
                 </span>
-                <button onClick={() => setActiveChallenge(null)} className="text-sm font-bold text-slate-400 hover:text-slate-600 dark:text-slate-400" title="Exit Challenge">
+                <button onClick={() => { setActiveChallenge(null); setShowCoach(false); }} className="text-sm font-bold text-slate-400 hover:text-slate-600 dark:text-slate-400" title="Exit Challenge">
                   <X size={20} />
                 </button>
               </div>
@@ -471,18 +476,18 @@ const CodePlayground = ({ navigate, user }) => {
             {/* Editor Container */}
             <div className="flex-1 flex flex-col bg-white rounded-2xl dark:bg-[#1A202C] shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden min-h-[50%]">
               <div className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-700 px-4 py-2 flex items-center justify-between">
-                <div className="relative">
+                <div className="relative" ref={langMenuRef}>
                   <button onClick={() => setShowLangMenu(!showLangMenu)}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-colors font-semibold text-sm text-slate-700 dark:text-slate-300">
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 transition-colors font-semibold text-sm text-slate-700 dark:text-slate-300">
                     <span className="text-lg leading-none">{currentLang?.icon}</span>
                     {currentLang?.label}
                     <CaretDown size={14} weight="bold" />
                   </button>
                   {showLangMenu && (
-                    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl dark:bg-[#1A202C] shadow-xl border border-slate-100 dark:border-slate-700 p-2 z-50 min-w-[160px]">
+                    <div className="absolute top-full left-0 mt-2 bg-white rounded-xl dark:bg-[#151B2B] shadow-xl border border-slate-100 dark:border-white/10 p-1 z-50 min-w-[160px]">
                       {LANGUAGES.map(lang => (
                         <button key={lang.id} onClick={() => handleLanguageChange(lang.id)}
-                          className={`w-full text-left px-3 py-2 rounded-lg flex items-center gap-3 transition-colors text-sm font-medium ${language === lang.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300'}`}>
+                          className={`w-full text-left px-3 py-2.5 rounded-xl flex items-center gap-3 transition-colors text-sm font-medium ${language === lang.id ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300' : 'hover:bg-slate-50 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300'}`}>
                           <span className="text-lg leading-none">{lang.icon}</span>
                           {lang.label}
                         </button>
@@ -564,18 +569,18 @@ const CodePlayground = ({ navigate, user }) => {
               <div className="lg:col-span-2 flex flex-col space-y-4">
                 <div className="soft-card p-3 flex items-center justify-between shrink-0">
                   <div className="flex items-center gap-3">
-                    <div className="relative">
+                    <div className="relative" ref={langMenuRef}>
                       <button data-testid="language-selector" onClick={() => setShowLangMenu(!showLangMenu)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 transition-colors font-bold text-sm text-slate-700 dark:text-slate-300">
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors font-bold text-sm text-slate-700 dark:text-slate-300">
                         <span className="text-base">{currentLang?.icon}</span>
                         {currentLang?.label}
                         <CaretDown size={14} weight="bold" />
                       </button>
                       {showLangMenu && (
-                        <div className="absolute top-full left-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 dark:bg-[#1A202C] dark:border-white/[0.06] p-2 z-50 min-w-[180px]">
+                        <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-xl border border-slate-100 dark:bg-[#151B2B] dark:border-white/10 p-1 z-50 min-w-[180px]">
                           {LANGUAGES.map(lang => (
                             <button key={lang.id} onClick={() => handleLanguageChange(lang.id)}
-                              className={`w-full text-left px-4 py-2.5 rounded-xl flex items-center gap-3 transition-colors text-sm font-medium ${language === lang.id ? 'bg-indigo-50 text-indigo-700' : 'hover:bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300'}`}>
+                              className={`w-full text-left px-4 py-2.5 rounded-xl flex items-center gap-3 transition-colors text-sm font-medium ${language === lang.id ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300' : 'hover:bg-slate-50 dark:hover:bg-white/[0.06] text-slate-700 dark:text-slate-300'}`}>
                               <span className="text-base">{lang.icon}</span>
                               {lang.label}
                             </button>
@@ -753,9 +758,9 @@ const CodePlayground = ({ navigate, user }) => {
               </div>
               
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 bg-white dark:bg-[#1A202C] border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-1.5 shadow-sm">
+                <div className="flex items-center gap-2 bg-white dark:bg-[#1A202C] border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 shadow-sm focus-within:ring-0">
                    <Funnel size={16} className="text-slate-400" />
-                   <select className="bg-transparent border-none outline-none text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer"
+                   <select className="bg-transparent border-none outline-none focus:ring-0 focus:outline-none text-sm font-semibold text-slate-700 dark:text-slate-300 cursor-pointer"
                      value={difficultyFilter} onChange={e => setDifficultyFilter(e.target.value)}>
                      <option value="">All Difficulties</option>
                      <option value="Easy">Easy</option>
@@ -770,9 +775,13 @@ const CodePlayground = ({ navigate, user }) => {
             </div>
             
             <div className="flex-1 overflow-y-auto p-2 min-h-[300px]">
-               {challenges.length === 0 ? (
+               {isChallengesLoading ? (
                  <div className="py-20 text-center text-slate-500 dark:text-slate-400">
                     Loading problems...
+                 </div>
+               ) : challenges.length === 0 ? (
+                 <div className="py-20 text-center text-slate-500 dark:text-slate-400">
+                    No problems found.
                  </div>
                ) : (
                  <div className="divide-y divide-slate-100 dark:divide-white/[0.06]">
@@ -781,12 +790,12 @@ const CodePlayground = ({ navigate, user }) => {
                         <div className="flex-1 pr-6">
                            <div className="flex items-center gap-3 mb-2">
                              <h4 className="text-[15px] font-bold text-slate-800 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{ch.title}</h4>
-                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md ${ch.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400' : ch.difficulty === 'Medium' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400'}`}>
+                             <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-xl ${ch.difficulty === 'Easy' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-400' : ch.difficulty === 'Medium' ? 'bg-amber-50 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-500/15 dark:text-rose-400'}`}>
                                {ch.difficulty}
                              </span>
                            </div>
                            <div className="flex gap-2 text-xs text-slate-400 mt-2 truncate">
-                              {ch.topics?.slice(0, 3).map(t => <span key={t} className="bg-slate-100 dark:bg-white/[0.06] dark:text-slate-400 px-2.5 py-1 rounded-lg font-medium">{t}</span>)}
+                              {ch.topics?.slice(0, 3).map(t => <span key={t} className="bg-slate-100 dark:bg-white/[0.06] dark:text-slate-400 px-2.5 py-1 rounded-xl font-medium">{t}</span>)}
                            </div>
                         </div>
                         <button className="px-5 py-2.5 rounded-xl bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-slate-300 font-bold text-sm group-hover:bg-indigo-600 group-hover:text-white dark:group-hover:bg-indigo-500 transition-all shadow-sm">
@@ -941,7 +950,7 @@ const CodePlayground = ({ navigate, user }) => {
         </div>
       )}
       {/* Floating Action Button (FAB) for AI Coach */}
-      {!showCoach && (
+      {!showCoach && activeChallenge && (
         <button 
           onClick={() => setShowCoach(true)}
           className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg shadow-indigo-500/30 flex items-center justify-center z-[90] transition-transform hover:scale-110 active:scale-95 group"
@@ -952,7 +961,7 @@ const CodePlayground = ({ navigate, user }) => {
       )}
 
       {/* AI Coach Floating Window */}
-      {showCoach && (
+      {showCoach && activeChallenge && (
         <div className="fixed bottom-6 right-6 w-[400px] max-h-[600px] h-[75vh] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col z-[100] animate-fade-in overflow-hidden">
           <div className="px-5 py-4 border-b border-indigo-600 bg-indigo-600 flex justify-between items-center text-white">
             <div className="flex items-center gap-3">

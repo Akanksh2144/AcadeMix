@@ -1,6 +1,6 @@
 import litellm
 import os
-from fastapi import HTTPException
+from app.core.config import settings
 
 # Using litellm to abstract the provider choice (Google Gemini / OpenAI / Anthropics)
 # The API keys should be available in the environment matching litellm's expected format (e.g. GEMINI_API_KEY).
@@ -15,7 +15,7 @@ async def generate_code_review(code: str, language: str, output: str, error: str
     """
     Calls an LLM to generate a strict JSON code review, defending against prompt injections.
     """
-    model = os.environ.get("LLM_REVIEW_MODEL", DEFAULT_MODEL)
+    model = settings.LLM_REVIEW_MODEL
     
     # We now assume 'code' has ALREADY been pre-scrubbed by ast_parser BEFORE entering the queue.
     stripped_code = code
@@ -52,7 +52,8 @@ async def generate_code_review(code: str, language: str, output: str, error: str
             ],
             response_format={ "type": "json_object" },
             temperature=0.1,
-            max_tokens=8000
+            max_tokens=2000,
+            timeout=15.0
         )
         content = response.choices[0].message.content
         return json.loads(content)
@@ -69,7 +70,7 @@ async def generate_coach_stream(messages: List[Dict[str, str]], current_code: st
     """
     Calls an LLM as a Socratic AI Coach, streaming the response.
     """
-    model = os.environ.get("LLM_REVIEW_MODEL", DEFAULT_MODEL)
+    model = settings.LLM_REVIEW_MODEL
     
     system_prompt = (
         "You are 'Ami', an expert Socratic programming tutor. "
@@ -130,4 +131,5 @@ async def generate_coach_stream(messages: List[Dict[str, str]], current_code: st
     except Exception as e:
         print(f"LLM AI Coach Error: {e}")
         yield "\\n\\n*Coach service is currently unavailable. Please try again.*"
+
 

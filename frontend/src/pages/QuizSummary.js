@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, CheckCircle, XCircle, Clock, Trophy, Warning, Code, BookOpen, Minus, CaretDown, CaretUp, Eye } from '@phosphor-icons/react';
+import { CheckCircle, XCircle, Clock, Trophy, Warning, Code, BookOpen, Minus, CaretDown, CaretUp, Eye } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { attemptsAPI } from '../services/api';
 
-const QuizSummary = ({ navigate, user, attemptData }) => {
+const QuizSummary = ({ navigate, user, attemptData, onLogout }) => {
   const [attempt, setAttempt] = useState(attemptData || null);
   const [loading, setLoading] = useState(!attemptData);
   const [expandedQ, setExpandedQ] = useState(new Set());
@@ -110,20 +111,15 @@ const QuizSummary = ({ navigate, user, attemptData }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-4">
-          <button data-testid="back-button" onClick={() => navigate('quiz-results')}
-            className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
-            <ArrowLeft size={22} weight="duotone" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white truncate">{attempt.quiz_title || 'Quiz Summary'}</h1>
-            <p className="text-sm font-medium text-slate-400 truncate">{attempt.quiz_subject || 'Detailed Results'}</p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title={attempt.quiz_title || 'Quiz Summary'}
+        subtitle={attempt.quiz_subject || 'Detailed Results'}
+        backTo="quiz-results"
+        maxWidth="max-w-7xl"
+      />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Score Hero Card */}
         <div className="soft-card p-0 overflow-hidden mb-8" style={{animation: 'fadeInUp 0.4s ease'}}>
           <div className={`bg-gradient-to-r ${getGradeBg(scorePct)} p-6 sm:p-10 text-white text-center`}>

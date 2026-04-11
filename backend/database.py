@@ -284,9 +284,17 @@ async def shadow_check_results(results, session):
 
 
 async def get_db():
-    """FastAPI dependency — yields a tenant-scoped session."""
+    """FastAPI dependency — yields a tenant-scoped session.
+
+    Uses the Unit of Work pattern: the entire HTTP request runs inside
+    a single transaction.  On success the transaction auto-commits;
+    on any unhandled exception it auto-rolls-back.  Existing
+    ``await session.commit()`` calls within service methods become
+    safe no-ops inside the managed transaction scope.
+    """
     async with AsyncSessionLocal() as session:
-        yield session
+        async with session.begin():
+            yield session
 
 
 async def get_admin_db():
@@ -297,7 +305,8 @@ async def get_admin_db():
     """
     async with AdminSessionLocal() as session:
         session.info["_admin_bypass"] = True
-        yield session
+        async with session.begin():
+            yield session
 
 
 @asynccontextmanager

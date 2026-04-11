@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Plus, Upload, MagnifyingGlass, Pencil, Trash, Spinner } from '@phosphor-icons/react';
+import { Plus, Upload, MagnifyingGlass, Pencil, Trash, Spinner } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { usersAPI, departmentsAPI, sectionsAPI, rolesAPI } from '../services/api';
 import { Toaster, toast } from 'sonner';
 
@@ -16,7 +17,7 @@ const PERMISSION_MODULES = [
   { id: 'metrics', label: 'Metrics', actions: ['view_dept', 'view_college'] },
 ];
 
-const UserManagement = ({ navigate }) => {
+const UserManagement = ({ navigate, user, onLogout }) => {
   const [activeTab, setActiveTab] = useState('students');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -201,16 +202,11 @@ const UserManagement = ({ navigate }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <Toaster position="top-right" richColors />
-      <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center gap-4">
-            <button data-testid="back-button" onClick={() => navigate('admin-dashboard')} className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
-              <ArrowLeft size={22} weight="duotone" />
-            </button>
-            <div><h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Institute Management</h1><p className="text-sm font-medium text-slate-400">Manage structure, staff, and students automatically.</p></div>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="Institute Management"
+        subtitle="Manage structure, staff, and students automatically."
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
@@ -224,7 +220,7 @@ const UserManagement = ({ navigate }) => {
           </div>
         </div>
 
-        <div className="bg-slate-100 rounded-2xl p-1 inline-flex flex-wrap gap-1 mb-6">
+        <div className="bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1.5 inline-flex flex-wrap gap-1 mb-6">
           <button onClick={() => setActiveTab('students')} className={`pill-tab ${activeTab === 'students' ? 'pill-tab-active' : 'pill-tab-inactive'}`}>Students ({data.students.length})</button>
           <button onClick={() => setActiveTab('teachers')} className={`pill-tab ${activeTab === 'teachers' ? 'pill-tab-active' : 'pill-tab-inactive'}`}>Faculty ({data.teachers.length})</button>
           <button onClick={() => setActiveTab('departments')} className={`pill-tab ${activeTab === 'departments' ? 'pill-tab-active' : 'pill-tab-inactive'}`}>Departments ({data.departments.length})</button>

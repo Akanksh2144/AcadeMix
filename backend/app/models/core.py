@@ -1,5 +1,6 @@
 from sqlalchemy import Column, String, Integer, Float, ForeignKey, DateTime, Boolean, Index, UniqueConstraint, Date, CheckConstraint, Text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, text
 import uuid
 from database import Base
@@ -67,9 +68,49 @@ class User(Base, SoftDeleteMixin):
     email = Column(String, unique=True, index=True, nullable=False)
     password_hash = Column(String, nullable=False)
     name = Column(String, nullable=False)
-    profile_data = Column(JSONB, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    profile = relationship("UserProfile", back_populates="user", lazy="joined", uselist=False)
+
+    @property
+    def profile_data(self):
+        if self.profile:
+            return {
+                "department": self.profile.department,
+                "section": self.profile.section,
+                "batch": self.profile.batch,
+                "current_semester": self.profile.current_semester,
+                "phone": self.profile.phone,
+                "blood_group": self.profile.blood_group,
+                "telemetry_strikes": self.profile.telemetry_strikes,
+                "acad_tokens": self.profile.acad_tokens,
+                "college_id": self.profile.college_id,
+                "roll_number": self.profile.roll_number,
+                "force_password_change": self.profile.force_password_change,
+            }
+        return {}
+
+class UserProfile(Base, SoftDeleteMixin):
+    __tablename__ = "user_profiles"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
+    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
+    roll_number = Column(String, nullable=True, index=True)
+    
+    department = Column(String, nullable=True)
+    section = Column(String, nullable=True)
+    batch = Column(String, nullable=True)
+    current_semester = Column(Integer, nullable=True)
+    
+    force_password_change = Column(Boolean, nullable=False, server_default=text('false'))
+    
+    phone = Column(String, nullable=True)
+    blood_group = Column(String, nullable=True)
+    
+    telemetry_strikes = Column(Integer, nullable=False, server_default=text('0'))
+    acad_tokens = Column(Float, nullable=False, server_default=text('0.0'))
+
+    user = relationship("User", back_populates="profile")
 
 class UserPermission(Base, SoftDeleteMixin):
     """Admin-configurable permission flags per user. Separate from role.

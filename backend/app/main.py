@@ -48,9 +48,11 @@ DEFAULT_GRADE_SCALE = [
     {"min_pct": 0, "grade": "F", "points": 0},
 ]
 
-JWT_SECRET = os.environ["JWT_SECRET"]
+from app.core.config import settings
 
-cors_origins_env = os.environ.get("CORS_ORIGINS", "")
+JWT_SECRET = settings.JWT_SECRET
+
+cors_origins_env = settings.CORS_ORIGINS
 if not cors_origins_env:
     raise ValueError("CORS_ORIGINS must be explicitly set (no wildcard allowed)")
 
@@ -77,7 +79,7 @@ def _scrub_pii(event, hint):
                     data[pii_key] = "[FILTERED]"
     return event
 
-sentry_dsn = os.environ.get("SENTRY_DSN", "")
+sentry_dsn = settings.SENTRY_DSN
 if sentry_dsn:
     sentry_sdk.init(
         dsn=sentry_dsn,
@@ -101,9 +103,9 @@ async def _seed_db():
       3. Upsert Admin user with college_id = college.id
     """
     async with AsyncSessionLocal() as session:
-        admin_college_id_str = os.environ.get("ADMIN_COLLEGE_ID", "A001")
-        admin_pwd = os.environ.get("ADMIN_PASSWORD", "admin123")
-        college_name = os.environ.get("COLLEGE_NAME", "Guru Nanak Institutions Technical Campus")
+        admin_college_id_str = settings.ADMIN_COLLEGE_ID
+        admin_pwd = settings.ADMIN_PASSWORD
+        college_name = settings.COLLEGE_NAME
 
         # 1. Upsert College
         college_r = await session.execute(
@@ -143,7 +145,7 @@ async def _seed_db():
         # 3. Upsert Admin user with real college FK
         result = await session.execute(
             select(models.User).where(
-                models.User.profile_data["college_id"].astext == admin_college_id_str
+                models.User.email == "admin@gni.edu"
             )
         )
         existing = result.scalars().first()
@@ -154,26 +156,29 @@ async def _seed_db():
                 password_hash=hash_password(admin_pwd),
                 role="admin",
                 college_id=college.id,
-                profile_data={
-                    "college_id": admin_college_id_str,
-                    "college": college_name,
-                    "department": "Administration",
-                },
             )
             try:
                 session.add(admin)
+                await session.flush()
+                
+                admin_profile = models.UserProfile(
+                    user_id=admin.id,
+                    college_id=college.id,
+                    department="Administration",
+                )
+                session.add(admin_profile)
                 await session.commit()
-                logger.info("[startup] Admin user '%s' seeded with college_id=%s", admin_college_id_str, college.id)
+                logger.info("[startup] Admin user 'admin@gni.edu' seeded with college_id=%s", college.id)
             except IntegrityError:
                 await session.rollback()
-                logger.info("[startup] Admin '%s' was seeded by another worker. Skipping.", admin_college_id_str)
+                logger.info("[startup] Admin 'admin@gni.edu' was seeded by another worker. Skipping.")
         else:
             if existing.college_id is None:
                 existing.college_id = college.id
                 await session.commit()
                 logger.info("[startup] Fixed admin college_id: None → %s", college.id)
             else:
-                logger.info("[startup] Admin '%s' already exists. Skipping seed.", admin_college_id_str)
+                logger.info("[startup] Admin 'admin@gni.edu' already exists. Skipping seed.")
 
 
 @asynccontextmanager
@@ -218,9 +223,8 @@ app.add_middleware(
 )
 
 # ─── Rate Limiter ─────────────────────────────────────────────────────────────
-redis_url = os.environ.get("REDIS_URL", "")
-redis_client = pyredis.from_url(redis_url) if redis_url else None
-limiter = Limiter(key_func=get_remote_address, storage_uri=redis_url) if redis_url else Limiter(key_func=get_remote_address)
+from app.core.limiter import limiter
+app.state.limiter = limiter
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 

@@ -95,9 +95,9 @@ class NodalService:
         
         stmt = select(
             models.User.college_id,
-            func.count(models.MarkEntry.id).label("total_entries")
+            func.count(models.MarkSubmission.id).label("total_entries")
         ).join(
-            models.User, models.User.id == models.MarkEntry.faculty_id
+            models.User, models.User.id == models.MarkSubmission.faculty_id
         ).where(
             models.User.college_id.in_(c_ids)
         ).group_by(models.User.college_id)

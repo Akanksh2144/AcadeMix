@@ -29,14 +29,14 @@ async def search_students(
     offset: int = Query(0, ge=0),
     user: dict = Depends(require_role("hod", "admin", "exam_cell", "teacher")), 
     session: AsyncSession = Depends(get_db)):
-    stmt = select(models.User).where(
+    stmt = select(models.User).outerjoin(models.UserProfile).where(
         models.User.role == "student",
         models.User.college_id == user["college_id"]
     )
     if q:
         stmt = stmt.where(
             models.User.name.ilike(f"%{q}%") |
-            models.User.profile_data["roll_number"].astext.ilike(f"%{q}%")
+            models.UserProfile.roll_number.ilike(f"%{q}%")
         )
     result = await session.execute(stmt.order_by(models.User.name).offset(offset).limit(limit))
     students = result.scalars().all()
@@ -69,15 +69,15 @@ async def student_profile(student_id: str, user: dict = Depends(require_role("ho
     )
     attempts = attempts_r.scalars().all()
     marks_r = await session.execute(
-        select(models.MarkEntry).where(
-            models.MarkEntry.student_id == student_id
-        )
+        select(models.MarkSubmissionEntry, models.MarkSubmission)
+        .join(models.MarkSubmission, models.MarkSubmission.id == models.MarkSubmissionEntry.submission_id)
+        .where(models.MarkSubmissionEntry.student_id == student_id)
     )
-    marks_rows = marks_r.scalars().all()
+    marks_rows = marks_r.all()
     mid_marks = [{
-        "course_id": r.course_id, "exam_type": r.exam_type,
-        "marks_obtained": r.marks_obtained, "max_marks": r.max_marks
-    } for r in marks_rows]
+        "course_id": sub.subject_code, "exam_type": sub.exam_type,
+        "marks_obtained": entry.marks_obtained, "max_marks": sub.max_marks
+    } for entry, sub in marks_rows]
     return {
         "student": {"id": student.id, "name": student.name, "email": student.email, **(student.profile_data or {})},
         "semesters": semesters,

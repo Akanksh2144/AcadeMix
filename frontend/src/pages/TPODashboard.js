@@ -30,7 +30,7 @@ const OverviewContent = () => {
     tpoAPI.getStats().then(res => { setStats(res.data); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="tpo" />;
 
   const metrics = [
     { label: 'Total Students', value: stats?.total_students || 0, icon: Users, color: 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-500' },
@@ -90,10 +90,10 @@ const CompaniesContent = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    tpoAPI.getCompanies().then(res => { setCompanies(res.data); setLoading(false); }).catch(() => setLoading(false));
+    tpoAPI.getCompanies().then(res => { setCompanies(res.data.data || res.data || []); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="content-cards" />;
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show">
@@ -140,10 +140,10 @@ const DrivesContent = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    tpoAPI.getDrives().then(res => { setDrives(res.data); setLoading(false); }).catch(() => setLoading(false));
+    tpoAPI.getDrives().then(res => { setDrives(res.data.data || res.data || []); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="content-list" />;
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show">
@@ -196,19 +196,20 @@ const ApplicationsContent = () => {
 
   useEffect(() => {
     tpoAPI.getDrives().then(res => { 
-        setDrives(res.data);
-        if (res.data.length > 0) setSelectedDrive(res.data[0].id);
+        const d = res.data.data || res.data || [];
+        setDrives(d);
+        if (d.length > 0) setSelectedDrive(d[0].id);
         setLoading(false); 
     }).catch(() => setLoading(false));
   }, []);
 
   useEffect(() => {
       if (selectedDrive) {
-          tpoAPI.getApplicants(selectedDrive).then(res => setApplicants(res.data || []));
+          tpoAPI.getApplicants(selectedDrive).then(res => setApplicants(res.data.data || res.data || []));
       }
   }, [selectedDrive]);
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="content-list" />;
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show">
@@ -274,15 +275,21 @@ const TPODashboard = ({ navigate, user, onLogout }) => {
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <header className="glass-header">
         <div className="w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center"><Briefcase size={22} weight="duotone" className="text-white" /></div>
-              <div><h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadMix</h1><p className="text-xs font-bold uppercase tracking-widest text-slate-400">Training & Placement</p></div>
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center">
+              <Briefcase size={22} weight="duotone" className="text-white" />
             </div>
-            <div className="flex items-center gap-3">
+            <div>
+              <h1 className="text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">AcadMix</h1>
+              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">Training & Placement</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Notification Bell */}
+            <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
+                className="p-2.5 rounded-full bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 transition-colors relative"
                 aria-label="Notifications"
               >
                 <Bell size={20} weight={showNotifications ? "fill" : "duotone"} />
@@ -292,63 +299,71 @@ const TPODashboard = ({ navigate, user, onLogout }) => {
                   </div>
                 )}
               </button>
-              <AnimatePresence>
-                {showNotifications && (
-                  <>
-                    <motion.div
-                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="fixed inset-0 z-[60]"
-                      onClick={() => setShowNotifications(false)}
-                    ></motion.div>
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
-                      className="absolute top-20 right-4 sm:right-8 z-[61] w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-100 dark:bg-[#1A202C] dark:border-white/[0.06] overflow-hidden"
-                    >
-                      <div className="px-5 py-4 border-b border-slate-100 dark:border-slate-700 flex w-full items-center justify-between">
-                        <h4 className="font-extrabold text-slate-800 dark:text-slate-100">Notifications</h4>
-                        <button onClick={() => { setNotifRead(true); setShowNotifications(false); }} className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors">Mark all as read</button>
-                      </div>
-                      <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800">
-                        {notifications.map((item, i) => (
-                          <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer text-left">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-blue-50">
-                              <Info size={14} weight="duotone" className="text-blue-500" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-bold text-slate-800 dark:text-slate-100 truncate">{item.title}</p>
-                              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">{item.desc}</p>
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-2 block">{item.time}</span>
-                            </div>
+            </div>
+            <AnimatePresence>
+              {showNotifications && (
+                <>
+                  <div className="fixed inset-0 z-[60]" onClick={() => setShowNotifications(false)}></div>
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                    className="fixed top-16 right-4 sm:right-8 z-[61] w-80 sm:w-96 bg-white dark:bg-[#1A202C] rounded-2xl shadow-2xl border border-slate-100 dark:border-white/10 overflow-hidden"
+                  >
+                    <div className="px-5 py-4 border-b border-slate-100 dark:border-white/10 flex items-center justify-between">
+                      <h4 className="font-extrabold text-slate-800 dark:text-slate-100">Notifications</h4>
+                      <button onClick={() => { setNotifRead(true); setShowNotifications(false); }} className="text-xs font-bold text-blue-500 hover:text-blue-600 transition-colors">Mark all as read</button>
+                    </div>
+                    <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-white/5">
+                      {notifications.map((item, i) => (
+                        <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-blue-50 dark:bg-blue-500/15">
+                            <Info size={14} weight="duotone" className="text-blue-500" />
                           </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  </>
-                )}
-              </AnimatePresence>
-              <motion.button
-                whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
-                onClick={toggleTheme}
-                className="p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 transition-colors"
-                aria-label="Toggle theme"
-              >
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.div key={isDark ? 'dark' : 'light'} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
-                    {isDark ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">{item.title}</p>
+                            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">{item.desc}</p>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-1.5 block">{item.time}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </motion.div>
-                </AnimatePresence>
-              </motion.button>
-              <button onClick={() => setShowProfile(true)} className="hidden sm:flex items-center gap-3 bg-slate-50 dark:bg-white/5 rounded-2xl px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer text-left border border-slate-100 dark:border-white/5">
+                </>
+              )}
+            </AnimatePresence>
+
+            {/* Theme Toggle */}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={toggleTheme}
+              className="p-2.5 rounded-full bg-slate-50 dark:bg-white/5 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-500 dark:text-slate-400 transition-colors"
+              aria-label="Toggle theme"
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div key={isDark ? 'dark' : 'light'} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
+                  {isDark ? <Sun size={20} weight="duotone" /> : <Moon size={20} weight="duotone" />}
+                </motion.div>
+              </AnimatePresence>
+            </motion.button>
+
+            {/* User Pill */}
+            <button onClick={() => setShowProfile(true)} className="hidden sm:flex items-center gap-3 bg-slate-50 dark:bg-white/5 rounded-2xl px-4 py-2 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer text-left border border-slate-100 dark:border-white/5">
               <div className="w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center shrink-0">
                 <UserCircle size={18} weight="duotone" className="text-indigo-500" />
               </div>
               <div className="flex flex-col justify-center">
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight">{user?.name}</p>
-                <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-500 leading-tight mt-0.5">{user?.id || user?.role}</p>
+                <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-500 leading-tight mt-0.5">{user?.department || 'T&P'} • {user?.section || 'Placement Officer'}</p>
               </div>
             </button>
-              <button onClick={onLogout} className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors" aria-label="Sign out"><SignOut size={20} weight="duotone" /></button>
-            </div>
+
+            {/* Logout */}
+            <button onClick={onLogout} className="p-2.5 rounded-full bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 transition-colors" aria-label="Sign out">
+              <SignOut size={20} weight="duotone" />
+            </button>
           </div>
         </div>
       </header>

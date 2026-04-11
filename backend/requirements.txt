@@ -132,3 +132,4 @@ sentry-sdk[fastapi]>=2.0.0
 razorpay==1.4.1
 
 gunicorn>=21.2.0
+pydantic-settings

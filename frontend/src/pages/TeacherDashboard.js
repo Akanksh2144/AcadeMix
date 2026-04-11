@@ -84,7 +84,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
     { label: 'Active Quizzes', value: String(activeQuizzes), sub: 'live now', icon: Fire, color: 'bg-rose-50 dark:bg-rose-500/15 text-rose-500 dark:text-rose-400', gradient: 'from-rose-500 to-pink-500', onClick: () => navigate('teacher-quizzes') },
   ];
 
-  if (initialLoading) return <DashboardSkeleton />;
+  if (initialLoading) return <DashboardSkeleton variant="teacher" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -209,7 +209,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
               <button 
                 key={tab.id} 
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 justify-center min-w-max flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                className={`flex-1 justify-center min-w-max flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${
                   activeTab === tab.id 
                     ? "bg-white dark:bg-[#1E293B]/80 text-blue-600 dark:text-blue-400 shadow-sm border border-slate-200/50 dark:border-white/[0.06] backdrop-blur-md"
                     : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5 border border-transparent"
@@ -368,13 +368,13 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
             <motion.div variants={itemVariants} className="mb-4">
               <div className="flex items-center gap-1.5 bg-white dark:bg-[#1A202C]/60 backdrop-blur-md border border-slate-200 dark:border-slate-700/80 rounded-2xl p-1.5 shadow-sm w-fit">
                 <button onClick={() => setTeachingMode('plan')}
-                  className={`px-3.5 py-2 rounded-[14px] text-xs font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-1.5 ${
+                  className={`px-3.5 py-2 rounded-2xl text-xs font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-1.5 ${
                     teachingMode === 'plan' ? 'bg-white dark:bg-[#1A202C] text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
                   }`}>
                   <Notebook size={14} weight="duotone" /> Teaching Plan
                 </button>
                 <button onClick={() => setTeachingMode('record')}
-                  className={`px-3.5 py-2 rounded-[14px] text-xs font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-1.5 ${
+                  className={`px-3.5 py-2 rounded-2xl text-xs font-semibold transition-all duration-200 whitespace-nowrap flex items-center gap-1.5 ${
                     teachingMode === 'record' ? 'bg-white dark:bg-[#1A202C] text-blue-600 dark:text-blue-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
                   }`}>
                   <PencilLine size={14} weight="duotone" /> Class Record

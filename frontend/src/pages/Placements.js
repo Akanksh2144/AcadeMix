@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Buildings, MapPin, CalendarBlank, Briefcase, Clock, Users, Star, CaretDown, CaretUp } from '@phosphor-icons/react';
+import { Buildings, MapPin, CalendarBlank, Briefcase, Clock, Users, Star, CaretDown, CaretUp } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { placementsAPI } from '../services/api';
 
 const formatDate = (d) => {
@@ -19,7 +20,7 @@ const getDaysUntil = (d) => {
   return { text: `In ${days} days`, urgent: false };
 };
 
-const Placements = ({ navigate, user }) => {
+const Placements = ({ navigate, user, onLogout }) => {
   const [placements, setPlacements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -57,33 +58,26 @@ const Placements = ({ navigate, user }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
-          <button onClick={() => navigate('student-dashboard')} className="p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 text-slate-500 dark:text-slate-400 transition-colors">
-            <ArrowLeft size={20} weight="bold" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Placements</h1>
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              {upcoming.length} upcoming • {completed.length} completed
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="Placements"
+        subtitle={`${upcoming.length} upcoming • ${completed.length} completed`}
+        maxWidth="max-w-7xl"
+      />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Filter Tabs */}
-        <div className="flex items-center gap-2 mb-6 sm:mb-8" style={{animation: 'fadeInUp 0.2s ease'}}>
+        <div className="flex items-center gap-1 p-1.5 bg-slate-100 dark:bg-white/[0.04] rounded-xl mb-6 sm:mb-8 w-fit" style={{animation: 'fadeInUp 0.2s ease'}}>
           {[
             { key: 'all', label: `All (${placements.length})` },
             { key: 'upcoming', label: `Upcoming (${upcoming.length})` },
             { key: 'completed', label: `Past (${completed.length})` },
           ].map(tab => (
             <button key={tab.key} onClick={() => setFilter(tab.key)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${
+              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border border-transparent ${
                 filter === tab.key
-                  ? 'bg-indigo-50 dark:bg-indigo-500/150 text-white'
-                  : 'bg-slate-100 text-slate-500 dark:text-slate-400 hover:bg-slate-200'
+                  ? 'bg-white dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 shadow-sm dark:border-indigo-500/25'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/[0.04]'
               }`}>
               {tab.label}
             </button>

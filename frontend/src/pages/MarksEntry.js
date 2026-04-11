@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ArrowLeft, PaperPlaneTilt, FloppyDisk, CheckCircle, Clock, Warning, WarningCircle, Percent, ChartBar, PencilLine, X, DownloadSimple, UploadSimple } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { marksAPI } from '../services/api';
 import * as XLSX from 'xlsx';
 
-const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
+const MarksEntry = ({ navigate, user, preselectedAssignment, onLogout }) => {
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(preselectedAssignment || null);
   const [examType, setExamType] = useState('mid1');
@@ -319,31 +320,11 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-4">
-          <button data-testid="back-button" onClick={() => {
-            if (selectedAssignment && !isDirectNavigation) {
-              // Only go to assignment list if user manually selected from list
-              setSelectedAssignment(null);
-            } else {
-              // Go back to dashboard (for direct navigation or from assignment list)
-              const dashboardRoute = user?.role === 'hod' ? 'hod-dashboard' : 'teacher-dashboard';
-              navigate(dashboardRoute);
-            }
-          }}
-            className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
-            <ArrowLeft size={22} weight="duotone" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">
-              {selectedAssignment ? selectedAssignment.subject_name : 'Mid-term Marks Entry'}
-            </h1>
-            <p className="text-sm font-medium text-slate-400">
-              {selectedAssignment ? `${selectedAssignment.subject_code} | Batch ${selectedAssignment.batch} Sec ${selectedAssignment.section}` : 'Select a subject to enter marks'}
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title={selectedAssignment ? selectedAssignment.subject_name : 'Mid-term Marks Entry'}
+        subtitle={selectedAssignment ? `${selectedAssignment.subject_code} | Batch ${selectedAssignment.batch} Sec ${selectedAssignment.section}` : 'Select a subject to enter marks'}
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {!selectedAssignment ? (
@@ -374,7 +355,7 @@ const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
           <div data-testid="marks-entry-form">
             {/* Row 1: Mid-1/Mid-2 tabs */}
             <div className="flex flex-wrap items-center gap-4 mb-4">
-              <div className="flex items-center gap-2 bg-slate-100 rounded-2xl p-1.5" data-testid="exam-type-tabs">
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1.5" data-testid="exam-type-tabs">
                 <button data-testid="tab-mid1" onClick={() => handleExamTypeChange('mid1')}
                   className={`pill-tab ${examType === 'mid1' ? 'pill-tab-active' : 'pill-tab-inactive'}`}>Mid-term 1</button>
                 <button data-testid="tab-mid2" onClick={() => handleExamTypeChange('mid2')}

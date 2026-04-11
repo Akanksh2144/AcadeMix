@@ -154,7 +154,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
     window.open(`${API_URL}/api/parent/children/${selectedChild}/progress-report?token=${token}`, '_blank');
   };
 
-  if (loading && children.length === 0) return <DashboardSkeleton />;
+  if (loading && children.length === 0) return <DashboardSkeleton variant="student" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -347,7 +347,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
             ))}
           </div>
 
-        {loading ? <DashboardSkeleton /> : (
+        {loading ? <DashboardSkeleton variant="content-table" /> : (
           <>
             {/* ═══════ OVERVIEW ═══════ */}
             {activeTab === 'overview' && (

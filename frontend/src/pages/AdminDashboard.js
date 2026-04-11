@@ -86,7 +86,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
     { month: 'Dec', students: Math.max(totalStudents - 1, 0) }, { month: 'Jan', students: totalStudents },
   ];
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="admin" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -174,7 +174,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
               </div>
               <div className="flex flex-col justify-center">
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight">{user?.name}</p>
-                <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-500 leading-tight mt-0.5">{user?.id || user?.role}</p>
+                <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-500 leading-tight mt-0.5">{user?.department || 'Admin'} • {user?.role === 'admin' ? 'Administrator' : user?.role}</p>
               </div>
             </button>
               <button data-testid="logout-button" onClick={onLogout} className="p-2.5 rounded-full bg-red-50 hover:bg-red-100 text-red-500 transition-colors" aria-label="Sign out"><SignOut size={20} weight="duotone" /></button>

@@ -391,10 +391,10 @@ class ParentService:
             grade_html += f"<tr><td>Semester {sem}</td><td>-</td><td>{sgpa}</td><td>{cgpa}</td><td>{sem_credits}</td><td>{arrears}</td></tr>"
 
         from sqlalchemy import String
-        entries_stmt = select(models.MarkEntry).where(
-            models.MarkEntry.college_id == cid,
-            models.MarkEntry.is_deleted == False
-        ).where(models.MarkEntry.extra_data.cast(String).ilike(f'%"{student_id}"%'))
+        entries_stmt = select(models.MarkSubmission).where(
+            models.MarkSubmission.college_id == cid,
+            models.MarkSubmission.is_deleted == False
+        ).where(models.MarkSubmission.extra_data.cast(String).ilike(f'%"{student_id}"%'))
         entries_r = await self.db.execute(entries_stmt)
         entries = entries_r.scalars().all()
         

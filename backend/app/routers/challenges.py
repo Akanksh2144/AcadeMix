@@ -1,4 +1,5 @@
-from app.core.config import limiter, code_runner_url
+from app.core.limiter import limiter
+from app.core.config import settings
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -102,7 +103,7 @@ async def submit_challenge(request: Request, req: ChallengeSubmit, user: dict = 
     )
     async def _do_request():
         return await _http_client.post(
-            f"{code_runner_url}/run",
+            f"{settings.CODE_RUNNER_URL}/run",
             json={"language": req.language, "code": req.code, "test_input": init_sql_script},
             timeout=lang_timeout
         )

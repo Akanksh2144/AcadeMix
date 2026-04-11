@@ -1,5 +1,6 @@
 import razorpay
 import os
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import List, Dict, Any
@@ -68,7 +69,7 @@ class FeesService:
             "receipt": f"receipt_{invoice_id[:8]}"
         }
         
-        rzp_order = self.rzp_client.order.create(data=order_data)
+        rzp_order = await run_in_threadpool(self.rzp_client.order.create, data=order_data)
 
         # Store pending intent
         pending_payment = FeePayment(
@@ -93,11 +94,14 @@ class FeesService:
         """Verifies HMAC signature securely on the backend."""
         try:
             # required payload format from razorpay web hook / frontend checkout handler
-            self.rzp_client.utility.verify_payment_signature({
-                'razorpay_order_id': payload.get('razorpay_order_id'),
-                'razorpay_payment_id': payload.get('razorpay_payment_id'),
-                'razorpay_signature': payload.get('razorpay_signature')
-            })
+            await run_in_threadpool(
+                self.rzp_client.utility.verify_payment_signature,
+                {
+                    'razorpay_order_id': payload.get('razorpay_order_id'),
+                    'razorpay_payment_id': payload.get('razorpay_payment_id'),
+                    'razorpay_signature': payload.get('razorpay_signature')
+                }
+            )
             
             # Signature valid, fetch the pending order based on order_id
             order_id = payload.get('razorpay_order_id')
@@ -136,3 +140,40 @@ class FeesService:
             created += 1
         await self.db.commit()
         return created
+
+    async def get_payment_history(self, student_id: str, college_id: str) -> List[Dict[str, Any]]:
+        """Returns all payments (successful + pending) for a student, most recent first."""
+        payments_query = await self.db.execute(
+            select(FeePayment).where(
+                FeePayment.student_id == student_id,
+                FeePayment.college_id == college_id,
+                FeePayment.is_deleted == False
+            ).order_by(FeePayment.created_at.desc())
+        )
+        payments = payments_query.scalars().all()
+
+        # Build invoice lookup for fee_type
+        invoice_ids = list(set(p.invoice_id for p in payments if p.invoice_id))
+        invoices_map = {}
+        if invoice_ids:
+            inv_query = await self.db.execute(
+                select(StudentFeeInvoice).where(StudentFeeInvoice.id.in_(invoice_ids))
+            )
+            for inv in inv_query.scalars().all():
+                invoices_map[inv.id] = inv
+
+        history = []
+        for p in payments:
+            inv = invoices_map.get(p.invoice_id)
+            history.append({
+                "payment_id": str(p.id),
+                "invoice_id": str(p.invoice_id) if p.invoice_id else None,
+                "fee_type": inv.fee_type if inv else "Fee Payment",
+                "academic_year": inv.academic_year if inv else "",
+                "amount": p.amount_paid,
+                "status": p.status,
+                "transaction_ref": p.transaction_reference or "",
+                "paid_at": p.created_at.isoformat() if p.created_at else None,
+            })
+        return history
+

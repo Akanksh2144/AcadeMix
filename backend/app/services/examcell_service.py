@@ -291,8 +291,8 @@ class ExamCellService:
 
     async def publish_marks(self, college_id: str, user_id: str, entry_id: str) -> Dict[str, Any]:
         result = await self.db.execute(
-            select(models.MarkEntry)
-            .where(models.MarkEntry.id == entry_id, models.MarkEntry.college_id == college_id)
+            select(models.MarkSubmission)
+            .where(models.MarkSubmission.id == entry_id, models.MarkSubmission.college_id == college_id)
             .with_for_update()
         )
         entry = result.scalars().first()

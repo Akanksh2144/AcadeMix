@@ -25,6 +25,15 @@ async def get_my_due_fees(
     return {"data": await svc.get_student_due_fees(student_id, user["college_id"])}
 
 
+@router.get("/fees/history")
+async def get_payment_history(
+    user: dict = Depends(require_role("student", "parent")),
+    svc: FeesService = Depends(get_fees_service)
+):
+    student_id = user["id"]
+    return {"data": await svc.get_payment_history(student_id, user["college_id"])}
+
+
 class CreateOrderPayload(BaseModel):
     invoice_id: str
     amount_to_pay: float

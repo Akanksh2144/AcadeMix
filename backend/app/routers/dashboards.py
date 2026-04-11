@@ -180,17 +180,17 @@ async def hod_dashboard(user: dict = Depends(require_role("hod", "admin")), sess
     assignments_r = await session.execute(
         select(func.count(models.FacultyAssignment.id))
     )
-    # Pending/approved from JSONB status field
-    mark_entries_r = await session.execute(
-        select(models.MarkEntry)
+    # Pending/approved from relational status column
+    mark_subs_r = await session.execute(
+        select(models.MarkSubmission).where(models.MarkSubmission.college_id == user["college_id"])
     )
-    all_entries = mark_entries_r.scalars().all()
-    pending = sum(1 for e in all_entries if (e.extra_data or {}).get("status") == "submitted")
-    approved = sum(1 for e in all_entries if (e.extra_data or {}).get("status") == "approved")
+    all_subs = mark_subs_r.scalars().all()
+    pending = sum(1 for e in all_subs if e.status == "submitted")
+    approved = sum(1 for e in all_subs if e.status == "approved")
     recent = [{
-        "id": e.id, "course_id": e.course_id, "exam_type": e.exam_type,
-        "status": (e.extra_data or {}).get("status", "draft"), "activity_type": "marks_review"
-    } for e in all_entries[-15:]]
+        "id": e.id, "course_id": e.subject_code, "exam_type": e.exam_type,
+        "status": e.status or "draft", "activity_type": "marks_review"
+    } for e in all_subs[-15:]]
     return {
         "total_teachers": teachers_r.scalar() or 0,
         "total_students": students_r.scalar() or 0,
@@ -202,11 +202,11 @@ async def hod_dashboard(user: dict = Depends(require_role("hod", "admin")), sess
 
 @router.get("/dashboard/exam_cell")
 async def exam_cell_dashboard(user: dict = Depends(require_role("exam_cell", "admin")), session: AsyncSession = Depends(get_db)):
-    mark_entries_r = await session.execute(
-        select(models.MarkEntry)
+    mark_subs_r = await session.execute(
+        select(models.MarkSubmission).where(models.MarkSubmission.college_id == user["college_id"])
     )
-    all_entries = mark_entries_r.scalars().all()
-    approved = sum(1 for e in all_entries if (e.extra_data or {}).get("status") == "approved")
+    all_entries = mark_subs_r.scalars().all()
+    approved = sum(1 for e in all_entries if e.status == "approved")
     sem_r = await session.execute(select(models.SemesterGrade))
     all_grades = sem_r.scalars().all()
     return {

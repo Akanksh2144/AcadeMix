@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
-from fastapi import HTTPException, UploadFile
+from fastapi import UploadFile
+from app.core.exceptions import ResourceNotFoundError, InputValidationError, AuthorizationError, PayloadTooLargeError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -8,6 +9,7 @@ import csv
 import io
 
 from app import models
+from app.models.core import UserProfile
 from app.core.audit import log_audit
 
 class MarksService:
@@ -16,12 +18,12 @@ class MarksService:
 
     async def get_students_for_assignment(self, department: str, batch: str, section: str, college_id: str) -> List[Dict[str, Any]]:
         result = await self.session.execute(
-            select(models.User).where(
+            select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
                 models.User.college_id == college_id,
                 models.User.role == "student",
-                models.User.profile_data["department"].astext == department,
-                models.User.profile_data["batch"].astext == batch,
-                models.User.profile_data["section"].astext == section,
+                UserProfile.department == department,
+                UserProfile.batch == batch,
+                UserProfile.section == section,
             )
         )
         students = result.scalars().all()
@@ -29,10 +31,10 @@ class MarksService:
 
     async def get_entry(self, assignment_id: str, exam_type: str, component_id: Optional[str], user: dict) -> Dict[str, Any]:
         result = await self.session.execute(
-            select(models.MarkEntry).where(
-                func.jsonb_extract_path_text(models.MarkEntry.extra_data, 'assignment_id') == assignment_id,
-                models.MarkEntry.exam_type == exam_type,
-                models.MarkEntry.faculty_id == user["id"],
+            select(models.MarkSubmission).where(
+                func.jsonb_extract_path_text(models.MarkSubmission.extra_data, 'assignment_id') == assignment_id,
+                models.MarkSubmission.exam_type == exam_type,
+                models.MarkSubmission.faculty_id == user["id"],
             )
         )
         entries = result.scalars().all()
@@ -60,13 +62,13 @@ class MarksService:
         )
         assignment = assign_r.scalars().first()
         if not assignment:
-            raise HTTPException(status_code=404, detail="Assignment not found")
+            raise ResourceNotFoundError("FacultyAssignment", req.assignment_id)
             
         existing_r = await self.session.execute(
-            select(models.MarkEntry).where(
-                models.MarkEntry.course_id == assignment.subject_code,
-                models.MarkEntry.exam_type == req.exam_type,
-                models.MarkEntry.faculty_id == user["id"],
+            select(models.MarkSubmission).where(
+                models.MarkSubmission.course_id == assignment.subject_code,
+                models.MarkSubmission.exam_type == req.exam_type,
+                models.MarkSubmission.faculty_id == user["id"],
             )
         )
         entries = existing_r.scalars().all()
@@ -79,9 +81,9 @@ class MarksService:
         current_status = (existing.extra_data or {}).get("status", "draft")
         if current_status == "approved":
             if not req.revision_reason or not req.revision_reason.strip():
-                raise HTTPException(status_code=400, detail="Revision reason is required to edit approved marks")
+                raise InputValidationError("Revision reason is required to edit approved marks")
         if current_status == "submitted":
-            raise HTTPException(status_code=400, detail="Cannot edit submitted marks. Wait for approval or rejection.")
+            raise InputValidationError("Cannot edit submitted marks. Wait for approval or rejection.")
             
         # Write to legacy MarkEntry
         if existing:
@@ -90,7 +92,7 @@ class MarksService:
             existing.max_marks = req.max_marks
             entry_id = existing.id
         else:
-            row = models.MarkEntry(
+            row = models.MarkSubmission(
                 student_id=None,
                 course_id=assignment.subject_code,
                 faculty_id=user["id"],
@@ -163,20 +165,20 @@ class MarksService:
 
     async def submit_entry(self, entry_id: str, user: dict) -> Dict[str, str]:
         entry_r = await self.session.execute(
-            select(models.MarkEntry).where(
-                models.MarkEntry.id == entry_id,
-                models.MarkEntry.college_id == user["college_id"]
+            select(models.MarkSubmission).where(
+                models.MarkSubmission.id == entry_id,
+                models.MarkSubmission.college_id == user["college_id"]
             )
         )
         entry = entry_r.scalars().first()
         if not entry:
-             raise HTTPException(status_code=404, detail="Mark entry not found")
+             raise ResourceNotFoundError("MarkEntry", entry_id)
         if entry.faculty_id != user["id"]:
-             raise HTTPException(status_code=403, detail="Unauthored mark entry")
+             raise AuthorizationError("Unauthorized mark entry")
              
         current_status = (entry.extra_data or {}).get("status", "draft")
         if current_status == "approved":
-             raise HTTPException(status_code=400, detail="Already approved")
+             raise InputValidationError("Already approved")
              
         entry.extra_data = {**(entry.extra_data or {}), "status": "submitted"}
         
@@ -201,18 +203,18 @@ class MarksService:
 
     async def review_entry(self, entry_id: str, req, user: dict) -> Dict[str, str]:
         entry_r = await self.session.execute(
-            select(models.MarkEntry).where(
-                models.MarkEntry.id == entry_id,
-                models.MarkEntry.college_id == user["college_id"]
+            select(models.MarkSubmission).where(
+                models.MarkSubmission.id == entry_id,
+                models.MarkSubmission.college_id == user["college_id"]
             )
         )
         entry = entry_r.scalars().first()
         if not entry:
-            raise HTTPException(status_code=404, detail="Mark entry not found")
+            raise ResourceNotFoundError("MarkEntry", entry_id)
             
         current_status = (entry.extra_data or {}).get("status", "draft")
         if current_status != "submitted":
-            raise HTTPException(status_code=400, detail="Marks not submitted for review")
+            raise InputValidationError("Marks not submitted for review")
             
         entry.extra_data = {
             **(entry.extra_data or {}), 
@@ -245,9 +247,9 @@ class MarksService:
 
     async def get_approved_marks(self, college_id: str) -> List[Dict[str, Any]]:
         result = await self.session.execute(
-            select(models.MarkEntry).where(
-                models.MarkEntry.college_id == college_id
-            ).order_by(models.MarkEntry.created_at.desc())
+            select(models.MarkSubmission).where(
+                models.MarkSubmission.college_id == college_id
+            ).order_by(models.MarkSubmission.created_at.desc())
         )
         entries = result.scalars().all()
         approved = [e for e in entries if (e.extra_data or {}).get("status") == "approved"]
@@ -261,7 +263,7 @@ class MarksService:
         fac_ids = list(set(e.faculty_id for e in approved))
         fac_map = {}
         if fac_ids:
-            fac_r = await self.session.execute(select(models.User).where(models.User.id.in_(fac_ids)))
+            fac_r = await self.session.execute(select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(models.User.id.in_(fac_ids)))
             fac_map = {u.id: u for u in fac_r.scalars().all()}
             
         return [{
@@ -277,20 +279,20 @@ class MarksService:
     async def upload_marks(self, file: UploadFile, semester: int, subject_code: str, exam_type: str, user: dict, max_marks: float) -> Dict[str, Any]:
         MAX_FILE_SIZE = 5 * 1024 * 1024 # 5 MB threshold
         if file.size and file.size > MAX_FILE_SIZE:
-            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 5MB for CSV marks ingress.")
+            raise PayloadTooLargeError("File too large. Maximum allowed size is 5MB for CSV marks ingress.")
             
         content = await file.read(MAX_FILE_SIZE + 1)
         if len(content) > MAX_FILE_SIZE:
-            raise HTTPException(status_code=413, detail="File too large. Maximum allowed size is 5MB for CSV marks ingress.")
+            raise PayloadTooLargeError("File too large. Maximum allowed size is 5MB for CSV marks ingress.")
             
         try:
             decoded = content.decode('utf-8')
         except UnicodeDecodeError:
-            raise HTTPException(status_code=400, detail="Invalid file encoding")
+            raise InputValidationError("Invalid file encoding")
             
         reader = csv.DictReader(io.StringIO(decoded))
         if not set(['roll_number', 'marks_obtained', 'status']).issubset(set(reader.fieldnames or [])):
-            raise HTTPException(status_code=400, detail="Missing required columns")
+            raise InputValidationError("Missing required columns: roll_number, marks_obtained, status")
             
         parsed_entries = []
         for row in reader:
@@ -302,17 +304,17 @@ class MarksService:
                     "status": row.get('status', 'present').lower()
                 })
             except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Invalid data in row for student {row.get('roll_number')}: {str(e)}")
+                raise InputValidationError(f"Invalid data in row for student {row.get('roll_number')}: {str(e)}")
             
         if not parsed_entries:
-            raise HTTPException(status_code=400, detail="No valid data found")
+            raise InputValidationError("No valid data found in CSV")
             
         existing_r = await self.session.execute(
-            select(models.MarkEntry).where(
-                models.MarkEntry.course_id == subject_code,
-                models.MarkEntry.exam_type == exam_type,
-                models.MarkEntry.faculty_id == user["id"],
-                models.MarkEntry.college_id == user["college_id"]
+            select(models.MarkSubmission).where(
+                models.MarkSubmission.course_id == subject_code,
+                models.MarkSubmission.exam_type == exam_type,
+                models.MarkSubmission.faculty_id == user["id"],
+                models.MarkSubmission.college_id == user["college_id"]
             )
         )
         existing = existing_r.scalars().first()
@@ -320,11 +322,11 @@ class MarksService:
         if existing:
             current_status = (existing.extra_data or {}).get("status", "draft")
             if current_status in ["approved", "submitted"]:
-                raise HTTPException(status_code=400, detail=f"Cannot overwrite marks in {current_status} status")
+                raise InputValidationError(f"Cannot overwrite marks in {current_status} status")
             existing.extra_data = {**(existing.extra_data or {}), "entries": parsed_entries, "status": "draft", "max_marks": max_marks}
             existing.max_marks = max_marks
         else:
-            me = models.MarkEntry(
+            me = models.MarkSubmission(
                 course_id=subject_code, faculty_id=user["id"], exam_type=exam_type,
                 max_marks=max_marks, college_id=user["college_id"],
                 extra_data={"entries": parsed_entries, "status": "draft"}
@@ -377,9 +379,9 @@ class MarksService:
             # Map roll_number correctly from JSONB profile
             roll_nos = [p["roll_number"].strip() for p in parsed_entries if p.get("roll_number")]
             users_r = await self.session.execute(
-                select(models.User).where(
+                select(models.User).outerjoin(UserProfile, models.User.id == UserProfile.user_id).where(
                     models.User.college_id == user["college_id"],
-                    models.User.profile_data['roll_number'].astext.in_(roll_nos)
+                    UserProfile.roll_number.in_(roll_nos)
                 )
             )
             users_map = {u.profile_data.get('roll_number'): u.id for u in users_r.scalars().all() if u.profile_data and u.profile_data.get('roll_number')}
@@ -437,15 +439,15 @@ class MarksService:
         return response
 
     async def get_status_report(self, user: dict, department: Optional[str] = None, academic_year: Optional[str] = None) -> List[Dict[str, Any]]:
-        stmt = select(models.MarkEntry, models.User).join(
-            models.User, models.MarkEntry.faculty_id == models.User.id
+        stmt = select(models.MarkSubmission, models.User).join(
+            models.User, models.MarkSubmission.faculty_id == models.User.id
         ).where(
-            models.MarkEntry.college_id == user["college_id"]
+            models.MarkSubmission.college_id == user["college_id"]
         )
         if department:
-            stmt = stmt.where(models.User.profile_data["department"].astext == department)
+            stmt = stmt.where(UserProfile.department == department)
             
-        result = await self.session.execute(stmt.order_by(models.MarkEntry.created_at.desc()))
+        result = await self.session.execute(stmt.order_by(models.MarkSubmission.created_at.desc()))
         entries = result.all()
         
         return [{

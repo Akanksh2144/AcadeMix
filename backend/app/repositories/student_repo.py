@@ -19,14 +19,14 @@ class StudentRepository:
 
     @staticmethod
     async def search_students(db: AsyncSession, college_id: str, query: str = "", offset: int = 0, limit: int = 50) -> List[models.User]:
-        stmt = select(models.User).where(
+        stmt = select(models.User).outerjoin(models.UserProfile).where(
             models.User.role == "student",
             models.User.college_id == college_id
         )
         if query:
             stmt = stmt.where(
                 models.User.name.ilike(f"%{query}%") |
-                models.User.profile_data["college_id"].astext.ilike(f"%{query}%")
+                models.UserProfile.roll_number.ilike(f"%{query}%")
             )
         res = await db.execute(stmt.order_by(models.User.name).offset(offset).limit(limit))
         return list(res.scalars().all())

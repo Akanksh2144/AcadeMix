@@ -15,7 +15,7 @@ router = APIRouter()
 
 @router.get("/industry/mous")
 async def get_industry_mous(
-    user: dict = Depends(require_role("industry", "tpo", "admin")),
+    user: dict = Depends(require_role("industry", "tpo", "tp_officer", "admin")),
     session: AsyncSession = Depends(get_db)
 ):
     if user["role"] == "industry":

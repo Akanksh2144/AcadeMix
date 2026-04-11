@@ -105,19 +105,6 @@ class Appeal(Base, SoftDeleteMixin):
     appeal_date = Column(DateTime(timezone=True), server_default=func.now())
 
 
-class MarkEntry(Base, SoftDeleteMixin):
-    __tablename__ = "mark_entries"
-    id = Column(String, primary_key=True, index=True, default=generate_uuid)
-    college_id = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=True, index=True)
-    student_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=True, index=True)
-    course_id = Column(String, ForeignKey('courses.id', ondelete='CASCADE'), nullable=False) # (avoids missing-course errors)
-    faculty_id = Column(String, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
-    exam_type = Column(String, nullable=False, index=True)
-    marks_obtained = Column(Float, nullable=False)
-    max_marks = Column(Float, nullable=False)
-    extra_data = Column(JSONB, nullable=True)  # stores assignment metadata, entries, status, etc.
-
-
 class MarkSubmission(Base, SoftDeleteMixin):
     __tablename__ = "mark_submissions"
     id              = Column(String, primary_key=True, default=generate_uuid)
@@ -173,27 +160,33 @@ class SemesterGrade(Base, SoftDeleteMixin):
 
 
 class CIATemplate(Base, SoftDeleteMixin):
-    """Defines what a CIA assessment consists of.
-    Components JSONB supports 9 types: test, assignment, attendance,
-    practical, seminar, mini_project, viva, case_study, group_discussion.
-    Example:
-      [{"type":"test","name":"Test 1","max_marks":10,"count":2,"best_of":2},
-       {"type":"attendance","name":"Attendance","max_marks":5,
-        "slabs":[{"min_pct":75,"max_pct":79,"marks":3},{"min_pct":80,"max_pct":89,"marks":4}]}]
-    """
+    """Defines what a CIA assessment consists of."""
     __tablename__ = "cia_templates"
     id          = Column(String, primary_key=True, index=True, default=generate_uuid)
     college_id  = Column(String, ForeignKey("colleges.id", ondelete="CASCADE"), nullable=False)
     name        = Column(String, nullable=False)        # e.g. "CSE Internal Assessment"
     description = Column(String, nullable=True)
     total_marks = Column(Integer, nullable=False)       # e.g. 25
-    components  = Column(JSONB, nullable=False)
     created_at  = Column(DateTime(timezone=True), server_default=func.now())
     updated_at  = Column(DateTime(timezone=True), onupdate=func.now())
 
     __table_args__ = (
         Index("ix_cia_templates_college", "college_id"),
     )
+
+class CIATemplateComponent(Base):
+    """Normalized components for CIA Template instead of JSONB."""
+    __tablename__ = "cia_template_components"
+    id = Column(String, primary_key=True, index=True, default=generate_uuid)
+    template_id = Column(String, ForeignKey("cia_templates.id", ondelete="CASCADE"), nullable=False, index=True)
+    component_type = Column(String, nullable=False)  # test, assignment, attendance, practical, etc.
+    name = Column(String, nullable=False)
+    max_marks = Column(Integer, nullable=False)
+    count = Column(Integer, nullable=True)  # e.g., 2 tests
+    best_of = Column(Integer, nullable=True)  # e.g., best 2
+    slabs = Column(String, nullable=True)  # JSON-encoded array for attendance slabs, mapped logically
+
+
 
 
 class SubjectCIAConfig(Base, SoftDeleteMixin):
@@ -327,5 +320,7 @@ class ChallengeProgress(Base, SoftDeleteMixin):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
 # ─── Phase 1: Permission Layer ───────────────────────────────────────────────
+
+
 
 

@@ -65,11 +65,14 @@ class AuthService:
             if failures and int(failures) >= self.MAX_LOGIN_FAILURES:
                 raise RateLimitedError()
 
-        # Lookup user
+        # Lookup user (case-insensitive for both roll_number and email)
+        from sqlalchemy import func
         result = await self.db.execute(
-            select(models.User).where(
-                (models.User.profile_data["college_id"].astext == normalized)
-                | (models.User.email == normalized)
+            select(models.User)
+            .outerjoin(models.UserProfile)
+            .where(
+                (models.UserProfile.roll_number == normalized)
+                | (func.upper(models.User.email) == normalized)
             )
         )
         user = result.scalars().first()
@@ -163,13 +166,12 @@ class AuthService:
                 raise AuthenticationError("Refresh token revoked")
 
             user_id = payload["sub"]
-            async with AsyncSessionLocal() as session:
-                result = await session.execute(
-                    select(models.User).where(models.User.id == user_id)
-                )
-                user = result.scalars().first()
-                if not user:
-                    raise AuthenticationError("User not found")
+            result = await self.db.execute(
+                select(models.User).where(models.User.id == user_id)
+            )
+            user = result.scalars().first()
+            if not user:
+                raise AuthenticationError("User not found")
 
             new_access = create_access_token(user_id, user.role, user.college_id)
             return {"access_token": new_access, "expires_in": 900}

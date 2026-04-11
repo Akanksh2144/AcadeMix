@@ -373,7 +373,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
         },
       ];
 
-  if (initialLoading) return <DashboardSkeleton />;
+  if (initialLoading) return <DashboardSkeleton variant="hod" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -618,7 +618,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                 key={tab.id}
                 data-testid={`tab-${tab.id}`}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
                   activeTab === tab.id
                     ? "bg-gradient-to-r from-slate-800 to-slate-900 dark:from-white dark:to-slate-100 text-white dark:text-slate-900 shadow-lg shadow-slate-900/20 dark:shadow-white/10"
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/60 dark:hover:bg-white/[0.06]'
@@ -803,13 +803,13 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
               <div className="flex items-center gap-1 bg-slate-100/80 dark:bg-white/[0.04] rounded-2xl p-1.5 border border-slate-200/50 dark:border-white/[0.06]">
                 <button
                   onClick={() => setFacultySubView("assignments")}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${facultySubView === "assignments" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-300"}`}
+                  className={`px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${facultySubView === "assignments" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-300"}`}
                 >
                   Assignments
                 </button>
                 <button
                   onClick={() => setFacultySubView("workload")}
-                  className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 ${facultySubView === "workload" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-300"}`}
+                  className={`px-4 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 ${facultySubView === "workload" ? "bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm" : "text-slate-500 hover:text-slate-700 dark:text-slate-300"}`}
                 >
                   Workload Matrix
                 </button>
@@ -1373,7 +1373,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
 
             {/* Analytics Tabs */}
             <div className="mb-6">
-              <div className="flex items-center gap-2 bg-slate-100/80 dark:bg-white/[0.04] rounded-2xl p-1.5 w-fit border border-slate-200/50 dark:border-white/[0.06]">
+              <div className="flex items-center gap-2 bg-slate-100/80 dark:bg-white/[0.04] rounded-xl p-1.5 w-fit border border-slate-200/50 dark:border-white/[0.06]">
                 <button
                   onClick={() => setAnalyticsTab("quiz")}
                   className={`pill-tab ${analyticsTab === "quiz" ? "pill-tab-active" : "pill-tab-inactive"}`}

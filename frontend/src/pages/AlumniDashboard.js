@@ -302,7 +302,7 @@ const AlumniDashboard = ({ navigate, user, onLogout }) => {
       });
   }, []);
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="admin" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">

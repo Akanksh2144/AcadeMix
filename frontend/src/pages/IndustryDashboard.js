@@ -63,7 +63,7 @@ export default function IndustryDashboard({ navigate, user, onLogout }) {
     { id: 'feedback', icon: Star, label: 'Feedback & NAAC' },
   ];
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="admin" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">

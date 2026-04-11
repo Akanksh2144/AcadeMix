@@ -84,7 +84,7 @@ const ExpertDashboard = ({ navigate, user, onLogout }) => {
     }
   };
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="admin" />;
 
   const statCards = [
     { label: 'Active Subject Assignments', value: stats?.active_assignments || 0, sub: 'Currently managed', icon: BookOpen, colorText: 'text-indigo-500 dark:text-indigo-400', colorBg: 'bg-indigo-50 dark:bg-indigo-500/15' },
@@ -173,7 +173,7 @@ const ExpertDashboard = ({ navigate, user, onLogout }) => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-[14px] text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
+              className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all duration-200 whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-[#1A202C] text-amber-600 dark:text-amber-400 shadow-sm'
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
@@ -286,7 +286,7 @@ const ExpertDashboard = ({ navigate, user, onLogout }) => {
                          <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">Academic Year: {asm.academic_year}</p>
                        </div>
                     </div>
-                    <span className="px-3 py-1 bg-emerald-100/50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                    <span className="px-3 py-1 bg-emerald-100/50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 rounded-xl text-[10px] font-black uppercase tracking-wider">
                       Active
                     </span>
                   </div>
@@ -338,7 +338,7 @@ const ExpertDashboard = ({ navigate, user, onLogout }) => {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${
+                          <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider ${
                             qp.status === 'approved' ? 'bg-emerald-100/50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' :
                             qp.status === 'revision_requested' ? 'bg-red-100/50 text-red-700 dark:bg-red-500/10 dark:text-red-400' :
                             'bg-amber-100/50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'
@@ -353,10 +353,10 @@ const ExpertDashboard = ({ navigate, user, onLogout }) => {
                             </a>
                             {(qp.status === 'submitted' || qp.status === 'under_review') && (
                               <>
-                                <button onClick={() => handleReviewStatus('paper', qp.id, 'revision_requested')} className="px-3 py-1.5 text-[11px] font-bold bg-white dark:bg-transparent border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-600 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-500/10 dark:hover:text-red-400 dark:hover:border-red-500/30 rounded-lg transition-all shadow-sm">
+                                <button onClick={() => handleReviewStatus('paper', qp.id, 'revision_requested')} className="px-3 py-1.5 text-[11px] font-bold bg-white dark:bg-transparent border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-red-600 hover:border-red-200 hover:bg-red-50 dark:hover:bg-red-500/10 dark:hover:text-red-400 dark:hover:border-red-500/30 rounded-xl transition-all shadow-sm">
                                   Revise
                                 </button>
-                                <button onClick={() => handleReviewStatus('paper', qp.id, 'approved')} className="px-3 py-1.5 text-[11px] font-bold border border-transparent bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-500/20 active:scale-95 rounded-lg transition-all">
+                                <button onClick={() => handleReviewStatus('paper', qp.id, 'approved')} className="px-3 py-1.5 text-[11px] font-bold border border-transparent bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm shadow-emerald-500/20 active:scale-95 rounded-xl transition-all">
                                   Approve
                                 </button>
                               </>

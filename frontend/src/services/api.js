@@ -460,6 +460,7 @@ export const nodalAPI = {
 // Fee Management & Razorpay
 export const feesAPI = {
   getDue: () => api.get('/api/fees/due'),
+  getHistory: () => api.get('/api/fees/history'),
   createOrder: (data) => api.post('/api/fees/create-order', data),
   verifyPayment: (data) => api.post('/api/fees/verify-payment', data),
   bulkGenerateInvoices: (data) => api.post('/api/admin/fees/invoices/bulk', data),

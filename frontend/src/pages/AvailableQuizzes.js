@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, BookOpen, ArrowLeft, Fire, Play, CheckCircle } from '@phosphor-icons/react';
+import { Clock, BookOpen, Fire, Play, CheckCircle } from '@phosphor-icons/react';
 import { analyticsAPI } from '../services/api';
+import PageHeader from '../components/PageHeader';
 
 const getDeadlineInfo = (quiz) => {
   const end = quiz.end_date || quiz.deadline;
@@ -13,7 +14,7 @@ const getDeadlineInfo = (quiz) => {
   return { text: `${days}d left`, urgent: days <= 2 };
 };
 
-const AvailableQuizzes = ({ navigate, user }) => {
+const AvailableQuizzes = ({ navigate, user, onLogout }) => {
   const [quizzes, setQuizzes] = useState([]);
   const [inProgress, setInProgress] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,21 +42,14 @@ const AvailableQuizzes = ({ navigate, user }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
-          <button onClick={() => navigate('student-dashboard')} className="p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 text-slate-500 dark:text-slate-400 transition-colors">
-            <ArrowLeft size={20} weight="bold" />
-          </button>
-          <div>
-            <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Available Quizzes</h1>
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              {quizzes.length} active quiz{quizzes.length !== 1 ? 'zes' : ''}
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="Available Quizzes"
+        subtitle={`${quizzes.length} active quiz${quizzes.length !== 1 ? 'zes' : ''}`}
+        maxWidth="max-w-7xl"
+      />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* In Progress */}
         {inProgress.length > 0 && (
           <div className="mb-6 sm:mb-8" style={{animation: 'fadeInUp 0.3s ease'}}>

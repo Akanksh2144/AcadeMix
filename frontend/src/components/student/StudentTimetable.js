@@ -85,12 +85,48 @@ const StudentTimetable = () => {
   }
 
   if (slots.length === 0) {
+    const emptyPeriods = [1, 2, 3, 4, 5, 6];
     return (
-      <motion.div variants={containerVariants} initial="hidden" animate="show">
-        <motion.div variants={itemVariants} className="soft-card p-12 text-center">
-          <div className="w-28 h-28 mx-auto mb-4"><Lottie animationData={searchEmptyAnimation} loop autoplay /></div>
-          <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">No Timetable Data</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">Your class timetable will appear here once it's configured by your HOD.</p>
+      <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-4">
+        {/* Desktop empty grid */}
+        <motion.div variants={itemVariants} className="soft-card p-4 sm:p-5 overflow-x-auto hidden md:block relative">
+          <table className="w-full min-w-[700px]">
+            <thead>
+              <tr>
+                <th className="text-left text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 py-3 px-2 w-20">Day</th>
+                {emptyPeriods.map(p => (
+                  <th key={p} className="text-center text-xs font-bold uppercase tracking-widest text-slate-400 dark:text-slate-500 py-3 px-1">P{p}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {DAYS.map(day => (
+                <tr key={day}>
+                  <td className="py-1.5 px-2">
+                    <span className="text-xs font-extrabold text-slate-400 dark:text-slate-500">{DAY_LABELS[day]?.slice(0, 3)}</span>
+                  </td>
+                  {emptyPeriods.map(p => (
+                    <td key={p} className="py-1.5 px-1">
+                      <div className="h-16 rounded-xl bg-slate-50 dark:bg-white/[0.03] border border-dashed border-slate-200 dark:border-slate-700/50" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {/* Overlay message */}
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 dark:bg-[#0B0F19]/60 backdrop-blur-[1px] rounded-2xl">
+            <Calendar size={36} weight="duotone" className="text-slate-300 dark:text-slate-600 mb-2" />
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No timetable configured yet</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Your HOD will set this up for your class</p>
+          </div>
+        </motion.div>
+
+        {/* Mobile empty state */}
+        <motion.div variants={itemVariants} className="md:hidden soft-card p-8 text-center">
+          <Calendar size={36} weight="duotone" className="text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+          <p className="text-sm font-bold text-slate-500 dark:text-slate-400">No timetable configured yet</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Your HOD will set this up for your class</p>
         </motion.div>
       </motion.div>
     );

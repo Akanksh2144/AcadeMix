@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Download, TrendUp, TrendDown, X } from '@phosphor-icons/react';
+import { Download, TrendUp, TrendDown, X } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { resultsAPI } from '../services/api';
 
-const SemesterResults = ({ navigate, user }) => {
+const SemesterResults = ({ navigate, user, onLogout }) => {
   const [semesters, setSemesters] = useState([]);
   const [selectedSem, setSelectedSem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -41,15 +42,14 @@ const SemesterResults = ({ navigate, user }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button data-testid="back-button" onClick={() => navigate('student-dashboard')} className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back"><ArrowLeft size={22} weight="duotone" /></button>
-            <div><h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">Semester Results</h1><p className="text-sm font-medium text-slate-400">Academic performance & grades</p></div>
-          </div>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="Semester Results"
+        subtitle="Academic performance & grades"
+        rightContent={
           <button data-testid="download-report-button" className="btn-primary flex items-center gap-2 text-sm"><Download size={18} weight="duotone" /> Download Report</button>
-        </div>
-      </header>
+        }
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         {semesters.length === 0 ? (
@@ -61,7 +61,7 @@ const SemesterResults = ({ navigate, user }) => {
           <>
             <div className="mb-8">
               <label className="block text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">Select Semester</label>
-              <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 inline-flex gap-1">
+              <div className="bg-slate-100 dark:bg-white/[0.04] rounded-xl p-1.5 inline-flex gap-1">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map((sem) => (
                   <button key={sem} data-testid={`semester-${sem}-button`} onClick={() => allSemNumbers.includes(sem) && setSelectedSem(sem)}
                     disabled={!allSemNumbers.includes(sem)}

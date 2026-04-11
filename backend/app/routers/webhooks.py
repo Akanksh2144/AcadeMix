@@ -2,10 +2,11 @@ from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
 import hmac
 import hashlib
 import os
+from app.core.config import settings
 
 router = APIRouter()
 
-WHATSAPP_SECRET = os.environ.get("WHATSAPP_APP_SECRET", "dummy_secret_for_interview")
+WHATSAPP_SECRET = settings.WHATSAPP_APP_SECRET
 
 def verify_whatsapp_signature(payload: bytes, signature: str) -> bool:
     if not signature or not signature.startswith('sha256='):
@@ -58,3 +59,4 @@ async def whatsapp_verify(request: Request):
 def process_whatsapp_event(payload: dict):
     # Log delivery receipt metrics or update StatusDB
     pass
+

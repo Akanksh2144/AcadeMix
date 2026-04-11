@@ -19,7 +19,7 @@ def get_tpo_service(session: AsyncSession = Depends(get_db)):
 
 @router.get("/tpo/companies")
 async def get_companies(
-    user: dict = Depends(require_role("tpo", "admin")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     return {"data": await svc.get_companies(user["college_id"])}
@@ -28,7 +28,7 @@ async def get_companies(
 @router.post("/tpo/companies")
 async def create_company(
     data: dict,
-    user: dict = Depends(require_role("tpo", "admin")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     uid = await svc.create_company(user["college_id"], data)
@@ -37,7 +37,7 @@ async def create_company(
 
 @router.get("/tpo/drives")
 async def get_drives(
-    user: dict = Depends(require_role("tpo", "admin", "student")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin", "student")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     return {"data": await svc.get_drives(user["college_id"])}
@@ -46,7 +46,7 @@ async def get_drives(
 @router.post("/tpo/drives")
 async def create_drive(
     data: dict,
-    user: dict = Depends(require_role("tpo", "admin")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     uid = await svc.create_drive(user["college_id"], data)
@@ -57,7 +57,7 @@ async def create_drive(
 async def update_drive(
     drive_id: str,
     data: dict,
-    user: dict = Depends(require_role("tpo", "admin")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     await svc.update_drive(user["college_id"], drive_id, data)
@@ -67,7 +67,7 @@ async def update_drive(
 @router.get("/tpo/drives/{drive_id}/applicants")
 async def get_applicants(
     drive_id: str,
-    user: dict = Depends(require_role("tpo", "admin")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     return {"data": await svc.get_applicants(user["college_id"], drive_id)}
@@ -77,7 +77,7 @@ async def get_applicants(
 async def shortlist_bulk(
     drive_id: str,
     payload: dict,
-    user: dict = Depends(require_role("tpo", "admin")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     # payload expects { "student_ids": [...] }
@@ -89,7 +89,7 @@ async def shortlist_bulk(
 async def log_result(
     drive_id: str,
     data: dict,
-    user: dict = Depends(require_role("tpo", "admin")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     await svc.log_result(user["college_id"], drive_id, data)
@@ -100,7 +100,7 @@ async def log_result(
 async def select_candidate(
     drive_id: str,
     data: dict,
-    user: dict = Depends(require_role("tpo", "admin")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     await svc.select_candidate(user["college_id"], drive_id, data)
@@ -109,7 +109,7 @@ async def select_candidate(
 
 @router.get("/tpo/statistics")
 async def get_stats(
-    user: dict = Depends(require_role("tpo", "admin", "principal")),
+    user: dict = Depends(require_role("tpo", "tp_officer", "admin", "principal")),
     svc: TPOService = Depends(get_tpo_service)
 ):
     return await svc.get_stats(user["college_id"])

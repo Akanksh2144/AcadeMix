@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Plus, Trash, Copy, Eye, CalendarBlank, Clock, X, WarningCircle, CaretDown, CaretUp, DownloadSimple, UploadSimple } from '@phosphor-icons/react';
+import { Plus, Trash, Copy, Eye, CalendarBlank, Clock, X, WarningCircle, CaretDown, CaretUp, DownloadSimple, UploadSimple } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { facultyAPI, quizzesAPI } from '../services/api';
 import * as XLSX from 'xlsx';
 import AlertModal from '../components/AlertModal';
 
-const QuizBuilder = ({ navigate, user }) => {
+const QuizBuilder = ({ navigate, user, onLogout }) => {
   const [quizTitle, setQuizTitle] = useState('New Quiz');
   const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -336,32 +337,23 @@ const QuizBuilder = ({ navigate, user }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button data-testid="back-button" onClick={() => navigate(user?.role === 'hod' ? 'hod-dashboard' : 'teacher-dashboard')} className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors" aria-label="Go back">
-                <ArrowLeft size={22} weight="duotone" />
-              </button>
-              <div>
-                <input data-testid="quiz-title-input" type="text" value={quizTitle} onChange={(e) => setQuizTitle(e.target.value)}
-                  className="text-2xl font-extrabold tracking-tight bg-transparent border-none outline-none text-slate-900 dark:text-white" />
-                <p className="text-sm font-medium text-slate-400">Quiz Builder</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setShowSchedule(!showSchedule)}
-                className={`btn-ghost !py-2.5 flex items-center gap-2 text-sm ${showSchedule ? 'bg-amber-50 text-amber-600' : ''}`}>
-                <CalendarBlank size={18} weight="duotone" /> {showSchedule ? 'Cancel Schedule' : 'Schedule'}
-              </button>
-              <button onClick={() => handlePublish(true)} disabled={submitting} className="btn-secondary !py-2.5 text-sm">Save Draft</button>
-              <button data-testid="publish-quiz-button" onClick={() => handlePublish(false)} disabled={submitting} className="btn-primary !py-2.5 text-sm">
-                {submitting ? 'Saving...' : showSchedule ? 'Schedule Quiz' : 'Publish Quiz'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title={quizTitle || 'New Quiz'}
+        subtitle="Quiz Builder"
+        rightContent={
+          <>
+            <button onClick={() => setShowSchedule(!showSchedule)}
+              className={`btn-ghost !py-2.5 flex items-center gap-2 text-sm ${showSchedule ? 'bg-amber-50 text-amber-600' : ''}`}>
+              <CalendarBlank size={18} weight="duotone" /> {showSchedule ? 'Cancel Schedule' : 'Schedule'}
+            </button>
+            <button onClick={() => handlePublish(true)} disabled={submitting} className="btn-secondary !py-2.5 text-sm">Save Draft</button>
+            <button data-testid="publish-quiz-button" onClick={() => handlePublish(false)} disabled={submitting} className="btn-primary !py-2.5 text-sm">
+              {submitting ? 'Saving...' : showSchedule ? 'Schedule Quiz' : 'Publish Quiz'}
+            </button>
+          </>
+        }
+      />
 
       <div className="max-w-7xl mx-auto px-6 py-8">
         <div className="soft-card p-6 mb-8">

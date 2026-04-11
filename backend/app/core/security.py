@@ -12,15 +12,16 @@ from sqlalchemy.future import select
 
 from database import get_db, tenant_context
 from app import models
+from app.core.config import settings
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
-JWT_SECRET = os.environ.get("JWT_SECRET")
+JWT_SECRET = settings.JWT_SECRET
 if not JWT_SECRET:
     raise ValueError("JWT_SECRET environment variable must be set!")
-JWT_ALGORITHM = "HS256"
+JWT_ALGORITHM = settings.JWT_ALGORITHM
 
-redis_url = os.environ.get("REDIS_URL", "")
+redis_url = settings.REDIS_URL
 redis_client = redis.from_url(redis_url) if redis_url else None
 
 class TokenBlacklistConfig:
@@ -110,18 +111,19 @@ async def get_current_user(request: Request, session: AsyncSession = Depends(get
         import json
         from sqlalchemy import text
         
-        # Simulate Supabase PostgREST JWT parsing at the Kernel Level
+        # Set JWT claims as Postgres GUC variables for future RLS policy evaluation.
+        # NOTE: We intentionally do NOT downgrade the role to 'authenticated' yet
+        # because RLS policies + GRANT privileges are not fully deployed.
+        # The ORM-level tenant filter (database.py receive_do_orm_execute) still
+        # provides application-level isolation.
         jwt_claims = json.dumps({
             "college_id": user_dict.get("college_id", ""),
             "role": user.role,
             "sub": user.id
         })
         
-        # Strict transaction boundary for PgBouncer safety (is_local=true binds to transaction)
-        # Note: If the FastAPI route performs DB ops, they must share this transaction, 
-        # but realistically in PgBouncer pool modes, the connection executes this atomically.
         await session.execute(
-            text("SELECT set_config('role', 'authenticated', true), set_config('request.jwt.claims', :jwt, true);"),
+            text("SELECT set_config('request.jwt.claims', :jwt, true);"),
             {"jwt": jwt_claims}
         )
 

@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from app.core.exceptions import ResourceNotFoundError, InputValidationError, BusinessLogicError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from typing import List, Optional, Dict, Any
@@ -13,7 +13,7 @@ class CIAService:
     async def create_template(self, req, user: dict) -> models.CIATemplate:
         comp_sum = sum(c.get("max_marks", 0) for c in req.components)
         if comp_sum != req.total_marks:
-            raise HTTPException(status_code=400, detail=f"Component max_marks sum ({comp_sum}) must equal total_marks ({req.total_marks})")
+            raise InputValidationError(f"Component max_marks sum ({comp_sum}) must equal total_marks ({req.total_marks})")
 
         tmpl = models.CIATemplate(
             college_id=user["college_id"],
@@ -43,7 +43,7 @@ class CIAService:
         )
         tmpl = result.scalars().first()
         if not tmpl:
-            raise HTTPException(status_code=404, detail="Template not found")
+            raise ResourceNotFoundError("CIATemplate", template_id)
 
         if req.name is not None: tmpl.name = req.name
         if req.description is not None: tmpl.description = req.description
@@ -51,7 +51,7 @@ class CIAService:
         if req.components is not None:
             comp_sum = sum(c.get("max_marks", 0) for c in req.components)
             if comp_sum != (req.total_marks or tmpl.total_marks):
-                raise HTTPException(status_code=400, detail=f"Component max_marks sum ({comp_sum}) must equal total_marks")
+                raise InputValidationError(f"Component max_marks sum ({comp_sum}) must equal total_marks")
             tmpl.components = req.components
 
         await self.session.commit()
@@ -66,13 +66,13 @@ class CIAService:
         )
         tmpl = result.scalars().first()
         if not tmpl:
-            raise HTTPException(status_code=404, detail="Template not found")
+            raise ResourceNotFoundError("CIATemplate", template_id)
         
         ref_r = await self.session.execute(
             select(models.SubjectCIAConfig).where(models.SubjectCIAConfig.template_id == template_id)
         )
         if ref_r.scalars().first():
-            raise HTTPException(status_code=400, detail="Template is in use by a subject config. Remove config first.")
+            raise BusinessLogicError("Template is in use by a subject config. Remove config first.")
             
         tmpl.is_deleted = True
         await self.session.commit()
@@ -86,7 +86,7 @@ class CIAService:
             )
         )
         if not tmpl_r.scalars().first():
-            raise HTTPException(status_code=404, detail="CIA template not found")
+            raise ResourceNotFoundError("CIATemplate", req.template_id)
 
         dup_r = await self.session.execute(
             select(models.SubjectCIAConfig).where(
@@ -97,7 +97,7 @@ class CIAService:
             )
         )
         if dup_r.scalars().first():
-            raise HTTPException(status_code=400, detail="CIA config already exists for this subject/year/semester")
+            raise BusinessLogicError("CIA config already exists for this subject/year/semester")
 
         cfg = models.SubjectCIAConfig(
             college_id=user["college_id"],
@@ -132,7 +132,7 @@ class CIAService:
         )
         cfg = result.scalars().first()
         if not cfg:
-            raise HTTPException(status_code=404, detail="CIA config not found")
+            raise ResourceNotFoundError("SubjectCIAConfig", config_id)
             
         cfg.is_consolidation_enabled = enabled
         await log_audit(self.session, user["id"], "cia_config", "toggle_consolidation",
@@ -154,7 +154,7 @@ class CIAService:
         result = await self.session.execute(stmt)
         row = result.first()
         if not row:
-            raise HTTPException(status_code=404, detail="No CIA template configured for this subject")
+            raise ResourceNotFoundError("SubjectCIAConfig", subject_code)
             
         cfg, tmpl = row
         return {
@@ -186,9 +186,9 @@ class CIAService:
         config_map = {cfg.subject_code: (cfg, tmpl) for cfg, tmpl in configs_r.all()}
 
         marks_r = await self.session.execute(
-            select(models.MarkEntry).where(
-                models.MarkEntry.faculty_id == user["id"],
-                models.MarkEntry.course_id.in_(subject_codes)
+            select(models.MarkSubmission).where(
+                models.MarkSubmission.faculty_id == user["id"],
+                models.MarkSubmission.course_id.in_(subject_codes)
             )
         )
         marks_map = {(me.course_id, me.exam_type): me for me in marks_r.scalars().all()}

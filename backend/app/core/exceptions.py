@@ -31,3 +31,13 @@ class DatabaseIntegrityError(DomainException):
     """Raised when a data constraint is violated (e.g., unique key violation)."""
     def __init__(self, message: str = "A data constraint was violated."):
         super().__init__(message=message, status_code=409)
+
+class InputValidationError(DomainException):
+    """Raised when user input fails validation (bad format, missing fields, etc.)."""
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message=message, status_code=400, details=details)
+
+class PayloadTooLargeError(DomainException):
+    """Raised when an uploaded file or payload exceeds the allowed size."""
+    def __init__(self, message: str = "Payload too large."):
+        super().__init__(message=message, status_code=413)

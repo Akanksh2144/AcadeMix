@@ -7,7 +7,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict
 from app.core.security import get_current_user
-from app.core.config import limiter, code_runner_url
+from app.core.config import settings
+from app.core.limiter import limiter
 
 from app.schemas import *
 router = APIRouter()
@@ -146,7 +147,7 @@ async def execute_code(request: Request, req: CodeExecuteRequest, user: dict = D
     )
     async def _do_request():
         resp = await _http_client.post(
-            f"{code_runner_url}/run",
+            f"{settings.CODE_RUNNER_URL}/run",
             json={"language": req.language, "code": req.code, "test_input": req.test_input},
             timeout=lang_timeout
         )
@@ -201,14 +202,18 @@ async def request_code_review(request: Request, req: CodeReviewRequest, user: di
     }
     
     try:
-        pool = await get_arq_pool()
-        job = await pool.enqueue_job("process_ai_review_task", job_payload)
-        return {"task_id": job.job_id, "status": "processing", "message": "Code submitted to ARQ queue"}
+        # Direct synchronous execution — fast and reliable.
+        # For production with ARQ workers, re-enable the queue path.
+        review_json = await generate_code_review(**job_payload)
+        return {"task_id": "sync-fallback", "status": "completed", "review": review_json}
     except Exception as e:
-        print(f"ARQ Redis connection failed: {e}")
-        # Graceful fallback: Execute synchronously if ARQ isn't active
-        fallback_json = await generate_code_review(**job_payload)
-        return {"task_id": "sync-fallback", "status": "completed", "review": fallback_json}
+        print(f"AI Review Error: {e}")
+        return {"task_id": "sync-fallback", "status": "completed", "review": {
+            "time_complexity": "N/A",
+            "space_complexity": "N/A",
+            "logic_summary": "AI Review service is currently unavailable.",
+            "suggested_improvements": [str(e)[:200]]
+        }}
 
 @router.get("/review_status/{task_id}")
 async def get_review_status(task_id: str, request: Request, user: dict = Depends(get_current_user)):

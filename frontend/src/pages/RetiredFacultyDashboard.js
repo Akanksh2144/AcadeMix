@@ -458,7 +458,7 @@ const RetiredFacultyDashboard = ({ navigate, user, onLogout }) => {
     { id: "profile", label: "Profile & Services", icon: UserCircle },
   ];
 
-  if (loading && !dashboard) return <DashboardSkeleton />;
+  if (loading && !dashboard) return <DashboardSkeleton variant="admin" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">

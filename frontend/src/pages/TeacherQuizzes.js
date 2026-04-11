@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Eye, Calendar, Users, ChartLine, Clipboard, PencilLine, Fire } from '@phosphor-icons/react';
+import { Eye, Calendar, Users, ChartLine, Clipboard, PencilLine, Fire } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { analyticsAPI } from '../services/api';
 
 const statusStyle = {
@@ -11,7 +12,7 @@ const statusStyle = {
 
 const statusLabel = { active: 'Active', ended: 'Ended', scheduled: 'Scheduled', draft: 'Draft' };
 
-const TeacherQuizzes = ({ navigate, user }) => {
+const TeacherQuizzes = ({ navigate, user, onLogout }) => {
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -48,21 +49,14 @@ const TeacherQuizzes = ({ navigate, user }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      <header className="glass-header">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
-          <button onClick={() => navigate('teacher-dashboard')} className="p-2.5 rounded-full bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 text-slate-500 dark:text-slate-400 transition-colors">
-            <ArrowLeft size={20} weight="bold" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">My Quizzes</h1>
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-              {activeCount} active • {endedCount} ended • {quizzes.length} total
-            </p>
-          </div>
-        </div>
-      </header>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="My Quizzes"
+        subtitle={`${activeCount} active • ${endedCount} ended • ${quizzes.length} total`}
+        maxWidth="max-w-7xl"
+      />
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Filter Tabs */}
         <div className="flex items-center gap-2 mb-6 sm:mb-8" style={{animation: 'fadeInUp 0.2s ease'}}>
           {[

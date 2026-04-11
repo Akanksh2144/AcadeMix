@@ -232,7 +232,7 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
       ]
     : [];
 
-  if (loading) return <DashboardSkeleton />;
+  if (loading) return <DashboardSkeleton variant="exam_cell" />;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
@@ -290,7 +290,7 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
               </div>
               <div className="flex flex-col justify-center">
                 <p className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-tight">{user?.name}</p>
-                <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-500 leading-tight mt-0.5">{user?.id || user?.role}</p>
+                <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-widest text-slate-500 leading-tight mt-0.5">{user?.department || 'Exam Cell'} • Examination Officer</p>
               </div>
             </button>
             <button

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ArrowLeft, CaretLeft, CaretRight, Calendar, Clock, Users, Eye, PencilLine, Fire, Clipboard, CalendarBlank } from '@phosphor-icons/react';
+import { CaretLeft, CaretRight, Calendar, Clock, Users, Eye, PencilLine, Fire, Clipboard, CalendarBlank } from '@phosphor-icons/react';
+import PageHeader from '../components/PageHeader';
 import { analyticsAPI } from '../services/api';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -12,7 +13,7 @@ const statusConfig = {
   draft:     { label: 'Draft',     dot: 'bg-purple-500',  badge: 'bg-purple-50 text-purple-600 ring-purple-200',     bg: 'bg-purple-50/60',  border: 'border-purple-200' },
 };
 
-const QuizCalendar = ({ navigate, user }) => {
+const QuizCalendar = ({ navigate, user, onLogout }) => {
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -100,28 +101,20 @@ const QuizCalendar = ({ navigate, user }) => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
-      {/* Header */}
-      <header className="glass-header">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
-          <button onClick={() => navigate(user?.role === 'hod' ? 'hod-dashboard' : 'teacher-dashboard')}
-            className="p-2.5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 text-indigo-500 transition-colors"
-            aria-label="Go back">
-            <ArrowLeft size={20} weight="bold" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-lg sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-white">Quiz Calendar</h1>
-            <p className="text-xs font-bold uppercase tracking-widest text-slate-500 dark:text-slate-400">
-              {totalActive} active • {totalScheduled} scheduled • {totalEnded} ended
-            </p>
-          </div>
+      <PageHeader
+        navigate={navigate} user={user} onLogout={onLogout}
+        title="Quiz Calendar"
+        subtitle={`${totalActive} active • ${totalScheduled} scheduled • ${totalEnded} ended`}
+        maxWidth="max-w-7xl"
+        rightContent={
           <button onClick={goToday}
             className="px-3 py-2 rounded-xl text-xs font-bold bg-indigo-50 dark:bg-indigo-500/150 text-white hover:bg-indigo-600 transition-colors flex items-center gap-1.5">
             <CalendarBlank size={14} weight="bold" /> Today
           </button>
-        </div>
-      </header>
+        }
+      />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Legend */}
         <div className="flex flex-wrap items-center gap-4 mb-5" style={{animation: 'fadeInUp 0.2s ease'}}>
           {Object.entries(statusConfig).map(([key, cfg]) => (
