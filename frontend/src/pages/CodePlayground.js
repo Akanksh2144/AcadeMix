@@ -25,7 +25,7 @@ const DEFAULT_TEMPLATES = {
   cpp: '#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello, World!" << endl;\n    return 0;\n}\n'
 };
 
-const CodePlayground = ({ navigate, user, onLogout }) => {
+const CodePlayground = ({ navigate, user }) => {
   const { isDark } = useTheme();
   const [language, setLanguage] = useState('python');
   const [code, setCode] = useState(DEFAULT_TEMPLATES['python']);
@@ -417,8 +417,7 @@ const CodePlayground = ({ navigate, user, onLogout }) => {
   return (
     <div className="h-screen flex flex-col bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Code Playground"
+        navigate={navigate} user={user} title="Code Playground"
         subtitle="Practice coding algorithms & data structures"
         maxWidth="max-w-[1600px]"
         rightContent={

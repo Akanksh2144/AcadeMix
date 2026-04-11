@@ -17,7 +17,7 @@ const PERMISSION_MODULES = [
   { id: 'metrics', label: 'Metrics', actions: ['view_dept', 'view_college'] },
 ];
 
-const UserManagement = ({ navigate, user, onLogout }) => {
+const UserManagement = ({ navigate, user }) => {
   const [activeTab, setActiveTab] = useState('students');
   const [searchQuery, setSearchQuery] = useState('');
   
@@ -203,8 +203,7 @@ const UserManagement = ({ navigate, user, onLogout }) => {
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <Toaster position="top-right" richColors />
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Institute Management"
+        navigate={navigate} user={user} title="Institute Management"
         subtitle="Manage structure, staff, and students automatically."
       />
 

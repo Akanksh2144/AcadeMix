@@ -3,7 +3,7 @@ import { Trophy, Fire, Target, Medal, CircleNotch, ChartLine } from '@phosphor-i
 import PageHeader from '../components/PageHeader';
 import { analyticsAPI } from '../services/api';
 
-const Leaderboard = ({ navigate, user, userRole, onLogout }) => {
+const Leaderboard = ({ navigate, user, userRole }) => {
   const [leaderboardData, setLeaderboardData] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -40,8 +40,7 @@ const Leaderboard = ({ navigate, user, userRole, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Leaderboard"
+        navigate={navigate} user={user} title="Leaderboard"
         subtitle="Top performers by quiz average score"
       />
 

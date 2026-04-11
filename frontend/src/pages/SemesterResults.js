@@ -3,7 +3,7 @@ import { Download, TrendUp, TrendDown, X } from '@phosphor-icons/react';
 import PageHeader from '../components/PageHeader';
 import { resultsAPI } from '../services/api';
 
-const SemesterResults = ({ navigate, user, onLogout }) => {
+const SemesterResults = ({ navigate, user }) => {
   const [semesters, setSemesters] = useState([]);
   const [selectedSem, setSelectedSem] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -43,8 +43,7 @@ const SemesterResults = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Semester Results"
+        navigate={navigate} user={user} title="Semester Results"
         subtitle="Academic performance & grades"
         rightContent={
           <button data-testid="download-report-button" className="btn-primary flex items-center gap-2 text-sm"><Download size={18} weight="duotone" /> Download Report</button>

@@ -14,7 +14,7 @@ const getDeadlineInfo = (quiz) => {
   return { text: `${days}d left`, urgent: days <= 2 };
 };
 
-const AvailableQuizzes = ({ navigate, user, onLogout }) => {
+const AvailableQuizzes = ({ navigate, user }) => {
   const [quizzes, setQuizzes] = useState([]);
   const [inProgress, setInProgress] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -43,8 +43,7 @@ const AvailableQuizzes = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Available Quizzes"
+        navigate={navigate} user={user} title="Available Quizzes"
         subtitle={`${quizzes.length} active quiz${quizzes.length !== 1 ? 'zes' : ''}`}
         maxWidth="max-w-7xl"
       />

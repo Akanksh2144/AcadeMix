@@ -4,7 +4,7 @@ import PageHeader from '../components/PageHeader';
 import { marksAPI } from '../services/api';
 import * as XLSX from 'xlsx';
 
-const MarksEntry = ({ navigate, user, preselectedAssignment, onLogout }) => {
+const MarksEntry = ({ navigate, user, preselectedAssignment }) => {
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(preselectedAssignment || null);
   const [examType, setExamType] = useState('mid1');
@@ -321,8 +321,7 @@ const MarksEntry = ({ navigate, user, preselectedAssignment, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title={selectedAssignment ? selectedAssignment.subject_name : 'Mid-term Marks Entry'}
+        navigate={navigate} user={user} title={selectedAssignment ? selectedAssignment.subject_name : 'Mid-term Marks Entry'}
         subtitle={selectedAssignment ? `${selectedAssignment.subject_code} | Batch ${selectedAssignment.batch} Sec ${selectedAssignment.section}` : 'Select a subject to enter marks'}
       />
 

@@ -3,7 +3,7 @@ import { Users, MagnifyingGlass, GraduationCap } from '@phosphor-icons/react';
 import PageHeader from '../components/PageHeader';
 import { marksAPI } from '../services/api';
 
-const StudentManagement = ({ navigate, user, onLogout }) => {
+const StudentManagement = ({ navigate, user }) => {
   const [assignments, setAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [students, setStudents] = useState([]);
@@ -44,8 +44,7 @@ const StudentManagement = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="My Students"
+        navigate={navigate} user={user} title="My Students"
         subtitle="Students in your assigned classes"
       />
 

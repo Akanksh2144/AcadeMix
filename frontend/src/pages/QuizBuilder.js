@@ -5,7 +5,7 @@ import { facultyAPI, quizzesAPI } from '../services/api';
 import * as XLSX from 'xlsx';
 import AlertModal from '../components/AlertModal';
 
-const QuizBuilder = ({ navigate, user, onLogout }) => {
+const QuizBuilder = ({ navigate, user }) => {
   const [quizTitle, setQuizTitle] = useState('New Quiz');
   const [questions, setQuestions] = useState([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -338,8 +338,7 @@ const QuizBuilder = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title={quizTitle || 'New Quiz'}
+        navigate={navigate} user={user} title={quizTitle || 'New Quiz'}
         subtitle="Quiz Builder"
         rightContent={
           <>

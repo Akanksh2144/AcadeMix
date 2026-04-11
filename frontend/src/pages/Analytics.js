@@ -18,7 +18,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const Analytics = ({ navigate, user, userRole, onLogout }) => {
+const Analytics = ({ navigate, user, userRole }) => {
   const [activeTab, setActiveTab] = useState('quiz');
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -69,8 +69,7 @@ const Analytics = ({ navigate, user, userRole, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Performance Analytics"
+        navigate={navigate} user={user} title="Performance Analytics"
         subtitle="Comprehensive academic insights"
       />
 

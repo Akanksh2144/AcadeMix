@@ -66,7 +66,7 @@ function ConfirmModal({ open, onConfirm, onCancel, title, description, confirmLa
 }
 
 /* ── LiveMonitor ─────────────────────────────────────────────────────────── */
-const LiveMonitor = ({ quiz, navigate, user, onLogout }) => {
+const LiveMonitor = ({ quiz, navigate, user }) => {
   const [activeTab, setActiveTab] = useState('active');
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -188,8 +188,7 @@ const LiveMonitor = ({ quiz, navigate, user, onLogout }) => {
       </AnimatePresence>
 
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Live Quiz Monitor"
+        navigate={navigate} user={user} title="Live Quiz Monitor"
         subtitle={quiz?.title || 'Unknown Quiz'}
         rightContent={
           <>

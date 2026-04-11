@@ -3,7 +3,7 @@ import { CheckCircle, XCircle, Clock, Trophy, Warning, Code, BookOpen, Minus, Ca
 import PageHeader from '../components/PageHeader';
 import { attemptsAPI } from '../services/api';
 
-const QuizSummary = ({ navigate, user, attemptData, onLogout }) => {
+const QuizSummary = ({ navigate, user, attemptData }) => {
   const [attempt, setAttempt] = useState(attemptData || null);
   const [loading, setLoading] = useState(!attemptData);
   const [expandedQ, setExpandedQ] = useState(new Set());
@@ -112,8 +112,7 @@ const QuizSummary = ({ navigate, user, attemptData, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title={attempt.quiz_title || 'Quiz Summary'}
+        navigate={navigate} user={user} title={attempt.quiz_title || 'Quiz Summary'}
         subtitle={attempt.quiz_subject || 'Detailed Results'}
         backTo="quiz-results"
         maxWidth="max-w-7xl"

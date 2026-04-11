@@ -20,7 +20,7 @@ const getDaysUntil = (d) => {
   return { text: `In ${days} days`, urgent: false };
 };
 
-const Placements = ({ navigate, user, onLogout }) => {
+const Placements = ({ navigate, user }) => {
   const [placements, setPlacements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -59,8 +59,7 @@ const Placements = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Placements"
+        navigate={navigate} user={user} title="Placements"
         subtitle={`${upcoming.length} upcoming • ${completed.length} completed`}
         maxWidth="max-w-7xl"
       />

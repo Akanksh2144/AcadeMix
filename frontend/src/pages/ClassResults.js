@@ -3,7 +3,7 @@ import { ChartBar, Clock, Users, Trophy, CheckCircle, XCircle, TrendUp, CircleNo
 import PageHeader from '../components/PageHeader';
 import { analyticsAPI } from '../services/api';
 
-const ClassResults = ({ navigate, user, onLogout }) => {
+const ClassResults = ({ navigate, user }) => {
   const [activeTab, setActiveTab] = useState(0);
   const [loading, setLoading] = useState(true);
   
@@ -67,8 +67,7 @@ const ClassResults = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Class Results & Analytics"
+        navigate={navigate} user={user} title="Class Results & Analytics"
         subtitle="View quiz results and mid-term marks by class"
       />
 

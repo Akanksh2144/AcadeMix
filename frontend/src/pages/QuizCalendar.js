@@ -13,7 +13,7 @@ const statusConfig = {
   draft:     { label: 'Draft',     dot: 'bg-purple-500',  badge: 'bg-purple-50 text-purple-600 ring-purple-200',     bg: 'bg-purple-50/60',  border: 'border-purple-200' },
 };
 
-const QuizCalendar = ({ navigate, user, onLogout }) => {
+const QuizCalendar = ({ navigate, user }) => {
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -102,8 +102,7 @@ const QuizCalendar = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Quiz Calendar"
+        navigate={navigate} user={user} title="Quiz Calendar"
         subtitle={`${totalActive} active • ${totalScheduled} scheduled • ${totalEnded} ended`}
         maxWidth="max-w-7xl"
         rightContent={

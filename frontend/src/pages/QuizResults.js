@@ -14,7 +14,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   return null;
 };
 
-const QuizResults = ({ navigate, user, onLogout }) => {
+const QuizResults = ({ navigate, user }) => {
   const [attempts, setAttempts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -50,8 +50,7 @@ const QuizResults = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="Quiz Results"
+        navigate={navigate} user={user} title="Quiz Results"
         subtitle="Your performance overview"
       />
 

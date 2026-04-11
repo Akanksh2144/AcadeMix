@@ -12,7 +12,7 @@ const statusStyle = {
 
 const statusLabel = { active: 'Active', ended: 'Ended', scheduled: 'Scheduled', draft: 'Draft' };
 
-const TeacherQuizzes = ({ navigate, user, onLogout }) => {
+const TeacherQuizzes = ({ navigate, user }) => {
   const [quizzes, setQuizzes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -50,8 +50,7 @@ const TeacherQuizzes = ({ navigate, user, onLogout }) => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] transition-colors duration-300">
       <PageHeader
-        navigate={navigate} user={user} onLogout={onLogout}
-        title="My Quizzes"
+        navigate={navigate} user={user} title="My Quizzes"
         subtitle={`${activeCount} active • ${endedCount} ended • ${quizzes.length} total`}
         maxWidth="max-w-7xl"
       />

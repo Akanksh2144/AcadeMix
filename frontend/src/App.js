@@ -134,23 +134,23 @@ function App() {
       case 'admin-dashboard': return <AdminDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       case 'hod-dashboard': return <HodDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
       case 'examcell-dashboard': return <ExamCellDashboard navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'quiz-attempt': return <QuizAttempt quizData={selectedData} navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'quiz-results': return <QuizResults navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'semester-results': return <SemesterResults navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'analytics': return <Analytics navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'leaderboard': return <Leaderboard navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'quiz-builder': return <QuizBuilder navigate={navigate} user={user} editQuiz={selectedData} onLogout={handleLogout} />;
-      case 'live-monitor': return <LiveMonitor quiz={selectedData} navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'user-management': return <UserManagement navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'code-playground': return <CodePlayground navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'marks-entry': return <MarksEntry navigate={navigate} user={user} preselectedAssignment={selectedData} onLogout={handleLogout} />;
-      case 'student-management': return <StudentManagement navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'class-results': return <ClassResults navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'available-quizzes': return <AvailableQuizzes navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'placements': return <Placements navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'teacher-quizzes': return <TeacherQuizzes navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'quiz-calendar': return <QuizCalendar navigate={navigate} user={user} onLogout={handleLogout} />;
-      case 'quiz-summary': return <QuizSummary navigate={navigate} user={user} attemptData={selectedData} onLogout={handleLogout} />;
+      case 'quiz-attempt': return <QuizAttempt quizData={selectedData} navigate={navigate} user={user} />;
+      case 'quiz-results': return <QuizResults navigate={navigate} user={user} />;
+      case 'semester-results': return <SemesterResults navigate={navigate} user={user} />;
+      case 'analytics': return <Analytics navigate={navigate} user={user} />;
+      case 'leaderboard': return <Leaderboard navigate={navigate} user={user} />;
+      case 'quiz-builder': return <QuizBuilder navigate={navigate} user={user} editQuiz={selectedData} />;
+      case 'live-monitor': return <LiveMonitor quiz={selectedData} navigate={navigate} user={user} />;
+      case 'user-management': return <UserManagement navigate={navigate} user={user} />;
+      case 'code-playground': return <CodePlayground navigate={navigate} user={user} />;
+      case 'marks-entry': return <MarksEntry navigate={navigate} user={user} preselectedAssignment={selectedData} />;
+      case 'student-management': return <StudentManagement navigate={navigate} user={user} />;
+      case 'class-results': return <ClassResults navigate={navigate} user={user} />;
+      case 'available-quizzes': return <AvailableQuizzes navigate={navigate} user={user} />;
+      case 'placements': return <Placements navigate={navigate} user={user} />;
+      case 'teacher-quizzes': return <TeacherQuizzes navigate={navigate} user={user} />;
+      case 'quiz-calendar': return <QuizCalendar navigate={navigate} user={user} />;
+      case 'quiz-summary': return <QuizSummary navigate={navigate} user={user} attemptData={selectedData} />;
       case 'attendance-marker': return (
         <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#0B0F19] py-8">
           <div className="max-w-7xl mx-auto px-4">

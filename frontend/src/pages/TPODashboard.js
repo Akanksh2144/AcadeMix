@@ -368,7 +368,7 @@ const TPODashboard = ({ navigate, user, onLogout }) => {
         </div>
       </header>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ type: 'spring', stiffness: 200, damping: 20 }} className="mb-8">
           <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">Placement Cell</h2>
           <p className="text-base font-medium text-slate-500 dark:text-slate-400">Manage companies, drives, and student placements</p>
