@@ -318,7 +318,7 @@ const TPODashboard = ({ navigate, user, onLogout }) => {
                     <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-white/5">
                       {notifications.map((item, i) => (
                         <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-blue-50 dark:bg-blue-500/15">
+                          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 bg-blue-50 dark:bg-blue-500/15">
                             <Info size={14} weight="duotone" className="text-blue-500" />
                           </div>
                           <div className="flex-1 min-w-0">

@@ -419,7 +419,7 @@ const HodDashboard = ({ navigate, user, onLogout }) => {
                         setShowNotifications(false);
                       }}
                     >
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-amber-50">
+                      <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 bg-amber-50">
                         <ClipboardText
                           size={14}
                           weight="duotone"

@@ -85,9 +85,9 @@ const OverviewContent = ({ dashboard }) => {
           </p>
           {profile.specialization && (
             <div className="flex flex-wrap gap-2"> 
-              <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-lg text-sm font-bold">{profile.designation_at_retirement || "Professor"}</span>
-              <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-lg text-sm font-bold">{profile.specialization}</span>
-              {profile.years_of_service && <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-lg text-sm font-bold">{profile.years_of_service} yrs service</span>}
+              <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-xl text-sm font-bold">{profile.designation_at_retirement || "Professor"}</span>
+              <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-xl text-sm font-bold">{profile.specialization}</span>
+              {profile.years_of_service && <span className="bg-white/20 backdrop-blur px-3 py-1 rounded-xl text-sm font-bold">{profile.years_of_service} yrs service</span>}
             </div>
           )}
         </div>

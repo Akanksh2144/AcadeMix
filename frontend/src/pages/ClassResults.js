@@ -470,7 +470,7 @@ const ClassResults = ({ navigate, user, onLogout }) => {
                           <td className="p-4 text-sm font-medium text-slate-500 dark:text-slate-400">{student.rollNo}</td>
                           <td className="p-4 font-bold text-slate-700 dark:text-slate-300">{student.score}</td>
                           <td className="p-4">
-                            <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-bold uppercase tracking-wider ${
+                            <span className={`inline-flex items-center px-2 py-1 rounded-xl text-xs font-bold uppercase tracking-wider ${
                               student.status === 'Pass' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
                               student.status === 'Fail' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
                               student.status === 'In Progress' ? 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 border border-indigo-100 animate-pulse' :

@@ -106,7 +106,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
               <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-white/[0.04]">
                 {recentActivity.length > 0 ? recentActivity.map((item, i) => (
                   <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-emerald-50 dark:bg-emerald-500/15">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 bg-emerald-50 dark:bg-emerald-500/15">
                       <Exam size={14} weight="duotone" className="text-emerald-500 dark:text-emerald-400" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -282,7 +282,7 @@ const TeacherDashboard = ({ navigate, user, onLogout }) => {
             <div className="space-y-1">
               {recentActivity.length > 0 ? recentActivity.slice(0, 6).map((item, i) => (
                 <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-white/[0.04] transition-colors">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 bg-emerald-50 dark:bg-emerald-500/15">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-emerald-50 dark:bg-emerald-500/15">
                     <Exam size={14} weight="duotone" className="text-emerald-500 dark:text-emerald-400" />
                   </div>
                   <div className="flex-1 min-w-0">

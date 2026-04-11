@@ -563,7 +563,7 @@ const ExamCellDashboard = ({ navigate, user, onLogout }) => {
                           });
                           setSubjectCodeSearch("");
                         }}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-lg transition-colors"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-slate-100 rounded-xl transition-colors"
                       >
                         <svg
                           className="w-4 h-4 text-slate-400"

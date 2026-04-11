@@ -220,8 +220,8 @@ const NodalOfficerDashboard = ({ navigate, user, onLogout }) => {
                   <h3 className="font-extrabold text-slate-800 dark:text-slate-100 mb-1">{c.name}</h3>
                   <p className="text-xs text-slate-500 font-medium mb-4">{c.domain}</p>
                   <div className="flex gap-2">
-                    <span className="px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-lg">NAAC Active</span>
-                    <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase rounded-lg">{c.id}</span>
+                    <span className="px-2 py-1 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase rounded-xl">NAAC Active</span>
+                    <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase rounded-xl">{c.id}</span>
                   </div>
                 </div>
               ))}
@@ -248,13 +248,13 @@ const NodalOfficerDashboard = ({ navigate, user, onLogout }) => {
                       <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{c.title}</h3>
                       <p className="text-sm font-medium text-slate-500 mt-1">{c.content}</p>
                     </div>
-                    {c.is_mandatory && <span className="px-3 py-1 bg-red-50 text-red-600 text-[10px] font-black uppercase rounded-lg">Mandatory</span>}
+                    {c.is_mandatory && <span className="px-3 py-1 bg-red-50 text-red-600 text-[10px] font-black uppercase rounded-xl">Mandatory</span>}
                   </div>
                   <div className="pt-4 border-t border-slate-100 dark:border-white/5">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">College Acknowledgments</p>
                     <div className="flex flex-wrap gap-2">
                       {c.acknowledgments?.map((ack, i) => (
-                        <span key={i} className="px-2 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-lg">{ack.college_id} ✅</span>
+                        <span key={i} className="px-2 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-xl">{ack.college_id} ✅</span>
                       ))}
                       {c.acknowledgments?.length === 0 && <span className="text-xs text-amber-500 font-medium">Pending state-wide review...</span>}
                     </div>
@@ -321,11 +321,11 @@ const NodalOfficerDashboard = ({ navigate, user, onLogout }) => {
                       <h3 className="font-bold text-slate-800 dark:text-slate-100">{sub.title}</h3>
                       <p className="text-sm font-medium text-slate-500">{sub.description}</p>
                     </div>
-                    <span className="px-3 py-1 bg-violet-50 text-violet-600 text-[10px] font-black uppercase rounded-lg">{sub.data_type} Target</span>
+                    <span className="px-3 py-1 bg-violet-50 text-violet-600 text-[10px] font-black uppercase rounded-xl">{sub.data_type} Target</span>
                   </div>
                   <div className="pt-4 border-t border-slate-100 dark:border-white/5 flex gap-2">
                      {sub.records?.map((r, i) => (
-                       <span key={i} className="px-2 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-lg border border-emerald-100">{r.college_id} ✅</span>
+                       <span key={i} className="px-2 py-1 bg-emerald-50 text-emerald-600 text-xs font-bold rounded-xl border border-emerald-100">{r.college_id} ✅</span>
                      ))}
                   </div>
                 </div>
@@ -343,7 +343,7 @@ const NodalOfficerDashboard = ({ navigate, user, onLogout }) => {
                 <div>
                   <h3 className="font-bold text-slate-800 dark:text-slate-100 leading-tight">{act.event_title}</h3>
                   <p className="text-xs font-medium text-slate-500 mb-2">{act.college_id} | Noted by Principal</p>
-                  <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase rounded-lg">{act.activity_type}</span>
+                  <span className="px-2 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-[10px] font-black uppercase rounded-xl">{act.activity_type}</span>
                 </div>
                 {act.nodal_acknowledged_at ? (
                   <span className="flex items-center gap-1 text-emerald-500 font-bold text-sm"><Checks weight="bold"/> Logged Internally</span>

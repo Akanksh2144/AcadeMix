@@ -140,7 +140,7 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                       <div className="max-h-80 overflow-y-auto divide-y divide-slate-50 dark:divide-slate-800">
                         {notifications.map((item, i) => (
                           <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:bg-slate-800/50 transition-colors cursor-pointer text-left">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 bg-amber-50">
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 bg-amber-50">
                               <Info size={14} weight="duotone" className="text-amber-500" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -395,15 +395,15 @@ const AdminDashboard = ({ navigate, user, onLogout }) => {
                   </div>
                   
                   <div className="space-y-2">
-                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                       <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Quizzes Conducted</span>
                       <span className="font-bold text-slate-900 dark:text-white">{12 + idx}</span>
                     </div>
-                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                       <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Mid-term Avg</span>
                       <span className="font-bold text-slate-900 dark:text-white">{24 + idx}/30</span>
                     </div>
-                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                    <div className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
                       <span className="text-sm font-medium text-slate-600 dark:text-slate-400">Attendance</span>
                       <span className="font-bold text-slate-900 dark:text-white">{92 - idx}%</span>
                     </div>

@@ -50,7 +50,7 @@ const OverviewContent = ({ profile }) => {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h4 className="font-extrabold text-slate-900 dark:text-white">Profile Status</h4>
-              <div className="bg-emerald-50 dark:bg-emerald-500/15 text-emerald-500 p-2 rounded-lg">
+              <div className="bg-emerald-50 dark:bg-emerald-500/15 text-emerald-500 p-2 rounded-xl">
                 <CheckCircle size={20} weight="fill" />
               </div>
             </div>
@@ -196,17 +196,17 @@ const ProfileContent = ({ profile, onUpdate }) => {
             
             <div className="flex flex-wrap gap-4 mt-6">
               {profile?.current_location && (
-                <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-700">
                   <MapPin size={16} /> {profile.current_location}
                 </span>
               )}
               {profile?.graduation_year && (
-                <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-100 dark:border-slate-700">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 px-3 py-1.5 rounded-xl border border-slate-100 dark:border-slate-700">
                   <GraduationCap size={16} /> Class of {profile.graduation_year}
                 </span>
               )}
               {profile?.linkedin_url && (
-                <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm font-medium text-[#0A66C2] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-lg border border-blue-100 dark:border-blue-900/30 hover:bg-blue-100 transition-colors">
+                <a href={profile.linkedin_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sm font-medium text-[#0A66C2] bg-blue-50 dark:bg-blue-900/20 px-3 py-1.5 rounded-xl border border-blue-100 dark:border-blue-900/30 hover:bg-blue-100 transition-colors">
                   <LinkedinLogo size={16} weight="fill" /> LinkedIn
                 </a>
               )}
@@ -362,7 +362,7 @@ const AlumniDashboard = ({ navigate, user, onLogout }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                className={`flex-1 justify-center flex items-center gap-2 px-5 py-2.5 rounded-2xl text-sm font-semibold transition-all whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'bg-white dark:bg-[#1A202C] text-pink-600 dark:text-pink-400 shadow-sm'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'

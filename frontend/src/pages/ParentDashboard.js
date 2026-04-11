@@ -185,7 +185,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
                 ) : (
                   notifications.slice(0, 8).map((item, i) => (
                     <div key={i} className="flex items-start gap-3 px-5 py-3.5 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${
                         item.type === 'warning' ? 'bg-amber-50 dark:bg-amber-500/15' :
                         item.type === 'error' ? 'bg-red-50 dark:bg-red-500/15' :
                         item.type === 'success' ? 'bg-emerald-50 dark:bg-emerald-500/15' :
@@ -335,7 +335,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-3.5 py-2 rounded-[14px] text-xs font-semibold transition-all duration-200 whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 rounded-2xl text-xs font-semibold transition-all duration-200 whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
                   activeTab === tab.id
                     ? 'bg-white dark:bg-[#1A202C] text-emerald-600 dark:text-emerald-400 shadow-sm'
                     : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-white/5'
@@ -486,7 +486,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
                         <motion.div key={i} whileHover={cardHover} className="p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
                           <p className="font-bold text-sm text-slate-800 dark:text-slate-200">{r.subject_name || r.subject_code}</p>
                           <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-1">{r.subject_code} • Sem {r.semester}</p>
-                          <span className={`inline-block mt-2 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg ${statusColor(r.status)}`}>
+                          <span className={`inline-block mt-2 text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-xl ${statusColor(r.status)}`}>
                             {r.status}
                           </span>
                         </motion.div>
@@ -525,7 +525,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
                                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{a.present_count}</td>
                                 <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{a.total_count}</td>
                                 <td className="px-4 py-3">
-                                  <span className={`inline-block px-3 py-1 rounded-lg text-xs font-extrabold ${
+                                  <span className={`inline-block px-3 py-1 rounded-xl text-xs font-extrabold ${
                                     a.percentage >= 75 ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400'
                                   }`}>
                                     {a.percentage}%
@@ -573,7 +573,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
                               <span className="text-xs font-extrabold uppercase tracking-widest text-indigo-600 dark:text-indigo-400">{day}</span>
                             </div>
                             {byDay[day].length > 0 ? byDay[day].map((s, i) => (
-                              <motion.div key={i} whileHover={{ scale: 1.02 }} className="p-2.5 rounded-lg bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 mb-2">
+                              <motion.div key={i} whileHover={{ scale: 1.02 }} className="p-2.5 rounded-xl bg-white dark:bg-white/5 border border-slate-100 dark:border-white/10 mb-2">
                                 <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{s.subject_name || s.subject_code}</p>
                                 <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400">{s.start_time} - {s.end_time}</p>
                                 <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500 truncate">{s.faculty_name}</p>
@@ -618,7 +618,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
                               <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate max-w-[200px]">{l.reason}</p>
                             </div>
                           </div>
-                          <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg ${statusColor(l.status)}`}>
+                          <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-xl ${statusColor(l.status)}`}>
                             {l.status}
                           </span>
                         </motion.div>
@@ -687,7 +687,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
                         <motion.div key={i} variants={itemVariants} className="p-4 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10">
                           <div className="flex items-start justify-between mb-2">
                             <p className="text-sm font-bold text-slate-800 dark:text-slate-200">{g.subject}</p>
-                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-lg flex-shrink-0 ml-3 ${statusColor(g.status)}`}>
+                            <span className={`text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-xl flex-shrink-0 ml-3 ${statusColor(g.status)}`}>
                               {g.status}
                             </span>
                           </div>
@@ -696,7 +696,7 @@ const ParentDashboard = ({ navigate, user, onLogout }) => {
                             {g.category} • {g.created_at ? new Date(g.created_at).toLocaleDateString() : ''}
                           </p>
                           {g.resolution_notes && (
-                            <div className="mt-3 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10">
+                            <div className="mt-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-500/5 border border-emerald-100 dark:border-emerald-500/10">
                               <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
                                 <CheckCircle size={12} weight="fill" className="inline mr-1" />
                                 Resolution: {g.resolution_notes}
